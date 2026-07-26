@@ -133,10 +133,63 @@ jobs:
           upload-artifact: false
           upload-release-assets: false
 
+      - name: Prepare SLSA provenance predicate
+        shell: bash
+        env:
+          WORKFLOW_REF: ${{ github.workflow_ref }}
+        run: |
+          set -euo pipefail
+          source_commit="$(git rev-parse HEAD)"
+          builder_id="https://github.com/${WORKFLOW_REF}"
+          invocation_id="https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}"
+          jq -n \
+            --arg repository "https://github.com/${GITHUB_REPOSITORY}" \
+            --arg tag "$RELEASE_TAG" \
+            --arg tag_ref "refs/tags/${RELEASE_TAG}" \
+            --arg source_commit "$source_commit" \
+            --arg workflow_ref "$WORKFLOW_REF" \
+            --arg workflow_commit "$GITHUB_SHA" \
+            --arg builder_id "$builder_id" \
+            --arg invocation_id "$invocation_id" \
+            '{
+              buildDefinition: {
+                buildType: "https://github.com/d31ma/SESAME/blob/main/docs/RELEASE_ENGINEERING.md#automated-release-workflow",
+                externalParameters: {
+                  releaseTag: $tag
+                },
+                internalParameters: {
+                  workflowRef: $workflow_ref,
+                  workflowCommit: $workflow_commit
+                },
+                resolvedDependencies: [{
+                  uri: ("git+" + $repository + "@" + $tag_ref),
+                  digest: {
+                    gitCommit: $source_commit
+                  }
+                }]
+              },
+              runDetails: {
+                builder: {
+                  id: $builder_id
+                },
+                metadata: {
+                  invocationId: $invocation_id
+                }
+              }
+            }' > "$RUNNER_TEMP/sesame-provenance.json"
+          jq -e \
+            --arg source_commit "$source_commit" \
+            '.buildDefinition.resolvedDependencies[0].digest.gitCommit == $source_commit
+             and (.buildDefinition.externalParameters.releaseTag | startswith("v"))
+             and (.runDetails.builder.id | length > 0)' \
+            "$RUNNER_TEMP/sesame-provenance.json" >/dev/null
+
       - name: Attest build provenance
-        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
+        uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # v4.2.0
         with:
           subject-path: release-assets/sesame-*
+          predicate-type: https://slsa.dev/provenance/v1
+          predicate-path: ${{ runner.temp }}/sesame-provenance.json
 
       - name: Verify generated attestations
         shell: bash
@@ -157,8 +210,24 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          expected_commit="$(git rev-parse HEAD)"
+          remote_commit="$(
+            git ls-remote --tags origin \
+              "refs/tags/${RELEASE_TAG}" "refs/tags/${RELEASE_TAG}^{}" |
+              awk '
+                $2 ~ /\^\{\}$/ { peeled = $1 }
+                $2 !~ /\^\{\}$/ { direct = $1 }
+                END { print (peeled != "" ? peeled : direct) }
+              '
+          )"
+          if [[ "$remote_commit" != "$expected_commit" ]]; then
+            echo "remote tag ${RELEASE_TAG} resolves to ${remote_commit:-missing}, expected ${expected_commit}" >&2
+            exit 1
+          fi
           gh release create "$RELEASE_TAG" \
             --repo "$GITHUB_REPOSITORY" \
             --title "$RELEASE_TAG" \
+            --target "$expected_commit" \
+            --verify-tag \
             --generate-notes \
             release-assets/sesame-* release-assets/SHA256SUMS

@@ -44,7 +44,10 @@ tag. After repairing the workflow on the default branch through ordinary
 review, dispatch `Release` with the existing `v*` tag. The recovery path checks
 out that tag, verifies its resolved commit and `VERSION`, and rebuilds from the
 immutable tagged source; it never publishes artifacts built from the workflow
-repair commit.
+repair commit. Its SLSA predicate records the default-branch workflow revision
+as builder configuration and the checked-out tag commit as the resolved source
+dependency. Publication revalidates the remote tag immediately before using
+`gh release create --verify-tag`.
 
 ## Developer-Preview Release Assets
 
