@@ -136,37 +136,55 @@ jobs:
       - name: Prepare SLSA provenance predicate
         shell: bash
         env:
-          WORKFLOW_REF: ${{ github.workflow_ref }}
+          WORKFLOW_IDENTITY: ${{ github.workflow_ref }}
+          WORKFLOW_GIT_REF: ${{ github.ref }}
         run: |
           set -euo pipefail
           source_commit="$(git rev-parse HEAD)"
-          builder_id="https://github.com/${WORKFLOW_REF}"
+          builder_id="https://github.com/${WORKFLOW_IDENTITY}"
           invocation_id="https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}"
           jq -n \
             --arg repository "https://github.com/${GITHUB_REPOSITORY}" \
             --arg tag "$RELEASE_TAG" \
             --arg tag_ref "refs/tags/${RELEASE_TAG}" \
             --arg source_commit "$source_commit" \
-            --arg workflow_ref "$WORKFLOW_REF" \
+            --arg workflow_ref "$WORKFLOW_GIT_REF" \
             --arg workflow_commit "$GITHUB_SHA" \
             --arg builder_id "$builder_id" \
             --arg invocation_id "$invocation_id" \
+            --arg event_name "$GITHUB_EVENT_NAME" \
             '{
               buildDefinition: {
-                buildType: "https://github.com/d31ma/SESAME/blob/main/docs/RELEASE_ENGINEERING.md#automated-release-workflow",
+                buildType: "https://slsa-framework.github.io/github-actions-buildtypes/workflow/v1",
                 externalParameters: {
-                  releaseTag: $tag
+                  inputs: {
+                    release_tag: $tag
+                  },
+                  workflow: {
+                    ref: $workflow_ref,
+                    repository: $repository,
+                    path: ".github/workflows/release.yml"
+                  }
                 },
                 internalParameters: {
-                  workflowRef: $workflow_ref,
-                  workflowCommit: $workflow_commit
-                },
-                resolvedDependencies: [{
-                  uri: ("git+" + $repository + "@" + $tag_ref),
-                  digest: {
-                    gitCommit: $source_commit
+                  github: {
+                    event_name: $event_name
                   }
-                }]
+                },
+                resolvedDependencies: [
+                  {
+                    uri: ("git+" + $repository + "@" + $workflow_ref),
+                    digest: {
+                      gitCommit: $workflow_commit
+                    }
+                  },
+                  {
+                    uri: ("git+" + $repository + "@" + $tag_ref),
+                    digest: {
+                      gitCommit: $source_commit
+                    }
+                  }
+                ]
               },
               runDetails: {
                 builder: {
@@ -179,8 +197,10 @@ jobs:
             }' > "$RUNNER_TEMP/sesame-provenance.json"
           jq -e \
             --arg source_commit "$source_commit" \
-            '.buildDefinition.resolvedDependencies[0].digest.gitCommit == $source_commit
-             and (.buildDefinition.externalParameters.releaseTag | startswith("v"))
+            --arg workflow_commit "$GITHUB_SHA" \
+            '.buildDefinition.resolvedDependencies[0].digest.gitCommit == $workflow_commit
+             and .buildDefinition.resolvedDependencies[1].digest.gitCommit == $source_commit
+             and (.buildDefinition.externalParameters.inputs.release_tag | startswith("v"))
              and (.runDetails.builder.id | length > 0)' \
             "$RUNNER_TEMP/sesame-provenance.json" >/dev/null
 
