@@ -136,6 +136,9 @@ jobs:
       - name: Prepare SLSA provenance predicate
         shell: bash
         env:
+          REPOSITORY_ID: ${{ github.repository_id }}
+          REPOSITORY_OWNER_ID: ${{ github.repository_owner_id }}
+          RUNNER_ENVIRONMENT: ${{ runner.environment }}
           WORKFLOW_IDENTITY: ${{ github.workflow_ref }}
           WORKFLOW_GIT_REF: ${{ github.ref }}
         run: |
@@ -145,7 +148,6 @@ jobs:
           invocation_id="https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}"
           jq -n \
             --arg repository "https://github.com/${GITHUB_REPOSITORY}" \
-            --arg tag "$RELEASE_TAG" \
             --arg tag_ref "refs/tags/${RELEASE_TAG}" \
             --arg source_commit "$source_commit" \
             --arg workflow_ref "$WORKFLOW_GIT_REF" \
@@ -153,23 +155,25 @@ jobs:
             --arg builder_id "$builder_id" \
             --arg invocation_id "$invocation_id" \
             --arg event_name "$GITHUB_EVENT_NAME" \
+            --arg repository_id "$REPOSITORY_ID" \
+            --arg repository_owner_id "$REPOSITORY_OWNER_ID" \
+            --arg runner_environment "$RUNNER_ENVIRONMENT" \
             '{
               buildDefinition: {
-                buildType: "https://slsa-framework.github.io/github-actions-buildtypes/workflow/v1",
-                externalParameters: ({
+                buildType: "https://actions.github.io/buildtypes/workflow/v1",
+                externalParameters: {
                   workflow: {
                     ref: $workflow_ref,
                     repository: $repository,
                     path: ".github/workflows/release.yml"
                   }
-                } + if $event_name == "workflow_dispatch" then {
-                  inputs: {
-                    release_tag: $tag
-                  }
-                } else {} end),
+                },
                 internalParameters: {
                   github: {
-                    event_name: $event_name
+                    event_name: $event_name,
+                    repository_id: $repository_id,
+                    repository_owner_id: $repository_owner_id,
+                    runner_environment: $runner_environment
                   }
                 },
                 resolvedDependencies: [
@@ -197,18 +201,14 @@ jobs:
               }
             }' > "$RUNNER_TEMP/sesame-provenance.json"
           jq -e \
-            --arg event_name "$GITHUB_EVENT_NAME" \
-            --arg tag "$RELEASE_TAG" \
             --arg source_commit "$source_commit" \
             --arg workflow_commit "$GITHUB_SHA" \
-            '.buildDefinition.resolvedDependencies[0].digest.gitCommit == $workflow_commit
+            '.buildDefinition.buildType == "https://actions.github.io/buildtypes/workflow/v1"
+             and .buildDefinition.resolvedDependencies[0].digest.gitCommit == $workflow_commit
              and .buildDefinition.resolvedDependencies[1].digest.gitCommit == $source_commit
-             and (
-               if $event_name == "workflow_dispatch"
-               then .buildDefinition.externalParameters.inputs.release_tag == $tag
-               else (.buildDefinition.externalParameters | has("inputs") | not)
-               end
-             )
+             and (.buildDefinition.internalParameters.github.repository_id | length > 0)
+             and (.buildDefinition.internalParameters.github.repository_owner_id | length > 0)
+             and (.buildDefinition.internalParameters.github.runner_environment | length > 0)
              and (.runDetails.builder.id | length > 0)' \
             "$RUNNER_TEMP/sesame-provenance.json" >/dev/null
 
