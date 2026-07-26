@@ -46,8 +46,9 @@ var ErrNoSigningKey = errors.New("no signing key is configured; run sesame init 
 
 // SigningKey is one ES256 key pair with a stable identifier.
 type SigningKey struct {
-	ID      string
-	private *ecdsa.PrivateKey
+	ID          string
+	private     *ecdsa.PrivateKey
+	publicPoint []byte
 }
 
 // NewSigningKey generates a fresh P-256 key.
@@ -62,14 +63,19 @@ func NewSigningKey() (*SigningKey, error) {
 func newSigningKey(private *ecdsa.PrivateKey) (*SigningKey, error) {
 	// The identifier is derived from the public key, so the same key always
 	// carries the same kid and a rotated key cannot silently reuse one.
+	publicPoint, err := private.PublicKey.Bytes()
+	if err != nil {
+		return nil, fmt.Errorf("encode public key point: %w", err)
+	}
 	public, err := x509.MarshalPKIXPublicKey(&private.PublicKey)
 	if err != nil {
 		return nil, fmt.Errorf("encode public key: %w", err)
 	}
 	digest := sha256.Sum256(public)
 	return &SigningKey{
-		ID:      base64.RawURLEncoding.EncodeToString(digest[:16]),
-		private: private,
+		ID:          base64.RawURLEncoding.EncodeToString(digest[:16]),
+		private:     private,
+		publicPoint: publicPoint,
 	}, nil
 }
 
@@ -129,8 +135,8 @@ func (k *SigningKey) PublicJWK() JWK {
 		Algorithm: AlgorithmES256,
 		KeyID:     k.ID,
 		Curve:     CurveP256,
-		X:         base64.RawURLEncoding.EncodeToString(padCoordinate(k.private.PublicKey.X)),
-		Y:         base64.RawURLEncoding.EncodeToString(padCoordinate(k.private.PublicKey.Y)),
+		X:         base64.RawURLEncoding.EncodeToString(k.publicPoint[1 : 1+coordinateBytes]),
+		Y:         base64.RawURLEncoding.EncodeToString(k.publicPoint[1+coordinateBytes:]),
 	}
 }
 

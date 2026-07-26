@@ -21,6 +21,7 @@ import (
 
 type passkeyDevice struct {
 	key          *ecdsa.PrivateKey
+	publicPoint  []byte
 	credentialID []byte
 	signCount    uint32
 }
@@ -37,10 +38,8 @@ func cborHead(major byte, argument uint64) []byte {
 }
 
 func (d *passkeyDevice) cose() []byte {
-	x := make([]byte, 32)
-	y := make([]byte, 32)
-	d.key.PublicKey.X.FillBytes(x)
-	d.key.PublicKey.Y.FillBytes(y)
+	x := d.publicPoint[1:33]
+	y := d.publicPoint[33:]
 	out := cborHead(5, 5)
 	out = append(out, cborHead(0, 1)...)
 	out = append(out, cborHead(0, 2)...)
@@ -166,7 +165,11 @@ func TestRealFYLOPasskeyCloneDetectedAcrossRestart(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GenerateKey: %v", err)
 	}
-	device := &passkeyDevice{key: key, credentialID: make([]byte, 20)}
+	device := &passkeyDevice{
+		key:          key,
+		publicPoint:  mustPublicPoint(t, key),
+		credentialID: make([]byte, 20),
+	}
 	if _, err := rand.Read(device.credentialID); err != nil {
 		t.Fatalf("rand: %v", err)
 	}

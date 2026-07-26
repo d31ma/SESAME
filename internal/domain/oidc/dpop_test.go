@@ -15,7 +15,8 @@ import (
 
 // dpopSigner is a test client holding a DPoP key.
 type dpopSigner struct {
-	private *ecdsa.PrivateKey
+	private     *ecdsa.PrivateKey
+	publicPoint []byte
 }
 
 func newDPoPSigner(t *testing.T) *dpopSigner {
@@ -25,15 +26,25 @@ func newDPoPSigner(t *testing.T) *dpopSigner {
 	if err != nil {
 		t.Fatalf("generate DPoP key: %v", err)
 	}
-	return &dpopSigner{private: private}
+	return &dpopSigner{private: private, publicPoint: mustPublicPoint(t, private)}
+}
+
+func mustPublicPoint(t testing.TB, private *ecdsa.PrivateKey) []byte {
+	t.Helper()
+
+	point, err := private.PublicKey.Bytes()
+	if err != nil {
+		t.Fatalf("encode public key: %v", err)
+	}
+	return point
 }
 
 func (d *dpopSigner) jwk() map[string]any {
 	return map[string]any{
 		"kty": dpopKeyType,
 		"crv": dpopCurve,
-		"x":   base64.RawURLEncoding.EncodeToString(d.private.PublicKey.X.FillBytes(make([]byte, coordinateBytes))),
-		"y":   base64.RawURLEncoding.EncodeToString(d.private.PublicKey.Y.FillBytes(make([]byte, coordinateBytes))),
+		"x":   base64.RawURLEncoding.EncodeToString(d.publicPoint[1 : 1+coordinateBytes]),
+		"y":   base64.RawURLEncoding.EncodeToString(d.publicPoint[1+coordinateBytes:]),
 	}
 }
 
@@ -121,8 +132,11 @@ func TestProofStructureIsRefusedNotRepaired(t *testing.T) {
 	valid := signer.proof(t, "proof-1", "POST", dpopTokenURI, dpopClock())
 
 	private := signer.jwk()
-	private["d"] = base64.RawURLEncoding.EncodeToString(
-		signer.private.D.FillBytes(make([]byte, coordinateBytes)))
+	privateBytes, err := signer.private.Bytes()
+	if err != nil {
+		t.Fatalf("encode private key: %v", err)
+	}
+	private["d"] = base64.RawURLEncoding.EncodeToString(privateBytes)
 
 	offCurve := signer.jwk()
 	offCurve["y"] = base64.RawURLEncoding.EncodeToString(make([]byte, coordinateBytes))

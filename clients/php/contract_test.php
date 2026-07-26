@@ -81,6 +81,25 @@ try {
     areEqual('sesame', $client->version()['name'], 'version name');
     areEqual(true, $client->metrics()['storage_configured'], 'storage configured');
 
+    // Standards dispatch pins contract v1 and rejects boundary injection.
+    $standards = $client->standardsDispatch([
+        'contract_version' => 'unsupported',
+        'endpoint' => 'oidc.token',
+        'method' => 'GET',
+    ]);
+    areEqual('1', $standards['contract_version'], 'standards contract version');
+    areEqual(405, $standards['status'], 'standards method status');
+    areEqual('POST', $standards['headers']['allow'], 'standards allowed method');
+    areEqual('application/json', $standards['headers']['content-type'],
+        'standards content type');
+    areEqual(['error' => 'invalid_request'], $standards['body'], 'standards error body');
+    areEqual('invalid_request', codeOf(fn() => $client->standardsDispatch([
+        'contract_version' => 'unsupported',
+        'endpoint' => 'oidc.token',
+        'method' => 'POST',
+        'authorization' => "Basic safe\r\nX-Injected: yes",
+    ])), 'standards boundary injection');
+
     // Tenant and principal.
     $tenantId = $client->tenantBootstrap('acme')['tenant']['tenant_id'];
     $principal = $client->principalCreate($tenantId, 'human', 'email', 'Alice@Example.com');

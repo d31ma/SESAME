@@ -49,7 +49,7 @@ Go is the one client not distributed as a file to copy. It lives inside the
 engine's own module, so the tag resolves it like any other Go package:
 
 ```bash
-go get github.com/d31ma/sesame/clients/go/sesame@v0.1.0
+go get github.com/d31ma/sesame/clients/go/sesame@v26.30.07
 ```
 
 Vendoring it would be strictly worse than that. The consequence worth knowing:
@@ -74,9 +74,10 @@ release, so a client and the engine it talks to are paired by construction.
 `VERSION` at the repository root is the single source of truth, and the
 release workflow refuses to build when it disagrees with the tag.
 
-Version `0.1.0` is deliberate: pre-1.0 says the client surface may still
-change. The machine protocol version is a separate number, currently `1`, and
-every shim checks it against the engine at startup and refuses a mismatch; see
+Release versions use UTC-derived CalVer in `YY.WW.DD` form. Every SDK bundle
+and the Go module tag share that SESAME release version. The machine protocol
+version is a separate number, currently `1`, and every shim checks it against
+the engine at startup and refuses a mismatch; see
 [the machine protocol](../api/machine/v1/README.md).
 
 ## How this is proven

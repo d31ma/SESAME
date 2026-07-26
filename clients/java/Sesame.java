@@ -650,6 +650,12 @@ public final class Sesame implements AutoCloseable {
     // Standards surfaces. Endpoint paths are the host's own; the engine
     // composes them under the configured issuer and refuses any that would
     // leave that origin.
+    public Object standardsDispatch(Map<String, Object> request) {
+        Map<String, Object> parameters = new LinkedHashMap<>(request);
+        parameters.put("contract_version", "1");
+        return this.request("standards.dispatch", parameters);
+    }
+
     public Object discovery(Map<String, Object> endpoints) {
         return request("oidc.discovery", endpoints);
     }

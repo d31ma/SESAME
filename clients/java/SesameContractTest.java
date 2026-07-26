@@ -26,13 +26,12 @@ public final class SesameContractTest {
             Path sesameBinary = build(root, workspace, "sesame", "./cmd/sesame");
             Path fakeFYLO = build(root, workspace, "fake-fylo",
                     "./internal/adapters/fylo/testdata/fakefylo");
-            Path fyloRoot = workspace.resolve("root");
-            Files.createDirectory(fyloRoot);
+            Path deployment = initializeDeployment(
+                    root, workspace, sesameBinary, fakeFYLO);
 
             Sesame.Options options = new Sesame.Options();
             options.binary = sesameBinary.toString();
-            options.fyloBinary = fakeFYLO.toString();
-            options.fyloRoot = fyloRoot.toString();
+            options.deployment = deployment.toString();
 
             try (Sesame client = new Sesame(options)) {
                 run(client);
@@ -124,6 +123,40 @@ public final class SesameContractTest {
         equals("tenant_not_found", codeOf(() -> client.tenantGetByName("missing")), "missing tenant");
         equals("operation_not_found", codeOf(() -> client.request("identity.unknown", null)),
                 "unknown operation");
+
+        standardsDispatchScenario(client);
+    }
+
+    private static void standardsDispatchScenario(Sesame client) {
+        Map<String, Object> endpoints = new LinkedHashMap<>();
+        endpoints.put("authorization_endpoint", "/authorize");
+        endpoints.put("token_endpoint", "/token");
+        endpoints.put("jwks_uri", "/.well-known/jwks.json");
+        endpoints.put("introspection_endpoint", "/introspect");
+        endpoints.put("revocation_endpoint", "/revoke");
+        endpoints.put("end_session_endpoint", "/logout");
+
+        Map<String, Object> request = new LinkedHashMap<>();
+        request.put("contract_version", "unsupported");
+        request.put("endpoint", "oidc.discovery");
+        request.put("method", "GET");
+        request.put("endpoints", endpoints);
+
+        Object discovery = client.standardsDispatch(request);
+        equals("1", field(discovery, "contract_version"), "standards contract version");
+        equals(200L, field(discovery, "status"), "standards discovery status");
+        equals("application/json", field(field(discovery, "headers"), "content-type"),
+                "standards discovery content type");
+        equals("https://id.example", field(field(discovery, "body"), "issuer"),
+                "standards discovery issuer");
+        equals("https://id.example/token", field(field(discovery, "body"), "token_endpoint"),
+                "standards discovery token endpoint");
+
+        Map<String, Object> unsupported = new LinkedHashMap<>();
+        unsupported.put("endpoint", "oidc.userinfo");
+        unsupported.put("method", "GET");
+        equals("invalid_request", codeOf(() -> client.standardsDispatch(unsupported)),
+                "unknown standards endpoint");
     }
 
     private static Object field(Object value, String key) {
@@ -173,6 +206,27 @@ public final class SesameContractTest {
             throw new IllegalStateException("go build " + source + " failed");
         }
         return output;
+    }
+
+    private static Path initializeDeployment(
+            Path root,
+            Path workspace,
+            Path sesameBinary,
+            Path fakeFYLO) throws IOException, InterruptedException {
+        Path deployment = workspace.resolve("deployment");
+        ProcessBuilder builder = new ProcessBuilder(
+                sesameBinary.toString(),
+                "init",
+                "--deployment", deployment.toString(),
+                "--fylo-binary", fakeFYLO.toString(),
+                "--issuer", "https://id.example");
+        builder.directory(root.toFile());
+        builder.redirectOutput(ProcessBuilder.Redirect.DISCARD);
+        builder.redirectError(ProcessBuilder.Redirect.INHERIT);
+        if (builder.start().waitFor() != 0) {
+            throw new IllegalStateException("sesame init failed");
+        }
+        return deployment;
     }
 
     private static void deleteTree(Path root) throws IOException {

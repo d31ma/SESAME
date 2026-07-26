@@ -21,9 +21,16 @@ Import path:
 github.com/d31ma/sesame/clients/go/sesame
 ```
 
-The client currently exposes process liveness, version metadata, and the raw
-typed request boundary. It does not expose authentication or authorization
-operations because those contracts have not been implemented.
+The client exposes typed methods for the complete machine-operation manifest,
+including identity lifecycle, authentication, authorization, OIDC, federation,
+SAML, SCIM, and the framework-neutral `StandardsDispatch` host boundary.
+Security and protocol semantics remain in the SESAME executable.
+
+Host frameworks translate their request object into `StandardsRequest` and
+apply the returned `StandardsResponse`; see the
+[host-adapter contract](../../api/standards/v1/README.md). The Go reference
+translation is under
+[`examples/hostserver`](../../examples/hostserver/standards.go).
 
 A client owns its subprocess. In the initial topology, one host application
 process owns one client, one SESAME subprocess, and one authoritative FYLO data
@@ -34,7 +41,7 @@ routing, and middleware.
 ## Installing
 
 ```bash
-go get github.com/d31ma/sesame/clients/go/sesame@v0.1.0
+go get github.com/d31ma/sesame/clients/go/sesame@v26.30.07
 ```
 
 Go is the one SESAME client not distributed as a file to copy. It lives inside

@@ -23,6 +23,7 @@ import (
 // these tests exercise the shipped verifier rather than a stub.
 type device struct {
 	key          *ecdsa.PrivateKey
+	publicPoint  []byte
 	credentialID []byte
 	signCount    uint32
 }
@@ -38,7 +39,7 @@ func newDevice(t *testing.T) *device {
 	if _, err := rand.Read(id); err != nil {
 		t.Fatalf("rand: %v", err)
 	}
-	return &device{key: key, credentialID: id}
+	return &device{key: key, publicPoint: mustPublicPoint(t, key), credentialID: id}
 }
 
 func header(major byte, argument uint64) []byte {
@@ -57,10 +58,8 @@ func textString(text string) []byte    { return append(header(3, uint64(len(text
 func negative(label int64) []byte      { return header(1, uint64(-1-label)) }
 
 func (d *device) coseKey() []byte {
-	x := make([]byte, 32)
-	y := make([]byte, 32)
-	d.key.PublicKey.X.FillBytes(x)
-	d.key.PublicKey.Y.FillBytes(y)
+	x := d.publicPoint[1:33]
+	y := d.publicPoint[33:]
 
 	out := header(5, 5)
 	out = append(out, header(0, 1)...)

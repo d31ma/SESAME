@@ -55,6 +55,7 @@ one SESAME subprocess and one authoritative FYLO root.
 | `authn.complete` | `{"transaction_id":...,"lifetime_seconds"?}` | the issued session, including its only copy of the secret |
 | `session.verify` | `{"session_id":...,"session_secret":...}` | the session, without its stored digest |
 | `session.revoke` | `{"session_id":...,"reason"?}` | `{"revoked":true}` |
+| `standards.dispatch` | the versioned request envelope in `api/standards/v1`; v1 supports the seven documented OIDC endpoints | bounded HTTP response instructions or an external-interaction action |
 | `authorize.decide_batch` | `{"requests":[...],"policy_version"?}` (at most 100) | `{"decisions":[...]}` |
 | `group.create` | `{"tenant_id":...,"name":...}` | one group |
 | `group.member_add` | `{"group_id":...,"principal_id":...}` | `{"member":true}` |

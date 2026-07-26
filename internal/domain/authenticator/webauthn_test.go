@@ -23,6 +23,7 @@ const (
 // is exercised against the real wire format rather than a convenient stub.
 type fakeAuthenticator struct {
 	key          *ecdsa.PrivateKey
+	publicPoint  []byte
 	credentialID []byte
 	signCount    uint32
 }
@@ -38,7 +39,21 @@ func newFakeAuthenticator(t *testing.T) *fakeAuthenticator {
 	if _, err := rand.Read(id); err != nil {
 		t.Fatalf("rand: %v", err)
 	}
-	return &fakeAuthenticator{key: key, credentialID: id}
+	return &fakeAuthenticator{
+		key:          key,
+		publicPoint:  mustPublicPoint(t, key),
+		credentialID: id,
+	}
+}
+
+func mustPublicPoint(t testing.TB, private *ecdsa.PrivateKey) []byte {
+	t.Helper()
+
+	point, err := private.PublicKey.Bytes()
+	if err != nil {
+		t.Fatalf("encode public key: %v", err)
+	}
+	return point
 }
 
 // cborBytes encodes a byte string header plus payload.
@@ -70,10 +85,8 @@ func cborNegativeLabel(label int64) []byte {
 
 // coseKey encodes the ES256 public key exactly as an authenticator would.
 func (a *fakeAuthenticator) coseKey() []byte {
-	x := make([]byte, 32)
-	y := make([]byte, 32)
-	a.key.PublicKey.X.FillBytes(x)
-	a.key.PublicKey.Y.FillBytes(y)
+	x := a.publicPoint[1:33]
+	y := a.publicPoint[33:]
 
 	out := cborHeader(5, 5) // five-entry map
 	out = append(out, cborHeader(0, 1)...)
@@ -485,6 +498,7 @@ func FuzzDecodeCBORNeverPanics(f *testing.F) {
 	device := &fakeAuthenticator{credentialID: make([]byte, 4)}
 	key, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	device.key = key
+	device.publicPoint = mustPublicPoint(f, key)
 	f.Add(device.attestationObject(AttestationNone, testRPID, flagUserPresent|flagAttestedCredData))
 	f.Add(device.coseKey())
 	f.Add([]byte{0xbf, 0xff})
@@ -497,7 +511,11 @@ func FuzzDecodeCBORNeverPanics(f *testing.F) {
 
 func FuzzVerifyPasskeyRegistrationNeverPanics(f *testing.F) {
 	key, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	device := &fakeAuthenticator{key: key, credentialID: make([]byte, 16)}
+	device := &fakeAuthenticator{
+		key:          key,
+		publicPoint:  mustPublicPoint(f, key),
+		credentialID: make([]byte, 16),
+	}
 	f.Add(device.attestationObject(AttestationNone, testRPID, flagUserPresent|flagAttestedCredData),
 		[]byte(`{"type":"webauthn.create","challenge":"x","origin":"https://id.example"}`))
 	f.Add([]byte{}, []byte{})

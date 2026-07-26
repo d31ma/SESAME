@@ -22,7 +22,10 @@ const (
 // clientKey is an attacker's or a victim's DPoP key. Both sides of every case
 // below hold a real key and mint real proofs; nothing here relies on an
 // attacker being unable to produce a well-formed one.
-type clientKey struct{ private *ecdsa.PrivateKey }
+type clientKey struct {
+	private     *ecdsa.PrivateKey
+	publicPoint []byte
+}
 
 func newClientKey(t *testing.T) *clientKey {
 	t.Helper()
@@ -31,16 +34,33 @@ func newClientKey(t *testing.T) *clientKey {
 	if err != nil {
 		t.Fatalf("generate DPoP key: %v", err)
 	}
-	return &clientKey{private: private}
+	return &clientKey{private: private, publicPoint: mustPublicPoint(t, private)}
+}
+
+func mustPublicPoint(t testing.TB, private *ecdsa.PrivateKey) []byte {
+	t.Helper()
+
+	point, err := private.PublicKey.Bytes()
+	if err != nil {
+		t.Fatalf("encode public key: %v", err)
+	}
+	return point
+}
+
+func trimCoordinate(coordinate []byte) []byte {
+	for len(coordinate) > 1 && coordinate[0] == 0 {
+		coordinate = coordinate[1:]
+	}
+	return coordinate
 }
 
 func (c *clientKey) jwk() map[string]any {
 	return map[string]any{
 		"kty": "EC", "crv": "P-256",
 		"x": base64.RawURLEncoding.EncodeToString(
-			c.private.PublicKey.X.FillBytes(make([]byte, 32))),
+			c.publicPoint[1:33]),
 		"y": base64.RawURLEncoding.EncodeToString(
-			c.private.PublicKey.Y.FillBytes(make([]byte, 32))),
+			c.publicPoint[33:]),
 	}
 }
 

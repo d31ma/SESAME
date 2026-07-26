@@ -14,12 +14,13 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"slices"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/d31ma/sesame/internal/platform/runtimeid"
 )
 
 const (
@@ -865,11 +866,7 @@ func runtimeMismatch(field, expected, actual string) error {
 }
 
 func localRuntimeTarget() string {
-	operatingSystem := runtime.GOOS
-	if operatingSystem == "darwin" {
-		operatingSystem = "macos"
-	}
-	return operatingSystem + "-" + runtime.GOARCH
+	return runtimeid.NativeFYLOTarget()
 }
 
 type machineResponse struct {

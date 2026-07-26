@@ -32,7 +32,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math/big"
 	"net/url"
 	"strings"
 )
@@ -290,16 +289,15 @@ func parseCOSEKey(raw []byte) ([]byte, error) {
 		return nil, fmt.Errorf("%w: coordinates are not 32 bytes", ErrPasskeyUnsupportedAlgorithm)
 	}
 
-	// Reject a point that is not on the curve rather than storing it and
-	// discovering the problem at every future assertion.
-	if !elliptic.P256().IsOnCurve(new(big.Int).SetBytes(x.bytes), new(big.Int).SetBytes(y.bytes)) {
-		return nil, fmt.Errorf("%w: public key is not on P-256", ErrPasskeyUnsupportedAlgorithm)
-	}
-
 	point := make([]byte, 0, 65)
 	point = append(point, 4)
 	point = append(point, x.bytes...)
 	point = append(point, y.bytes...)
+	// Reject a point that is not on the curve rather than storing it and
+	// discovering the problem at every future assertion.
+	if _, err := ecdsa.ParseUncompressedPublicKey(elliptic.P256(), point); err != nil {
+		return nil, fmt.Errorf("%w: public key is not on P-256", ErrPasskeyUnsupportedAlgorithm)
+	}
 	return point, nil
 }
 
@@ -419,12 +417,11 @@ func decodePasskeyPublicKey(encoded string) (*ecdsa.PublicKey, error) {
 	if err != nil || len(raw) != 65 || raw[0] != 4 {
 		return nil, fmt.Errorf("%w: stored public key is malformed", ErrPasskeyUnsupportedAlgorithm)
 	}
-	x := new(big.Int).SetBytes(raw[1:33])
-	y := new(big.Int).SetBytes(raw[33:])
-	if !elliptic.P256().IsOnCurve(x, y) {
+	public, err := ecdsa.ParseUncompressedPublicKey(elliptic.P256(), raw)
+	if err != nil {
 		return nil, fmt.Errorf("%w: stored public key is not on P-256", ErrPasskeyUnsupportedAlgorithm)
 	}
-	return &ecdsa.PublicKey{Curve: elliptic.P256(), X: x, Y: y}, nil
+	return public, nil
 }
 
 // ValidateCredentialID rejects values that cannot be credential identifiers.

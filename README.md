@@ -95,11 +95,12 @@ working call sequences in all ten languages.
 | **Sessions** | Bounded, revocable contexts; the secret is stored only as a digest; revocation is durable and cascades to refresh-token families |
 | **Authorization** | Deterministic default-deny decisions over roles, grants, groups, and bounded context conditions, with stable reasons and a versioned policy snapshot |
 | **OAuth 2.0 / OIDC** | Authorization code with mandatory PKCE, rotating refresh families with reuse detection, discovery, JWKS, introspection, revocation, consent, RP-initiated logout |
+| **Host adapters** | Versioned framework-neutral dispatch for seven OIDC endpoints; duplicate-preserving inputs, redacted errors, bounded responses, and one typed method in every SDK |
 | **Federation** | Inbound OIDC federation, and inbound SAML 2.0 with an in-tree XML canonicalizer that refuses every ambiguous document |
 | **Provisioning** | SCIM 2.0 users and groups, idempotent under directory reconciliation |
 | **Durability** | A hash-chained security ledger on FYLO with rebuildable projections, verified snapshots, and restart evidence run against a real FYLO runtime |
 
-84 operations across 17 families, one canonical manifest, and ten language SDKs
+85 operations across 18 families, one canonical manifest, and ten language SDKs
 that each carry a typed method for every one of them.
 
 ## What is not claimed
@@ -134,6 +135,11 @@ without updating the manifest fails the build.
 Error codes are a compatibility boundary — branch on the code, never the
 message. The full reference is at
 [sesame.del.ma/docs/errors](https://sesame.del.ma/docs/errors).
+
+Public HTTP frameworks use the independently versioned
+[host-adapter contract](api/standards/v1/README.md). The binary owns OAuth
+request validation and response mapping; adapters only preserve bounded request
+values and apply the returned instructions.
 
 ## SDKs
 
@@ -242,6 +248,7 @@ internal/
   adapters/                 FYLO, machine protocol, crypto, and clock
   platform/                 deployment, CLI, logging, and build metadata
 api/machine/v1/             the canonical operation manifest and reference
+api/standards/v1/           the framework-neutral public-route contract
 clients/                    ten SDK shims
 test/                       contract, adversarial, and real-FYLO evidence
 docs/                       ADRs, RFCs, operations, and security guidance
@@ -256,16 +263,17 @@ consumer of those public contracts and must never become a privileged bypass.
 
 ## Status
 
-Phases 0 through 5 are complete. Phase 6 (federation and provisioning) has
-three of five slices delivered — inbound OIDC, SCIM 2.0, and inbound SAML 2.0.
-LDAP and proxy gateways, and device authorization / PAR / DPoP, are not
-started. Phase 7 (scale and HA) is blocked on coordination and replication
-semantics from FYLO.
+The core identity, authorization, authentication, OIDC, SDK, inbound
+federation, SCIM, SAML, device authorization, PAR, and DPoP slices are
+implemented. The framework-neutral host contract is implemented and proven by
+the Go reference host; native examples for SvelteKit, Next.js, Nuxt, and Solid
+remain.
 
-Two exit criteria remain open and are tracked in
-[the project plan](docs/PROJECT_PLAN.md): the OpenID conformance run, and a
-deprecation cycle that has not been exercised because nothing has been
-deprecated yet.
+Open gates are tracked in [the project plan](docs/PROJECT_PLAN.md): official
+OpenID conformance, the first real deprecation cycle, packaged native
+qualification, the 72-hour production-evidence matrix, and independent
+security assessment. LDAP and proxy gateways remain deferred. Phase 7 scale
+and HA remains blocked on coordination and replication semantics from FYLO.
 
 ## Documentation
 
@@ -276,7 +284,9 @@ deprecated yet.
 [SDK distribution](docs/SDK_DISTRIBUTION.md)
 
 **Reference** — [Machine protocol](api/machine/v1/README.md) ·
+[Host-adapter contract](api/standards/v1/README.md) ·
 [Machine protocol RFC](docs/rfcs/0001-machine-protocol-v1.md) ·
+[Host-adapter RFC](docs/rfcs/0002-host-adapter-contract-v1.md) ·
 [Engineering standards](docs/ENGINEERING_STANDARDS.md) ·
 [Release engineering](docs/RELEASE_ENGINEERING.md)
 
@@ -305,11 +315,11 @@ rebuild, cold local restore, corruption detection, schema upcasting, bounded
 mixed admission, cancellation, restart, and latency/leak reporting. The macOS
 arm64 development candidate has passed it repeatedly.
 
-The Phase 1 gate stays open for evidence SESAME cannot manufacture from a
-development binary: an immutable FYLO release identity, FYLO-native internal
-transaction crash tests, provisioned S3 restore, native packaged runs on every
-claimed platform and filesystem, and sustained capacity results. See the
-[native evidence matrix](docs/fylo/NATIVE_MATRIX.md).
+FYLO v26.30.06 supplies immutable release identity and a provisioned S3 release
+gate. The Phase 1 gate remains open for FYLO-native internal transaction-crash
+evidence, a packaged SESAME artifact, remote deployment restore, native runs on
+every claimed platform and filesystem, and sustained release-profile capacity
+results. See the [native evidence matrix](docs/fylo/NATIVE_MATRIX.md).
 
 If that gate fails, SESAME will improve FYLO rather than weaken identity
 invariants.

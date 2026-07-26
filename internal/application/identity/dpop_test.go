@@ -23,7 +23,8 @@ const (
 
 // dpopKey is a test client holding a DPoP key.
 type dpopKey struct {
-	private *ecdsa.PrivateKey
+	private     *ecdsa.PrivateKey
+	publicPoint []byte
 }
 
 func newDPoPKey(t *testing.T) *dpopKey {
@@ -33,15 +34,25 @@ func newDPoPKey(t *testing.T) *dpopKey {
 	if err != nil {
 		t.Fatalf("generate DPoP key: %v", err)
 	}
-	return &dpopKey{private: private}
+	return &dpopKey{private: private, publicPoint: mustPublicPoint(t, private)}
+}
+
+func mustPublicPoint(t testing.TB, private *ecdsa.PrivateKey) []byte {
+	t.Helper()
+
+	point, err := private.PublicKey.Bytes()
+	if err != nil {
+		t.Fatalf("encode public key: %v", err)
+	}
+	return point
 }
 
 func (d *dpopKey) jwk() map[string]any {
 	return map[string]any{
 		"kty": "EC",
 		"crv": "P-256",
-		"x":   base64.RawURLEncoding.EncodeToString(d.private.PublicKey.X.FillBytes(make([]byte, 32))),
-		"y":   base64.RawURLEncoding.EncodeToString(d.private.PublicKey.Y.FillBytes(make([]byte, 32))),
+		"x":   base64.RawURLEncoding.EncodeToString(d.publicPoint[1:33]),
+		"y":   base64.RawURLEncoding.EncodeToString(d.publicPoint[33:]),
 	}
 }
 

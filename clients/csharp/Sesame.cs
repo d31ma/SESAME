@@ -616,6 +616,15 @@ public sealed class Client : IDisposable
     // Standards surfaces. Endpoint paths are the host's own; the engine
     // composes them under the configured issuer and refuses any that would
     // leave that origin.
+    public JsonElement StandardsDispatch(IDictionary<string, object?> request)
+    {
+        var parameters = new Dictionary<string, object?>(request)
+        {
+            ["contract_version"] = "1",
+        };
+        return Request("standards.dispatch", parameters);
+    }
+
     public JsonElement Discovery(IDictionary<string, object?>? endpoints = null) =>
         Request("oidc.discovery", endpoints ?? new Dictionary<string, object?>());
 

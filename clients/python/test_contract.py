@@ -59,6 +59,31 @@ class ContractTest(unittest.TestCase):
         self.assertEqual(self.client.version()["name"], "sesame")
         self.assertTrue(self.client.metrics()["storage_configured"])
 
+    def test_02_standards_dispatch_uses_v1_and_fails_closed(self) -> None:
+        result = self.client.standards_dispatch(
+            {
+                "contract_version": "unsupported",
+                "endpoint": "oidc.token",
+                "method": "GET",
+            }
+        )
+        self.assertEqual(result["contract_version"], "1")
+        self.assertEqual(result["status"], 405)
+        self.assertEqual(result["headers"]["allow"], "POST")
+        self.assertEqual(result["headers"]["content-type"], "application/json")
+        self.assertEqual(result["body"], {"error": "invalid_request"})
+
+        with self.assertRaises(ProtocolError) as rejected:
+            self.client.standards_dispatch(
+                {
+                    "contract_version": "unsupported",
+                    "endpoint": "oidc.token",
+                    "method": "POST",
+                    "authorization": "Basic safe\r\nX-Injected: yes",
+                }
+            )
+        self.assertEqual(rejected.exception.code, "invalid_request")
+
     def test_02_admin_bootstrap_converges(self) -> None:
         first = self.client.admin_bootstrap("acme", "email", "Admin@Example.com")
         self.assertTrue(first["created"])

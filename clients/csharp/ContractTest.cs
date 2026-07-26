@@ -79,20 +79,49 @@ string Build(string root, string workspace, string name, string source)
     return output;
 }
 
+string InitializeDeployment(
+    string root,
+    string workspace,
+    string sesameBinary,
+    string fakeFylo)
+{
+    var deployment = Path.Combine(workspace, "deployment");
+    var info = new ProcessStartInfo(sesameBinary)
+    {
+        WorkingDirectory = root,
+        UseShellExecute = false,
+        RedirectStandardOutput = true,
+        RedirectStandardError = true,
+    };
+    info.ArgumentList.Add("init");
+    info.ArgumentList.Add("--deployment");
+    info.ArgumentList.Add(deployment);
+    info.ArgumentList.Add("--fylo-binary");
+    info.ArgumentList.Add(fakeFylo);
+    info.ArgumentList.Add("--issuer");
+    info.ArgumentList.Add("https://id.example");
+    using var process = Process.Start(info) ?? throw new Exception("run sesame init");
+    var diagnostic = process.StandardError.ReadToEnd();
+    process.WaitForExit();
+    if (process.ExitCode != 0)
+    {
+        throw new Exception($"sesame init failed: {diagnostic}");
+    }
+    return deployment;
+}
+
 var root = RepositoryRoot();
 var workspace = Directory.CreateTempSubdirectory("sesame-csharp-contract-").FullName;
 try
 {
     var sesameBinary = Build(root, workspace, "sesame", "./cmd/sesame");
     var fakeFylo = Build(root, workspace, "fake-fylo", "./internal/adapters/fylo/testdata/fakefylo");
-    var fyloRoot = Path.Combine(workspace, "root");
-    Directory.CreateDirectory(fyloRoot);
+    var deployment = InitializeDeployment(root, workspace, sesameBinary, fakeFylo);
 
     using var client = new Client(new Options
     {
         Binary = sesameBinary,
-        FyloBinary = fakeFylo,
-        FyloRoot = fyloRoot,
+        Deployment = deployment,
     });
 
     // System operations report a storage-backed process.
@@ -174,9 +203,47 @@ try
     AreEqual("operation_not_found", CodeOf(() => client.Request("identity.unknown")),
         "unknown operation");
 
+    StandardsDispatchScenario(client);
+
     Console.WriteLine($"ok\tcsharp contract scenario\t{checks} checks");
 }
 finally
 {
     Directory.Delete(workspace, recursive: true);
+}
+
+void StandardsDispatchScenario(Client client)
+{
+    var endpoints = new Dictionary<string, object?>
+    {
+        ["authorization_endpoint"] = "/authorize",
+        ["token_endpoint"] = "/token",
+        ["jwks_uri"] = "/.well-known/jwks.json",
+        ["introspection_endpoint"] = "/introspect",
+        ["revocation_endpoint"] = "/revoke",
+        ["end_session_endpoint"] = "/logout",
+    };
+    var discovery = client.StandardsDispatch(new Dictionary<string, object?>
+    {
+        ["contract_version"] = "unsupported",
+        ["endpoint"] = "oidc.discovery",
+        ["method"] = "GET",
+        ["endpoints"] = endpoints,
+    });
+
+    AreEqual("1", Field(discovery, "contract_version"), "standards contract version");
+    AreEqual("200", Field(discovery, "status"), "standards discovery status");
+    AreEqual("application/json", Field(Object(discovery, "headers"), "content-type"),
+        "standards discovery content type");
+    AreEqual("https://id.example", Field(Object(discovery, "body"), "issuer"),
+        "standards discovery issuer");
+    AreEqual("https://id.example/token", Field(Object(discovery, "body"), "token_endpoint"),
+        "standards discovery token endpoint");
+
+    AreEqual("invalid_request", CodeOf(() => client.StandardsDispatch(
+        new Dictionary<string, object?>
+        {
+            ["endpoint"] = "oidc.userinfo",
+            ["method"] = "GET",
+        })), "unknown standards endpoint");
 }

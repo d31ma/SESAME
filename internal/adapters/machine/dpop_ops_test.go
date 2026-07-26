@@ -18,7 +18,10 @@ const (
 )
 
 // machineDPoPKey mints proofs over the wire the way a client would.
-type machineDPoPKey struct{ private *ecdsa.PrivateKey }
+type machineDPoPKey struct {
+	private     *ecdsa.PrivateKey
+	publicPoint []byte
+}
 
 func newMachineDPoPKey(t *testing.T) *machineDPoPKey {
 	t.Helper()
@@ -27,7 +30,17 @@ func newMachineDPoPKey(t *testing.T) *machineDPoPKey {
 	if err != nil {
 		t.Fatalf("generate DPoP key: %v", err)
 	}
-	return &machineDPoPKey{private: private}
+	return &machineDPoPKey{private: private, publicPoint: mustPublicPoint(t, private)}
+}
+
+func mustPublicPoint(t testing.TB, private *ecdsa.PrivateKey) []byte {
+	t.Helper()
+
+	point, err := private.PublicKey.Bytes()
+	if err != nil {
+		t.Fatalf("encode public key: %v", err)
+	}
+	return point
 }
 
 func (m *machineDPoPKey) proof(t *testing.T, id, method, uri, accessToken string) string {
@@ -52,9 +65,9 @@ func (m *machineDPoPKey) proof(t *testing.T, id, method, uri, accessToken string
 		"jwk": map[string]any{
 			"kty": "EC", "crv": "P-256",
 			"x": base64.RawURLEncoding.EncodeToString(
-				m.private.PublicKey.X.FillBytes(make([]byte, 32))),
+				m.publicPoint[1:33]),
 			"y": base64.RawURLEncoding.EncodeToString(
-				m.private.PublicKey.Y.FillBytes(make([]byte, 32))),
+				m.publicPoint[33:]),
 		},
 	}) + "." + encode(body)
 	digest := sha256.Sum256([]byte(input))

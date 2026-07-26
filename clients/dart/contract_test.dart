@@ -75,6 +75,31 @@ Future<void> main() async {
     areEqual('sesame', (await client.version())['name'], 'version name');
     areEqual(true, (await client.metrics())['storage_configured'], 'storage configured');
 
+    // Standards dispatch pins contract v1 and rejects boundary injection.
+    final standards = await client.standardsDispatch({
+      'contract_version': 'unsupported',
+      'endpoint': 'oidc.token',
+      'method': 'GET',
+    });
+    areEqual('1', standards['contract_version'], 'standards contract version');
+    areEqual(405, standards['status'], 'standards method status');
+    areEqual('POST', standards['headers']['allow'], 'standards allowed method');
+    areEqual('application/json', standards['headers']['content-type'],
+        'standards content type');
+    areEqual(
+        'invalid_request', standards['body']['error'], 'standards error body');
+    areEqual(
+        'invalid_request',
+        await codeOf(() async {
+          await client.standardsDispatch({
+            'contract_version': 'unsupported',
+            'endpoint': 'oidc.token',
+            'method': 'POST',
+            'authorization': 'Basic safe\r\nX-Injected: yes',
+          });
+        }),
+        'standards boundary injection');
+
     // Tenant and principal.
     final tenantId = (await client.tenantBootstrap('acme'))['tenant']['tenant_id'] as String;
     final principal =

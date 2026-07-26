@@ -50,6 +50,7 @@ func newProvider(t *testing.T) *provider {
 func (p *provider) keySet(t *testing.T) federation.KeySet {
 	t.Helper()
 
+	publicPoint := mustPublicPoint(t, p.ecKey)
 	return federation.KeySet{Keys: []federation.JWK{
 		{
 			KeyType:  "RSA",
@@ -61,10 +62,27 @@ func (p *provider) keySet(t *testing.T) federation.KeySet {
 			KeyType: "EC",
 			KeyID:   "ec-1",
 			Curve:   "P-256",
-			X:       base64.RawURLEncoding.EncodeToString(p.ecKey.X.Bytes()),
-			Y:       base64.RawURLEncoding.EncodeToString(p.ecKey.Y.Bytes()),
+			X:       base64.RawURLEncoding.EncodeToString(trimCoordinate(publicPoint[1:33])),
+			Y:       base64.RawURLEncoding.EncodeToString(trimCoordinate(publicPoint[33:])),
 		},
 	}}
+}
+
+func mustPublicPoint(t testing.TB, private *ecdsa.PrivateKey) []byte {
+	t.Helper()
+
+	point, err := private.PublicKey.Bytes()
+	if err != nil {
+		t.Fatalf("encode public key: %v", err)
+	}
+	return point
+}
+
+func trimCoordinate(coordinate []byte) []byte {
+	for len(coordinate) > 1 && coordinate[0] == 0 {
+		coordinate = coordinate[1:]
+	}
+	return coordinate
 }
 
 func claims() map[string]any {

@@ -1447,6 +1447,56 @@ type DiscoveryEndpoints struct {
 	EndSessionEndpoint    string `json:"end_session_endpoint,omitempty"`
 }
 
+// StandardsRequest is the versioned, framework-neutral representation of one
+// standards endpoint request. Query and Form retain every value so duplicate
+// parameters reach the engine instead of being hidden by a framework.
+type StandardsRequest struct {
+	ContractVersion string              `json:"contract_version"`
+	Endpoint        string              `json:"endpoint"`
+	Method          string              `json:"method"`
+	Query           map[string][]string `json:"query,omitempty"`
+	Form            map[string][]string `json:"form,omitempty"`
+	Authorization   string              `json:"authorization,omitempty"`
+	DPoP            string              `json:"dpop,omitempty"`
+	HTTPURI         string              `json:"http_uri,omitempty"`
+	Endpoints       *DiscoveryEndpoints `json:"endpoints,omitempty"`
+}
+
+// StandardsResponse is a bounded HTTP instruction returned by the engine.
+// Body is already JSON and must be served byte-for-byte. Headers use
+// lower-case names and are restricted to the contract's allowlist.
+type StandardsResponse struct {
+	ContractVersion string                `json:"contract_version"`
+	Status          int                   `json:"status"`
+	Headers         map[string]string     `json:"headers,omitempty"`
+	Body            json.RawMessage       `json:"body,omitempty"`
+	Action          *StandardsInteraction `json:"action,omitempty"`
+}
+
+// StandardsInteraction tells the host to render its own authentication or
+// consent experience. InteractionSecret is bearer-equivalent; keep it in a
+// server-side session or an HttpOnly, Secure cookie and never put it in a URL.
+type StandardsInteraction struct {
+	Kind              string   `json:"kind"`
+	InteractionID     string   `json:"interaction_id"`
+	InteractionSecret string   `json:"interaction_secret"`
+	ClientID          string   `json:"client_id"`
+	ClientName        string   `json:"client_name"`
+	Scopes            []string `json:"scopes"`
+	ExpiresAt         string   `json:"expires_at"`
+}
+
+// StandardsDispatch asks the binary to translate a bounded public endpoint
+// request into safe HTTP instructions or a host-owned interaction action.
+func (c *Client) StandardsDispatch(ctx context.Context, request StandardsRequest) (StandardsResponse, error) {
+	request.ContractVersion = "1"
+	var result StandardsResponse
+	if err := c.Request(ctx, "standards.dispatch", request, &result); err != nil {
+		return StandardsResponse{}, err
+	}
+	return result, nil
+}
+
 // Discovery returns the provider configuration for the host to serve at its
 // own /.well-known/openid-configuration.
 func (c *Client) Discovery(ctx context.Context, endpoints DiscoveryEndpoints) (ProviderMetadata, error) {

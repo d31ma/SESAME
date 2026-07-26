@@ -424,7 +424,7 @@ class Client {
     String method,
     String uri,
   ) =>
-      request2('oidc.dpop_verify', {
+      request('oidc.dpop_verify', {
         'access_token': accessToken,
         'dpop_proof': proof,
         'http_method': method,
@@ -432,7 +432,7 @@ class Client {
       });
 
   Future<dynamic> pushedAuthorize(Map<String, dynamic> request) =>
-      request2('oidc.pushed_authorize', request);
+      this.request('oidc.pushed_authorize', request);
 
   Future<dynamic> deviceAuthorize(String clientId, [List<String> scopes = const []]) =>
       request('oidc.device_authorize', {'client_id': clientId, 'scopes': scopes});
@@ -486,6 +486,12 @@ class Client {
   // Standards surfaces. Endpoint paths are the host's own; the engine composes
   // them under the configured issuer and refuses any that would leave that
   // origin.
+  Future<dynamic> standardsDispatch(Map<String, dynamic> requestParameters) =>
+      request('standards.dispatch', {
+        ...requestParameters,
+        'contract_version': '1',
+      });
+
   Future<dynamic> discovery([Map<String, dynamic> endpoints = const {}]) =>
       request('oidc.discovery', endpoints);
 

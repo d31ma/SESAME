@@ -132,7 +132,11 @@ pub struct ProtocolError {
 
 impl fmt::Display for ProtocolError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(formatter, "sesame protocol error {}: {}", self.code, self.message)
+        write!(
+            formatter,
+            "sesame protocol error {}: {}",
+            self.code, self.message
+        )
     }
 }
 
@@ -373,13 +377,18 @@ impl Client {
 
         let mut frame = String::new();
         let mut envelope = BTreeMap::new();
-        envelope.insert("protocol_version".into(), Value::String(PROTOCOL_VERSION.into()));
+        envelope.insert(
+            "protocol_version".into(),
+            Value::String(PROTOCOL_VERSION.into()),
+        );
         envelope.insert("request_id".into(), Value::String(request_id.clone()));
         envelope.insert("operation".into(), Value::String(operation.into()));
         envelope.insert("parameters".into(), parameters);
         Value::Object(envelope).write(&mut frame);
         if frame.len() > MAX_FRAME_BYTES {
-            return Err(Error::Transport("request exceeds the maximum frame size".into()));
+            return Err(Error::Transport(
+                "request exceeds the maximum frame size".into(),
+            ));
         }
         frame.push('\n');
 
@@ -469,7 +478,10 @@ impl Client {
         self.request("principal.get", object(&[("principal_id", principal_id)]))
     }
     pub fn principal_suspend(&mut self, principal_id: &str) -> Result<Value, Error> {
-        self.request("principal.suspend", object(&[("principal_id", principal_id)]))
+        self.request(
+            "principal.suspend",
+            object(&[("principal_id", principal_id)]),
+        )
     }
 
     // Authorization.
@@ -587,7 +599,10 @@ impl Client {
         lifetime_seconds: i64,
     ) -> Result<Value, Error> {
         let mut fields = BTreeMap::new();
-        fields.insert("transaction_id".into(), Value::String(transaction_id.into()));
+        fields.insert(
+            "transaction_id".into(),
+            Value::String(transaction_id.into()),
+        );
         fields.insert(
             "lifetime_seconds".into(),
             Value::Number(lifetime_seconds as f64),
@@ -717,7 +732,10 @@ impl Client {
                 ("redirect_uris", strings(redirect_uris)),
                 ("scopes", strings(scopes)),
                 ("audience", Value::String(audience.to_string())),
-                ("post_logout_redirect_uris", strings(post_logout_redirect_uris)),
+                (
+                    "post_logout_redirect_uris",
+                    strings(post_logout_redirect_uris),
+                ),
             ]),
         )
     }
@@ -779,11 +797,11 @@ impl Client {
     ) -> Result<Value, Error> {
         self.request(
             "oidc.dpop_verify",
-            Value::Object(vec![
-                ("access_token".to_string(), Value::String(access_token.to_string())),
-                ("dpop_proof".to_string(), Value::String(proof.to_string())),
-                ("http_method".to_string(), Value::String(method.to_string())),
-                ("http_uri".to_string(), Value::String(uri.to_string())),
+            object(&[
+                ("access_token", access_token),
+                ("dpop_proof", proof),
+                ("http_method", method),
+                ("http_uri", uri),
             ]),
         )
     }
@@ -896,6 +914,19 @@ impl Client {
     //
     // Endpoint paths are the host's own; the engine composes them under the
     // configured issuer and refuses any that would leave that origin.
+    pub fn standards_dispatch(&mut self, request: Value) -> Result<Value, Error> {
+        let Value::Object(mut fields) = request else {
+            return Err(Error::Transport(
+                "standards request must be a JSON object".to_string(),
+            ));
+        };
+        fields.insert(
+            "contract_version".to_string(),
+            Value::String("1".to_string()),
+        );
+        self.request("standards.dispatch", Value::Object(fields))
+    }
+
     pub fn discovery(&mut self, endpoints: Value) -> Result<Value, Error> {
         self.request("oidc.discovery", endpoints)
     }
@@ -1037,7 +1068,10 @@ impl Client {
             fields(vec![
                 ("tenant_id", Value::String(tenant_id.to_string())),
                 ("name", Value::String(name.to_string())),
-                ("identifier_namespace", Value::String(identifier_namespace.to_string())),
+                (
+                    "identifier_namespace",
+                    Value::String(identifier_namespace.to_string()),
+                ),
                 ("can_manage_groups", Value::Bool(can_manage_groups)),
             ]),
         )
@@ -1073,7 +1107,10 @@ impl Client {
     // SCIM Group provisioning. These require the client's can_manage_groups
     // grant: group membership drives authorization decisions.
     pub fn scim_group_create(&mut self, token: &str, body: &str) -> Result<Value, Error> {
-        self.request("scim.group_create", object(&[("token", token), ("body", body)]))
+        self.request(
+            "scim.group_create",
+            object(&[("token", token), ("body", body)]),
+        )
     }
 
     pub fn scim_group_get(&mut self, token: &str, resource_id: &str) -> Result<Value, Error> {
@@ -1109,7 +1146,11 @@ impl Client {
     ) -> Result<Value, Error> {
         self.request(
             "scim.group_patch",
-            object(&[("token", token), ("resource_id", resource_id), ("body", body)]),
+            object(&[
+                ("token", token),
+                ("resource_id", resource_id),
+                ("body", body),
+            ]),
         )
     }
 
@@ -1125,7 +1166,10 @@ impl Client {
     }
 
     pub fn scim_user_create(&mut self, token: &str, body: &str) -> Result<Value, Error> {
-        self.request("scim.user_create", object(&[("token", token), ("body", body)]))
+        self.request(
+            "scim.user_create",
+            object(&[("token", token), ("body", body)]),
+        )
     }
 
     pub fn scim_user_get(&mut self, token: &str, resource_id: &str) -> Result<Value, Error> {
@@ -1161,7 +1205,11 @@ impl Client {
     ) -> Result<Value, Error> {
         self.request(
             "scim.user_patch",
-            object(&[("token", token), ("resource_id", resource_id), ("body", body)]),
+            object(&[
+                ("token", token),
+                ("resource_id", resource_id),
+                ("body", body),
+            ]),
         )
     }
 
@@ -1231,7 +1279,11 @@ impl Client {
         )
     }
 
-    pub fn saml_provider_get(&mut self, tenant_id: &str, provider_id: &str) -> Result<Value, Error> {
+    pub fn saml_provider_get(
+        &mut self,
+        tenant_id: &str,
+        provider_id: &str,
+    ) -> Result<Value, Error> {
         self.request(
             "saml.provider_get",
             object(&[("tenant_id", tenant_id), ("provider_id", provider_id)]),
@@ -1387,7 +1439,6 @@ impl Drop for Client {
     }
 }
 
-
 /// Builds an object whose values are already `Value`s, for the operations
 /// that carry arrays alongside strings.
 pub fn fields(pairs: Vec<(&str, Value)>) -> Value {
@@ -1400,7 +1451,12 @@ pub fn fields(pairs: Vec<(&str, Value)>) -> Value {
 
 /// Builds a string array.
 pub fn strings(values: &[&str]) -> Value {
-    Value::Array(values.iter().map(|v| Value::String((*v).to_string())).collect())
+    Value::Array(
+        values
+            .iter()
+            .map(|v| Value::String((*v).to_string()))
+            .collect(),
+    )
 }
 
 /// Encodes a binary WebAuthn value for transport as unpadded base64url.
@@ -1408,8 +1464,7 @@ pub fn strings(values: &[&str]) -> Value {
 /// Written out rather than pulled in: the shim is standard-library only, and
 /// this is the one place it needs an encoder.
 pub fn base64url(input: &[u8]) -> String {
-    const ALPHABET: &[u8; 64] =
-        b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+    const ALPHABET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
     let mut out = String::with_capacity(input.len().div_ceil(3) * 4);
     for chunk in input.chunks(3) {
         let bytes = [
@@ -1469,13 +1524,20 @@ fn decode_response(request_id: &str, line: &str) -> Result<Value, Error> {
             .get("error")
             .ok_or_else(|| Error::Transport("failure response has no error".into()))?;
         return Err(Error::Protocol(ProtocolError {
-            code: error.get("code").and_then(Value::as_str).unwrap_or("").into(),
+            code: error
+                .get("code")
+                .and_then(Value::as_str)
+                .unwrap_or("")
+                .into(),
             message: error
                 .get("message")
                 .and_then(Value::as_str)
                 .unwrap_or("")
                 .into(),
-            retryable: error.get("retryable").and_then(Value::as_bool).unwrap_or(false),
+            retryable: error
+                .get("retryable")
+                .and_then(Value::as_bool)
+                .unwrap_or(false),
         }));
     }
     Ok(response.get("result").cloned().unwrap_or(Value::Null))
@@ -1611,8 +1673,7 @@ fn parse_string(bytes: &[char], cursor: &mut usize) -> Result<String, String> {
                         let mut code = 0u32;
                         for _ in 0..4 {
                             let digit = *bytes.get(*cursor).ok_or("short \\u escape")?;
-                            code = code * 16
-                                + digit.to_digit(16).ok_or("invalid \\u escape")?;
+                            code = code * 16 + digit.to_digit(16).ok_or("invalid \\u escape")?;
                             *cursor += 1;
                         }
                         text.push(char::from_u32(code).ok_or("invalid code point")?);

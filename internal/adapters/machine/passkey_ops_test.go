@@ -22,6 +22,7 @@ import (
 // edgeDevice produces real WebAuthn wire formats over the machine protocol.
 type edgeDevice struct {
 	key          *ecdsa.PrivateKey
+	publicPoint  []byte
 	credentialID []byte
 	signCount    uint32
 }
@@ -37,7 +38,7 @@ func newEdgeDevice(t *testing.T) *edgeDevice {
 	if _, err := rand.Read(id); err != nil {
 		t.Fatalf("rand: %v", err)
 	}
-	return &edgeDevice{key: key, credentialID: id}
+	return &edgeDevice{key: key, publicPoint: mustPublicPoint(t, key), credentialID: id}
 }
 
 func cborItem(major byte, argument uint64) []byte {
@@ -52,10 +53,8 @@ func cborItem(major byte, argument uint64) []byte {
 }
 
 func (d *edgeDevice) cose() []byte {
-	x := make([]byte, 32)
-	y := make([]byte, 32)
-	d.key.PublicKey.X.FillBytes(x)
-	d.key.PublicKey.Y.FillBytes(y)
+	x := d.publicPoint[1:33]
+	y := d.publicPoint[33:]
 
 	out := cborItem(5, 5)
 	out = append(out, cborItem(0, 1)...)

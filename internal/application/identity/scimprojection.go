@@ -124,10 +124,7 @@ func (s *Service) applySCIMUserDeprovisioned(event audit.Event) error {
 func (s *Service) exportSCIMClientsLocked() []SCIMClientState {
 	clients := make([]SCIMClientState, 0, len(s.scimClients))
 	for _, stored := range s.scimClients {
-		clients = append(clients, SCIMClientState{
-			Client:      stored.Client,
-			TokenDigest: stored.TokenDigest,
-		})
+		clients = append(clients, SCIMClientState(stored))
 	}
 	sort.Slice(clients, func(left, right int) bool {
 		return clients[left].Client.ID < clients[right].Client.ID
@@ -157,10 +154,7 @@ func (s *Service) admitSCIMClient(restored SCIMClientState) error {
 	if err := scimdomain.ValidateClientID(restored.Client.ID); err != nil {
 		return err
 	}
-	s.scimClients[restored.Client.ID] = provisioningClient{
-		Client:      restored.Client,
-		TokenDigest: restored.TokenDigest,
-	}
+	s.scimClients[restored.Client.ID] = provisioningClient(restored)
 	return nil
 }
 
