@@ -163,9 +163,9 @@ error, and optional diagnostic metadata.
 SESAME does not listen on a network port. The host application owns HTTP, TLS,
 routing, trusted-proxy handling, middleware, and public request limits. OIDC and
 later standards endpoints retain their standard public wire formats through
-host-framework adapters. A future RFC must define the bounded internal
-request/response envelope used to dispatch those routes to SESAME without
-moving protocol semantics into SDKs.
+host-framework adapters. [RFC 0002](rfcs/0002-host-adapter-contract-v1.md)
+defines the implemented bounded request/response envelope that dispatches
+those routes to SESAME without moving protocol semantics into SDKs.
 
 Stable error codes, idempotency behavior, pagination, deadlines, retry safety,
 and compatibility ranges are part of the public contract. Internal Go package
@@ -879,7 +879,7 @@ Exit:
 | Criterion | Status | Evidence |
 | --- | --- | --- |
 | Every SDK passes the shared contract corpus | met | all ten shims run the same 23-check scenario against a real compiled binary, as separate CI jobs, so the language that drifted is the one that fails. Each is additionally proven installable and runnable from its release artifact or git tag by `tools/verify-sdk-install.sh` |
-| No undocumented divergence | met | `api/machine/v1/operations.json` records all 84 operations and each SDK's gaps, asserted three ways by `test/contract`: against the engine's dispatch table (parsed from the processor), against the protocol reference, and against each SDK's source. All ten shims are at zero gaps |
+| No undocumented divergence | met | `api/machine/v1/operations.json` records all 85 operations and each SDK's gaps, asserted three ways by `test/contract`: against the engine's dispatch table (parsed from the processor), against the protocol reference, and against each SDK's source. All ten shims are at zero gaps |
 | Deprecation and minimum-version behaviour proven | **partly met** | *Minimum version* is met: `system.version` reports the protocol version and the operations the binary routes, every SDK verifies it at startup and refuses a mismatched engine, and `RequireOperations` lets an application assert what it depends on. A Go test drives a purpose-built impostor engine that answers with protocol `"2"` and proves `Start` refuses it. *Deprecation* is **not** met: nothing has been deprecated, so no cycle has been exercised end to end. That becomes real at the first removal |
 
 SDK distribution is settled and follows [FYLO](https://fylo.del.ma)'s model
@@ -1490,13 +1490,13 @@ services may be commercial without weakening that baseline.
 
 ## 11. Current Backlog
 
-1. Establish the committed baseline on `main` and publish the first immutable
-   developer-preview artifact without making a production-support claim.
+1. Publish the first immutable developer-preview artifact from the committed
+   `main` baseline without making a production-support claim.
 2. Run the official OpenID Foundation Basic OP and Config OP conformance
    profiles against a deployed TLS host and retain the resulting evidence.
-3. Specify and implement a framework-neutral host-adapter contract, then prove
-   it with thin examples for SvelteKit, Next.js, Nuxt, and Solid without moving
-   protocol or policy logic out of the SESAME binary.
+3. Extend the implemented framework-neutral host-adapter contract and Go
+   reference host with thin native examples for SvelteKit, Next.js, Nuxt, and
+   Solid, without moving protocol or policy logic out of the SESAME binary.
 4. Complete the explicitly promised security-operations surfaces: emergency
    lockdown and bounded audit/incident export, with tenant isolation,
    authorization, redaction, and recovery tests.

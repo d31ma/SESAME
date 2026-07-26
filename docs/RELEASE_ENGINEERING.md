@@ -39,11 +39,34 @@ buildability and integrity only; the platform-matched FYLO/CHEX/TTID bundle,
 signing/notarization, and native promotion gates below remain manual
 requirements before any support claim.
 
-## Release Archive
+## Developer-Preview Release Assets
 
-Each archive contains the platform-matched SESAME, FYLO, CHEX, and TTID
-executables, third-party licenses, install notes, and a machine-readable
-manifest. The manifest records:
+The current tag workflow publishes cross-compiled SESAME executables directly,
+not platform runtime archives:
+
+```text
+sesame-linux-amd64
+sesame-linux-arm64
+sesame-darwin-amd64
+sesame-darwin-arm64
+sesame-windows-amd64.exe
+sesame-clients.tar.gz
+SHA256SUMS
+sesame-v<version>.spdx.json
+```
+
+The workflow generates checksums, an SPDX SBOM, and signed GitHub build
+attestations. `sesame-clients.tar.gz` contains the nine copy-file SDK shims;
+the Go SDK resolves from the SESAME module tag. These developer-preview assets
+do not bundle FYLO, CHEX, or TTID and do not by themselves establish native
+platform support.
+
+## Future Promoted Runtime Archives
+
+Before a platform can advance beyond developer preview, its release archive
+must contain the platform-matched SESAME, FYLO, CHEX, and TTID executables,
+third-party licenses, install notes, and a machine-readable manifest. The
+manifest must record:
 
 - SESAME version and commit;
 - Go version and build settings;
@@ -56,7 +79,7 @@ manifest. The manifest records:
 - minimum/maximum compatible SDK protocol;
 - checksums for every file.
 
-Artifacts use deterministic names such as:
+Promoted runtime archives must use deterministic names such as:
 
 ```text
 sesame_<version>_linux_amd64.tar.gz
@@ -144,17 +167,21 @@ supported version range.
 
 ## SDK Releases
 
-SDKs use independent semantic versions but publish:
+SDKs share the SESAME release version and provenance chain. Each release
+publishes `sesame-clients.tar.gz`, containing one source file for Node, Python,
+Rust, Java, Kotlin, C#, PHP, Ruby, and Dart. Consumers copy the applicable file
+into their project; SESAME does not publish those shims to ecosystem package
+registries. Go is the exception: its SDK lives in the SESAME module and
+resolves from the same repository tag as the engine.
 
-- supported SESAME versions;
-- supported contract/protocol versions;
-- supported language/runtime versions;
-- package checksum/signature/provenance where the registry allows;
-- generated-code source schema;
-- lifecycle and security-support policy.
-
-An SDK release is blocked unless its ecosystem-native test suite and the shared
-contract corpus pass against the oldest and newest compatible SESAME binaries.
+`api/machine/v1/operations.json` is the canonical typed-operation surface and
+records any SDK gaps. `api/standards/v1/host-adapter.schema.json` is the
+normative host-adapter wire schema. An SDK bundle is blocked unless every shim
+passes its native contract scenario against a real SESAME executable, the
+operation-parity checks pass, and `tools/verify-sdk-install.sh` proves every
+documented copy-file installation from the release archive. SDK compatibility
+is bounded by the machine protocol and reported operation set, not by an
+independent per-language release version.
 
 ## Promotion Gates
 

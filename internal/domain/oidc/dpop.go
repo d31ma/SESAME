@@ -278,12 +278,12 @@ func decodeP256Coordinates(x, y string) (*ecdsa.PublicKey, error) {
 		return nil, fmt.Errorf("%w: jwk coordinates must be %d base64url bytes",
 			ErrDPoPProofMalformed, coordinateBytes)
 	}
-	key := &ecdsa.PublicKey{
-		Curve: elliptic.P256(),
-		X:     new(big.Int).SetBytes(decodedX),
-		Y:     new(big.Int).SetBytes(decodedY),
-	}
-	if !key.Curve.IsOnCurve(key.X, key.Y) {
+	point := make([]byte, 1+2*coordinateBytes)
+	point[0] = 4
+	copy(point[1:1+coordinateBytes], decodedX)
+	copy(point[1+coordinateBytes:], decodedY)
+	key, err := ecdsa.ParseUncompressedPublicKey(elliptic.P256(), point)
+	if err != nil {
 		return nil, fmt.Errorf("%w: jwk point is not on %s", ErrDPoPProofMalformed, dpopCurve)
 	}
 	return key, nil

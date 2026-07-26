@@ -687,6 +687,12 @@ final class Client
     // Standards surfaces. Endpoint paths are the host's own; the engine
     // composes them under the configured issuer and refuses any that would
     // leave that origin.
+    public function standardsDispatch(array $request): mixed
+    {
+        $request['contract_version'] = '1';
+        return $this->request('standards.dispatch', $request);
+    }
+
     public function discovery(array $endpoints = []): mixed
     {
         return $this->request('oidc.discovery', $endpoints);

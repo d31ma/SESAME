@@ -72,6 +72,7 @@ func (p *hostileIDP) discovery(t *testing.T, overrides map[string]any) string {
 func (p *hostileIDP) keySet(t *testing.T) string {
 	t.Helper()
 
+	publicPoint := mustPublicPoint(t, p.ecKey)
 	return encodeJSON(t, map[string]any{"keys": []map[string]string{
 		{
 			"kty": "RSA",
@@ -83,8 +84,8 @@ func (p *hostileIDP) keySet(t *testing.T) string {
 			"kty": "EC",
 			"kid": "idp-ec",
 			"crv": "P-256",
-			"x":   base64.RawURLEncoding.EncodeToString(p.ecKey.X.Bytes()),
-			"y":   base64.RawURLEncoding.EncodeToString(p.ecKey.Y.Bytes()),
+			"x":   base64.RawURLEncoding.EncodeToString(trimCoordinate(publicPoint[1:33])),
+			"y":   base64.RawURLEncoding.EncodeToString(trimCoordinate(publicPoint[33:])),
 		},
 	}})
 }

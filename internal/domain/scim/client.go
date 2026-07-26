@@ -194,11 +194,11 @@ func ValidateName(name string) error {
 func ParseBearer(header string) (string, error) {
 	const scheme = "bearer "
 	if len(header) <= len(scheme) || !strings.EqualFold(header[:len(scheme)], scheme) {
-		return "", errors.New("Authorization must be a Bearer credential")
+		return "", errors.New("authorization must be a Bearer credential")
 	}
 	token := strings.TrimSpace(header[len(scheme):])
 	if token == "" {
-		return "", errors.New("Authorization carries no credential")
+		return "", errors.New("authorization carries no credential")
 	}
 	return token, nil
 }

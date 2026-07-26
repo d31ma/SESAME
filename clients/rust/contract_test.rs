@@ -104,6 +104,51 @@ fn sdk_contract_scenario() {
         Some(true)
     );
 
+    // Standards dispatch pins contract v1 and rejects boundary injection.
+    let standards = client
+        .standards_dispatch(sesame::object(&[
+            ("contract_version", "unsupported"),
+            ("endpoint", "oidc.token"),
+            ("method", "GET"),
+        ]))
+        .expect("standards.dispatch method response");
+    assert_eq!(
+        standards.get("contract_version").and_then(Value::as_str),
+        Some("1")
+    );
+    assert_eq!(standards.get("status").and_then(Value::as_f64), Some(405.0));
+    assert_eq!(
+        standards
+            .get("headers")
+            .and_then(|headers| headers.get("allow"))
+            .and_then(Value::as_str),
+        Some("POST")
+    );
+    assert_eq!(
+        standards
+            .get("headers")
+            .and_then(|headers| headers.get("content-type"))
+            .and_then(Value::as_str),
+        Some("application/json")
+    );
+    assert_eq!(
+        standards
+            .get("body")
+            .and_then(|body| body.get("error"))
+            .and_then(Value::as_str),
+        Some("invalid_request")
+    );
+
+    let rejected = client
+        .standards_dispatch(sesame::object(&[
+            ("contract_version", "unsupported"),
+            ("endpoint", "oidc.token"),
+            ("method", "POST"),
+            ("authorization", "Basic safe\r\nX-Injected: yes"),
+        ]))
+        .expect_err("control-character authorization");
+    assert_eq!(rejected.code(), Some("invalid_request"));
+
     // Tenant and principal.
     let tenant = client.tenant_bootstrap("acme").expect("bootstrap");
     let tenant_id = expect_str(tenant.get("tenant").expect("tenant"), "tenant_id");

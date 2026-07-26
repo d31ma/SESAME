@@ -3,12 +3,24 @@
 All notable changes to SESAME will be documented here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-and releases will use Semantic Versioning once the first public version is
-tagged.
+and releases use UTC-derived CalVer in `YY.WW.DD` form.
 
 ## [Unreleased]
 
+## [26.30.07] - 2026-07-26
+
 ### Added
+
+- Framework-neutral host-adapter contract v1 through
+  `standards.dispatch`. Seven OIDC endpoints now accept one bounded,
+  duplicate-preserving request envelope and return only allowlisted HTTP
+  instructions or a host-owned interaction action. The binary owns method
+  checks, Basic client authentication, OAuth parameter mapping, error
+  redaction, validated redirects, DPoP request binding, and cache headers.
+  All ten SDKs expose one typed dispatch method, and `examples/hostserver`
+  now delegates its standards routes through the contract instead of
+  reimplementing them. Adds the normative schema, RFC 0002, negative-path
+  tests, and contract-drift checks.
 
 - Inbound SAML 2.0 vertical slice: an in-tree exclusive XML canonicalizer over
   `encoding/xml`'s raw token stream, signature and digest verification against
@@ -521,6 +533,10 @@ tagged.
 
 ### Fixed
 
+- FYLO release-target compatibility on Go `amd64` builds. SESAME now translates
+  Go's `darwin`/`amd64` identifiers to FYLO's canonical `macos-x64` form through
+  one shared mapper used by the runtime adapter, fake runtime, and qualification
+  runner. The strict target check remains fail closed.
 - Classified a SCIM PATCH value path (`emails[type eq "work"]`) as unsupported
   rather than malformed. It is well-formed SCIM that SESAME will not act on,
   and the caller needs to tell that apart from a broken request: one is fixed

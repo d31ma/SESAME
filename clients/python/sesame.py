@@ -538,6 +538,10 @@ class Client:
     #
     # Endpoint paths are the host's own; the engine composes them under the
     # configured issuer and refuses any that would leave that origin.
+    def standards_dispatch(self, request: dict[str, Any]) -> Any:
+        parameters = {**request, "contract_version": "1"}
+        return self.request("standards.dispatch", parameters)
+
     def discovery(self, endpoints: dict[str, str] | None = None) -> Any:
         return self.request("oidc.discovery", endpoints or {})
 

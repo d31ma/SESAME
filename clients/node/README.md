@@ -33,8 +33,11 @@ Start options: `binary`, `deployment`, `fyloBinary` with `fyloRoot`, and
 `stderr`. Without storage options the child answers system operations and
 returns `storage_not_configured` for the rest.
 
-TypeScript declarations ship in `index.d.ts`. Errors carry a stable `code`
+TypeScript declarations ship in `sesame.d.mts`. Errors carry a stable `code`
 and `retryable` flag; see [the machine protocol](../../api/machine/v1/README.md).
+`standardsDispatch` is the single integration boundary for public framework
+routes; its versioned envelope is documented in the
+[host-adapter contract](../../api/standards/v1/README.md).
 
 Run the binary-backed contract suite from this directory with a Go toolchain
 available:

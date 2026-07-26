@@ -85,6 +85,7 @@ var Operations = []string{
 	"scim.user_patch",
 	"session.revoke",
 	"session.verify",
+	"standards.dispatch",
 	"system.metrics",
 	"system.ping",
 	"system.readiness",

@@ -3,6 +3,7 @@ package contract_test
 import (
 	"encoding/json"
 	"go/ast"
+	"go/build"
 	"go/parser"
 	"go/token"
 	"os"
@@ -59,9 +60,9 @@ func TestManifestMatchesTheEngineDispatchTable(t *testing.T) {
 	// file would silently report a slice's operations as unrouted.
 	fileSet := token.NewFileSet()
 	packageDir := filepath.Join(root, "internal", "adapters", "machine")
-	packages, err := parser.ParseDir(fileSet, packageDir, nil, 0)
+	buildPackage, err := build.Default.ImportDir(packageDir, 0)
 	if err != nil {
-		t.Fatalf("parse the machine package: %v", err)
+		t.Fatalf("resolve the machine package: %v", err)
 	}
 
 	routed := map[string]struct{}{}
@@ -98,13 +99,13 @@ func TestManifestMatchesTheEngineDispatchTable(t *testing.T) {
 		}
 		return true
 	}
-	for name, pkg := range packages {
-		if strings.HasSuffix(name, "_test") {
-			continue
+	files := append(append([]string{}, buildPackage.GoFiles...), buildPackage.CgoFiles...)
+	for _, name := range files {
+		file, err := parser.ParseFile(fileSet, filepath.Join(packageDir, name), nil, 0)
+		if err != nil {
+			t.Fatalf("parse machine package file %s: %v", name, err)
 		}
-		for _, file := range pkg.Files {
-			ast.Inspect(file, collect)
-		}
+		ast.Inspect(file, collect)
 	}
 	if len(routed) == 0 {
 		t.Fatal("no dispatch table was found in the machine processor")

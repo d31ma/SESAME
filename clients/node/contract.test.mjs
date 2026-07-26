@@ -48,6 +48,29 @@ test('system operations report a storage-backed process', async () => {
     assert.equal((await client.metrics()).storage_configured, true)
 })
 
+test('standards dispatch uses contract v1 and fails closed', async () => {
+    const result = await client.standardsDispatch({
+        contract_version: 'unsupported',
+        endpoint: 'oidc.token',
+        method: 'GET'
+    })
+    assert.equal(result.contract_version, '1')
+    assert.equal(result.status, 405)
+    assert.equal(result.headers.allow, 'POST')
+    assert.equal(result.headers['content-type'], 'application/json')
+    assert.deepEqual(result.body, { error: 'invalid_request' })
+
+    await assert.rejects(
+        () => client.standardsDispatch({
+            contract_version: 'unsupported',
+            endpoint: 'oidc.token',
+            method: 'POST',
+            authorization: 'Basic safe\r\nX-Injected: yes'
+        }),
+        (error) => error instanceof ProtocolError && error.code === 'invalid_request'
+    )
+})
+
 test('administrator bootstrap converges', async () => {
     const first = await client.adminBootstrap('acme', { namespace: 'email', value: 'Admin@Example.com' })
     assert.equal(first.created, true)

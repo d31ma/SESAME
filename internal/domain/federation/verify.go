@@ -345,11 +345,15 @@ func rsaPublicKey(key JWK) (*rsa.PublicKey, error) {
 }
 
 func ecdsaPublicKey(key JWK, curve elliptic.Curve) (*ecdsa.PublicKey, error) {
-	expected := map[elliptic.Curve]string{
-		elliptic.P256(): "P-256",
-		elliptic.P384(): "P-384",
-		elliptic.P521(): "P-521",
+	curveDetails := map[elliptic.Curve]struct {
+		name       string
+		coordinate int
+	}{
+		elliptic.P256(): {name: "P-256", coordinate: 32},
+		elliptic.P384(): {name: "P-384", coordinate: 48},
+		elliptic.P521(): {name: "P-521", coordinate: 66},
 	}[curve]
+	expected := curveDetails.name
 	if key.Curve != expected {
 		return nil, fmt.Errorf(
 			"the token declares a %s algorithm but the key is on curve %q", expected, key.Curve)
@@ -362,18 +366,29 @@ func ecdsaPublicKey(key JWK, curve elliptic.Curve) (*ecdsa.PublicKey, error) {
 	if err != nil || len(y) == 0 {
 		return nil, errors.New("the provider's EC key has an unreadable y coordinate")
 	}
-	public := &ecdsa.PublicKey{
-		Curve: curve,
-		X:     new(big.Int).SetBytes(x),
-		Y:     new(big.Int).SetBytes(y),
-	}
-	// A point off the curve is not a key. Go's ecdsa.Verify does not check
-	// this for us, and an off-curve point can make verification behave in
-	// ways the caller does not expect.
-	if !curve.IsOnCurve(public.X, public.Y) {
+
+	point := make([]byte, 1+2*curveDetails.coordinate)
+	point[0] = 4
+	xOK := copyCoordinate(point[1:1+curveDetails.coordinate], x)
+	yOK := copyCoordinate(point[1+curveDetails.coordinate:], y)
+	public, err := ecdsa.ParseUncompressedPublicKey(curve, point)
+	// A point off the curve is not a key. ParseUncompressedPublicKey performs
+	// the on-curve and point-at-infinity validation before the key is used.
+	if !xOK || !yOK || err != nil {
 		return nil, errors.New("the provider's EC key is not a point on its declared curve")
 	}
 	return public, nil
+}
+
+func copyCoordinate(destination, encoded []byte) bool {
+	for len(encoded) > len(destination) && encoded[0] == 0 {
+		encoded = encoded[1:]
+	}
+	if len(encoded) > len(destination) {
+		return false
+	}
+	copy(destination[len(destination)-len(encoded):], encoded)
+	return true
 }
 
 // matchAudience enforces that this token was issued for SESAME.

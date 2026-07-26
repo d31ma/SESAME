@@ -1,6 +1,6 @@
 # SESAME Support
 
-SESAME is currently an unsupported developer scaffold. It is not ready for
+SESAME is currently an unsupported developer preview. It is not ready for
 production identity data or authentication traffic.
 
 Use:

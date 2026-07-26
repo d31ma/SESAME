@@ -368,6 +368,10 @@ export class Client {
     //
     // Endpoint paths are the host's own; the engine composes them under the
     // configured issuer and refuses any that would leave that origin.
+    standardsDispatch = (request) => this.request('standards.dispatch', {
+        ...request,
+        contract_version: '1',
+    })
     discovery = (endpoints = {}) => this.request('oidc.discovery', endpoints)
     signingKeys = () => this.request('token.jwks')
     // Introspection reports live grant state, not just signature validity:

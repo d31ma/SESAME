@@ -411,15 +411,7 @@ func (s *Service) applyPasskeyRegistered(event audit.Event) error {
 	if _, exists := s.passkeys[payload.CredentialID]; exists {
 		return fmt.Errorf("event sequence %d registers a duplicate credential", event.Sequence)
 	}
-	s.passkeys[payload.CredentialID] = authenticatordomain.Passkey{
-		CredentialID: payload.CredentialID,
-		PrincipalID:  payload.PrincipalID,
-		TenantID:     payload.TenantID,
-		PublicKey:    payload.PublicKey,
-		SignCount:    payload.SignCount,
-		UserVerified: payload.UserVerified,
-		RegisteredAt: payload.RegisteredAt,
-	}
+	s.passkeys[payload.CredentialID] = authenticatordomain.Passkey(payload)
 	return nil
 }
 

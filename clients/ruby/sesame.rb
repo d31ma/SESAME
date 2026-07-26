@@ -438,6 +438,11 @@ module Sesame
     # Standards surfaces. Endpoint paths are the host's own; the engine
     # composes them under the configured issuer and refuses any that would
     # leave that origin.
+    def standards_dispatch(request)
+      request = request.merge('contract_version' => '1')
+      self.request('standards.dispatch', request)
+    end
+
     def discovery(endpoints = {})
       request('oidc.discovery', endpoints)
     end

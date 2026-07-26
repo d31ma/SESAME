@@ -25,7 +25,7 @@ export const SDK_COUNT = SDK_LANGUAGES.length
 // Operations in api/machine/v1/operations.json — the canonical surface, held
 // in agreement with the engine's dispatch table, the protocol reference, and
 // every SDK's source by test/contract.
-export const OPERATION_COUNT = 84
+export const OPERATION_COUNT = 85
 
 // Release targets built by .github/workflows/release.yml.
 export const PLATFORMS = [

@@ -55,142 +55,47 @@ var loginPage = template.Must(template.New("login").Parse(`<!doctype html>
 </form>`))
 
 // registerOIDCRoutes mounts the standard OIDC wire routes on the host's own
-// mux. The paths are the host's to choose; these are the conventional ones.
+// mux. The framework-neutral dispatch contract now owns all OAuth parameter
+// parsing and response mapping. This example only translates net/http values
+// and renders the human interaction SESAME deliberately does not ship.
 func registerOIDCRoutes(mux *http.ServeMux, client *sesame.Client, tenantID string) {
-	// Discovery names this host's own routes. The engine composes them under
-	// the configured issuer and refuses any that would leave that origin, so
-	// a typo here fails loudly instead of pointing relying parties elsewhere.
-	mux.HandleFunc("GET /.well-known/openid-configuration", func(writer http.ResponseWriter, request *http.Request) {
-		metadata, err := client.Discovery(request.Context(), sesame.DiscoveryEndpoints{
-			AuthorizationEndpoint: "/authorize",
-			TokenEndpoint:         "/token",
-			JWKSURI:               "/.well-known/jwks.json",
-			IntrospectionEndpoint: "/introspect",
-			RevocationEndpoint:    "/revoke",
-			EndSessionEndpoint:    "/logout",
-		})
-		if err != nil {
-			log.Printf("discovery: %v", err)
-			writeJSON(writer, http.StatusServiceUnavailable, map[string]any{"error": "server_error"})
-			return
-		}
-		writeJSON(writer, http.StatusOK, metadata)
-	})
+	endpoints := &sesame.DiscoveryEndpoints{
+		AuthorizationEndpoint: "/authorize",
+		TokenEndpoint:         "/token",
+		JWKSURI:               "/.well-known/jwks.json",
+		IntrospectionEndpoint: "/introspect",
+		RevocationEndpoint:    "/revoke",
+		EndSessionEndpoint:    "/logout",
+	}
 
-	// Both back-channel endpoints authenticate the calling client the same
-	// way the token endpoint does.
-	mux.HandleFunc("POST /introspect", func(writer http.ResponseWriter, request *http.Request) {
-		clientID, clientSecret, token, ok := backChannelRequest(request)
-		if !ok {
-			writeJSON(writer, http.StatusBadRequest, map[string]any{"error": "invalid_request"})
-			return
-		}
-		result, err := client.Introspect(request.Context(), clientID, clientSecret, token)
-		if err != nil {
-			// A caller that cannot authenticate is told so; it is not told
-			// anything about the token.
-			writeJSON(writer, http.StatusUnauthorized, map[string]any{"error": "invalid_client"})
-			return
-		}
-		writer.Header().Set("Cache-Control", "no-store")
-		writeJSON(writer, http.StatusOK, result)
-	})
+	mux.HandleFunc("GET /.well-known/openid-configuration",
+		standardEndpoint(client, "oidc.discovery", endpoints))
+	mux.HandleFunc("GET /.well-known/jwks.json",
+		standardEndpoint(client, "oidc.jwks", nil))
+	mux.HandleFunc("POST /token",
+		standardEndpoint(client, "oidc.token", nil))
+	mux.HandleFunc("POST /introspect",
+		standardEndpoint(client, "oidc.introspection", nil))
+	mux.HandleFunc("POST /revoke",
+		standardEndpoint(client, "oidc.revocation", nil))
 
-	mux.HandleFunc("POST /revoke", func(writer http.ResponseWriter, request *http.Request) {
-		clientID, clientSecret, token, ok := backChannelRequest(request)
-		if !ok {
-			writeJSON(writer, http.StatusBadRequest, map[string]any{"error": "invalid_request"})
-			return
-		}
-		if err := client.Revoke(request.Context(), clientID, clientSecret, token); err != nil {
-			writeJSON(writer, http.StatusUnauthorized, map[string]any{"error": "invalid_client"})
-			return
-		}
-		// RFC 7009: success whether or not there was anything to revoke.
-		writer.Header().Set("Cache-Control", "no-store")
-		writer.WriteHeader(http.StatusOK)
-	})
-
-	// RP-initiated logout. The hint identifies the session; the engine
-	// decides whether the return URI is one this client registered.
 	mux.HandleFunc("GET /logout", func(writer http.ResponseWriter, request *http.Request) {
-		query := request.URL.Query()
-		result, err := client.Logout(request.Context(),
-			query.Get("id_token_hint"),
-			query.Get("post_logout_redirect_uri"),
-			query.Get("state"))
-		if err != nil {
-			// Rendered rather than redirected: the request has not proven a
-			// return URI worth trusting.
-			writeJSON(writer, http.StatusBadRequest, map[string]any{
-				"error":             "invalid_request",
-				"error_description": err.Error(),
-			})
+		response, ok := dispatchStandard(writer, request, client, "oidc.logout", nil)
+		if !ok {
 			return
 		}
-		clearCookies(writer)
-		if result.RedirectURI == "" {
-			writeJSON(writer, http.StatusOK, map[string]any{"signed_out": true})
-			return
+		if response.Status < http.StatusBadRequest {
+			clearCookies(writer)
 		}
-		target, err := url.Parse(result.RedirectURI)
-		if err != nil {
-			writeJSON(writer, http.StatusInternalServerError, map[string]any{"error": "server_error"})
-			return
-		}
-		if result.State != "" {
-			parameters := target.Query()
-			parameters.Set("state", result.State)
-			target.RawQuery = parameters.Encode()
-		}
-		http.Redirect(writer, request, target.String(), http.StatusSeeOther)
-	})
-
-	mux.HandleFunc("GET /.well-known/jwks.json", func(writer http.ResponseWriter, request *http.Request) {
-		keys, err := client.SigningKeys(request.Context())
-		if err != nil {
-			log.Printf("jwks: %v", err)
-			writeJSON(writer, http.StatusServiceUnavailable, map[string]any{"error": "server_error"})
-			return
-		}
-		writeJSON(writer, http.StatusOK, keys)
+		serveStandardResponse(writer, response)
 	})
 
 	mux.HandleFunc("GET /authorize", func(writer http.ResponseWriter, request *http.Request) {
-		query := request.URL.Query()
-		// Nothing is shown to the user until the engine has accepted the
-		// request. An invalid redirect URI in particular must never reach a
-		// page that could then redirect to it.
-		started, err := client.Authorize(request.Context(), sesame.AuthorizationRequest{
-			ClientID:            query.Get("client_id"),
-			RedirectURI:         query.Get("redirect_uri"),
-			ResponseType:        query.Get("response_type"),
-			Scopes:              strings.Fields(query.Get("scope")),
-			State:               query.Get("state"),
-			Nonce:               query.Get("nonce"),
-			CodeChallenge:       query.Get("code_challenge"),
-			CodeChallengeMethod: query.Get("code_challenge_method"),
-		})
-		if err != nil {
-			// The error is rendered here rather than redirected: the request
-			// has not yet proven a redirect URI worth trusting.
-			writeJSON(writer, http.StatusBadRequest, map[string]any{
-				"error":             "invalid_request",
-				"error_description": err.Error(),
-			})
+		response, ok := dispatchStandard(writer, request, client, "oidc.authorization", nil)
+		if !ok {
 			return
 		}
-
-		http.SetCookie(writer, &http.Cookie{
-			Name:     interactionCookie,
-			Value:    started.InteractionID + ":" + started.Secret,
-			Path:     "/",
-			HttpOnly: true,
-			Secure:   true,
-			SameSite: http.SameSiteLaxMode,
-			MaxAge:   int((15 * time.Minute).Seconds()),
-		})
-		renderLogin(writer, started.ClientName, "")
+		serveAuthorizationResponse(writer, response)
 	})
 
 	mux.HandleFunc("POST /login", func(writer http.ResponseWriter, request *http.Request) {
@@ -279,49 +184,26 @@ func registerOIDCRoutes(mux *http.ServeMux, client *sesame.Client, tenantID stri
 		redirectWithCode(writer, request, response)
 	})
 
-	mux.HandleFunc("POST /token", func(writer http.ResponseWriter, request *http.Request) {
-		if err := request.ParseForm(); err != nil {
-			writeJSON(writer, http.StatusBadRequest, map[string]any{"error": "invalid_request"})
-			return
-		}
-		// Client credentials may arrive in the body or as HTTP Basic. Both
-		// are standard; the engine sees the same two values either way.
-		clientID := request.PostFormValue("client_id")
-		clientSecret := request.PostFormValue("client_secret")
-		if basicID, basicSecret, ok := request.BasicAuth(); ok {
-			clientID, clientSecret = basicID, basicSecret
-		}
+}
 
-		// Both grants come through this one endpoint, exactly as the specs
-		// define. The engine decides which fields matter.
-		tokens, err := client.TokenExchange(request.Context(), sesame.TokenRequest{
-			GrantType:    request.PostFormValue("grant_type"),
-			Code:         request.PostFormValue("code"),
-			RedirectURI:  request.PostFormValue("redirect_uri"),
-			ClientID:     clientID,
-			ClientSecret: clientSecret,
-			CodeVerifier: request.PostFormValue("code_verifier"),
-			RefreshToken: request.PostFormValue("refresh_token"),
-			Scope:        request.PostFormValue("scope"),
-		})
-		if err != nil {
-			var protocolError *sesame.ProtocolError
-			code := "invalid_request"
-			if errors.As(err, &protocolError) && protocolError.Code == "invalid_grant" {
-				code = "invalid_grant"
-			}
-			// Token endpoint errors are 400 with an OAuth error code and no
-			// detail: the engine already refused to say which check failed.
-			writer.Header().Set("Cache-Control", "no-store")
-			writeJSON(writer, http.StatusBadRequest, map[string]any{"error": code})
-			return
-		}
-		// A refresh response carries a new refresh token that replaces the
-		// one the client sent. A client that keeps using the old one will
-		// have its whole family revoked.
-		writer.Header().Set("Cache-Control", "no-store")
-		writeJSON(writer, http.StatusOK, tokens)
+func serveAuthorizationResponse(writer http.ResponseWriter, response sesame.StandardsResponse) {
+	if !applyStandardResponseHeaders(writer, response) {
+		return
+	}
+	if response.Action == nil {
+		writeStandardResponse(writer, response)
+		return
+	}
+	http.SetCookie(writer, &http.Cookie{
+		Name:     interactionCookie,
+		Value:    response.Action.InteractionID + ":" + response.Action.InteractionSecret,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   int((15 * time.Minute).Seconds()),
 	})
+	renderLogin(writer, response.Action.ClientName, "")
 }
 
 // redirectWithCode sends the browser back to the client. The target is the
@@ -404,22 +286,6 @@ func renderConsent(
 	}{ClientName: registered.Name, Scopes: interaction.Scopes}); err != nil {
 		log.Printf("render consent: %v", err)
 	}
-}
-
-// backChannelRequest reads the client credentials and token from an
-// introspection or revocation request. Credentials may arrive as HTTP Basic
-// or in the body; both are standard.
-func backChannelRequest(request *http.Request) (clientID, clientSecret, token string, ok bool) {
-	if err := request.ParseForm(); err != nil {
-		return "", "", "", false
-	}
-	clientID = request.PostFormValue("client_id")
-	clientSecret = request.PostFormValue("client_secret")
-	if basicID, basicSecret, present := request.BasicAuth(); present {
-		clientID, clientSecret = basicID, basicSecret
-	}
-	token = request.PostFormValue("token")
-	return clientID, clientSecret, token, clientID != ""
 }
 
 // signIn runs the ordinary authentication flow. The host chooses how a user

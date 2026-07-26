@@ -1,0 +1,211 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/d31ma/sesame/blob/main/api/standards/v1/host-adapter.schema.json",
+  "title": "SESAME host-adapter contract v1",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/request"
+    },
+    {
+      "$ref": "#/$defs/response"
+    }
+  ],
+  "$defs": {
+    "multimap": {
+      "type": "object",
+      "maxProperties": 64,
+      "propertyNames": {
+        "minLength": 1,
+        "maxLength": 128
+      },
+      "additionalProperties": {
+        "type": "array",
+        "minItems": 1,
+        "maxItems": 64,
+        "items": {
+          "type": "string",
+          "maxLength": 16384
+        }
+      }
+    },
+    "endpoints": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "authorization_endpoint": {
+          "type": "string",
+          "maxLength": 16384
+        },
+        "token_endpoint": {
+          "type": "string",
+          "maxLength": 16384
+        },
+        "jwks_uri": {
+          "type": "string",
+          "maxLength": 16384
+        },
+        "introspection_endpoint": {
+          "type": "string",
+          "maxLength": 16384
+        },
+        "revocation_endpoint": {
+          "type": "string",
+          "maxLength": 16384
+        },
+        "end_session_endpoint": {
+          "type": "string",
+          "maxLength": 16384
+        }
+      }
+    },
+    "request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract_version",
+        "endpoint",
+        "method"
+      ],
+      "properties": {
+        "contract_version": {
+          "const": "1"
+        },
+        "endpoint": {
+          "enum": [
+            "oidc.authorization",
+            "oidc.discovery",
+            "oidc.introspection",
+            "oidc.jwks",
+            "oidc.logout",
+            "oidc.revocation",
+            "oidc.token"
+          ]
+        },
+        "method": {
+          "enum": [
+            "GET",
+            "POST"
+          ]
+        },
+        "query": {
+          "$ref": "#/$defs/multimap"
+        },
+        "form": {
+          "$ref": "#/$defs/multimap"
+        },
+        "authorization": {
+          "type": "string",
+          "maxLength": 16384
+        },
+        "dpop": {
+          "type": "string",
+          "maxLength": 16384
+        },
+        "http_uri": {
+          "type": "string",
+          "maxLength": 16384
+        },
+        "endpoints": {
+          "$ref": "#/$defs/endpoints"
+        }
+      }
+    },
+    "headers": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "allow": {
+          "type": "string"
+        },
+        "cache-control": {
+          "type": "string"
+        },
+        "content-type": {
+          "type": "string"
+        },
+        "location": {
+          "type": "string"
+        },
+        "pragma": {
+          "type": "string"
+        },
+        "www-authenticate": {
+          "type": "string"
+        },
+        "x-content-type-options": {
+          "type": "string"
+        }
+      }
+    },
+    "action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "interaction_id",
+        "interaction_secret",
+        "client_id",
+        "client_name",
+        "scopes",
+        "expires_at"
+      ],
+      "properties": {
+        "kind": {
+          "const": "interaction"
+        },
+        "interaction_id": {
+          "type": "string"
+        },
+        "interaction_secret": {
+          "type": "string"
+        },
+        "client_id": {
+          "type": "string"
+        },
+        "client_name": {
+          "type": "string"
+        },
+        "scopes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "expires_at": {
+          "type": "string"
+        }
+      }
+    },
+    "response": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract_version",
+        "status"
+      ],
+      "properties": {
+        "contract_version": {
+          "const": "1"
+        },
+        "status": {
+          "type": "integer",
+          "minimum": 200,
+          "maximum": 599
+        },
+        "headers": {
+          "$ref": "#/$defs/headers"
+        },
+        "body": {},
+        "action": {
+          "$ref": "#/$defs/action"
+        }
+      },
+      "not": {
+        "required": [
+          "body",
+          "action"
+        ]
+      }
+    }
+  }
+}

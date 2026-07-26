@@ -180,6 +180,7 @@ export class Client {
     consentWithdraw(principalId: string, clientId: string): Promise<{ withdrawn: boolean }>
     consentGet(principalId: string, clientId: string): Promise<Consent>
 
+    standardsDispatch(request: StandardsRequest): Promise<StandardsResponse>
     discovery(endpoints?: DiscoveryEndpoints): Promise<ProviderMetadata>
     signingKeys(): Promise<JWKS>
     introspect(clientId: string, clientSecret: string, token: string): Promise<Introspection>
@@ -330,6 +331,36 @@ export interface DiscoveryEndpoints {
     introspection_endpoint?: string
     revocation_endpoint?: string
     end_session_endpoint?: string
+}
+
+export interface StandardsRequest {
+    endpoint: 'oidc.authorization' | 'oidc.discovery' | 'oidc.introspection'
+        | 'oidc.jwks' | 'oidc.logout' | 'oidc.revocation' | 'oidc.token'
+    method: 'GET' | 'POST'
+    query?: Record<string, string[]>
+    form?: Record<string, string[]>
+    authorization?: string
+    dpop?: string
+    http_uri?: string
+    endpoints?: DiscoveryEndpoints
+}
+
+export interface StandardsInteraction {
+    kind: 'interaction'
+    interaction_id: string
+    interaction_secret: string
+    client_id: string
+    client_name: string
+    scopes: string[]
+    expires_at: string
+}
+
+export interface StandardsResponse {
+    contract_version: '1'
+    status: number
+    headers?: Record<string, string>
+    body?: unknown
+    action?: StandardsInteraction
 }
 
 export interface ProviderMetadata {

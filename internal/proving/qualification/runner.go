@@ -16,6 +16,7 @@ import (
 	"time"
 
 	sesame "github.com/d31ma/sesame/clients/go/sesame"
+	"github.com/d31ma/sesame/internal/platform/runtimeid"
 	fyloproving "github.com/d31ma/sesame/internal/proving/fylo"
 )
 
@@ -267,15 +268,7 @@ func validateReleaseIdentities(current, previous, fylo Artifact) error {
 }
 
 func nativeFYLOTarget() string {
-	osName := runtime.GOOS
-	if osName == "darwin" {
-		osName = "macos"
-	}
-	architecture := runtime.GOARCH
-	if architecture == "amd64" {
-		architecture = "x64"
-	}
-	return osName + "-" + architecture
+	return runtimeid.NativeFYLOTarget()
 }
 
 func runRestore(

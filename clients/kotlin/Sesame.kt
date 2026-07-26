@@ -557,6 +557,9 @@ class Client(options: Options) : AutoCloseable {
     // Standards surfaces. Endpoint paths are the host's own; the engine
     // composes them under the configured issuer and refuses any that would
     // leave that origin.
+    fun standardsDispatch(request: Map<String, Any?>): Any? =
+        this.request("standards.dispatch", request + ("contract_version" to "1"))
+
     fun discovery(endpoints: Map<String, Any?> = emptyMap()): Any? =
         request("oidc.discovery", endpoints)
 

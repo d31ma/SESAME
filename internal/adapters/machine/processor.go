@@ -301,6 +301,7 @@ func (p *Processor) routes() map[string]handlerFunc {
 		"grant.revoke":                          p.handleGrantRevoke,
 		"authorize.decide":                      func(_ context.Context, request Request) Response { return p.handleAuthorizeDecide(request) },
 		"authorize.decide_batch":                func(_ context.Context, request Request) Response { return p.handleAuthorizeDecideBatch(request) },
+		"standards.dispatch":                    p.handleStandardsDispatch,
 		"group.create":                          p.handleGroupCreate,
 		"group.member_add":                      func(ctx context.Context, request Request) Response { return p.handleGroupMember(ctx, request, true) },
 		"group.member_remove":                   func(ctx context.Context, request Request) Response { return p.handleGroupMember(ctx, request, false) },

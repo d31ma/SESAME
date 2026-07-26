@@ -6,9 +6,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"time"
+
+	"github.com/d31ma/sesame/internal/platform/runtimeid"
 )
 
 type machineRequest struct {
@@ -489,9 +490,5 @@ func integerArgument(arguments []string, name string, fallback int) int {
 }
 
 func runtimeTarget() string {
-	operatingSystem := runtime.GOOS
-	if operatingSystem == "darwin" {
-		operatingSystem = "macos"
-	}
-	return operatingSystem + "-" + runtime.GOARCH
+	return runtimeid.NativeFYLOTarget()
 }

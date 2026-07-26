@@ -24,7 +24,20 @@ import (
 )
 
 // fyloDPoPKey mints proofs the way a client would.
-type fyloDPoPKey struct{ private *ecdsa.PrivateKey }
+type fyloDPoPKey struct {
+	private     *ecdsa.PrivateKey
+	publicPoint []byte
+}
+
+func mustPublicPoint(t testing.TB, private *ecdsa.PrivateKey) []byte {
+	t.Helper()
+
+	point, err := private.PublicKey.Bytes()
+	if err != nil {
+		t.Fatalf("encode public key: %v", err)
+	}
+	return point
+}
 
 func (f *fyloDPoPKey) proof(t *testing.T, id, method, uri, accessToken string, now time.Time) string {
 	t.Helper()
@@ -46,9 +59,9 @@ func (f *fyloDPoPKey) proof(t *testing.T, id, method, uri, accessToken string, n
 		"jwk": map[string]any{
 			"kty": "EC", "crv": "P-256",
 			"x": base64.RawURLEncoding.EncodeToString(
-				f.private.PublicKey.X.FillBytes(make([]byte, 32))),
+				f.publicPoint[1:33]),
 			"y": base64.RawURLEncoding.EncodeToString(
-				f.private.PublicKey.Y.FillBytes(make([]byte, 32))),
+				f.publicPoint[33:]),
 		},
 	}) + "." + encode(body)
 	digest := sha256.Sum256([]byte(input))
@@ -120,7 +133,7 @@ func TestRealFYLODPoPBindingSurvivesRestart(t *testing.T) {
 	if err != nil {
 		t.Fatalf("generate DPoP key: %v", err)
 	}
-	key := &fyloDPoPKey{private: private}
+	key := &fyloDPoPKey{private: private, publicPoint: mustPublicPoint(t, private)}
 
 	open := func() (*fyloadapter.Client, *identityapp.Service) {
 		t.Helper()
@@ -266,7 +279,7 @@ func TestRealFYLODPoPBindingSurvivesRestart(t *testing.T) {
 	if err != nil {
 		t.Fatalf("generate key: %v", err)
 	}
-	attacker := &fyloDPoPKey{private: other}
+	attacker := &fyloDPoPKey{private: other, publicPoint: mustPublicPoint(t, other)}
 	if _, err := refresh(replayed,
 		attacker.proof(t, "r-1", "POST", tokenURI, "", now)); !errors.Is(err,
 		oidcdomain.ErrDPoPKeyMismatch) {

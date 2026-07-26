@@ -60,6 +60,30 @@ private fun build(root: Path, workspace: Path, name: String, source: String): Pa
     return output
 }
 
+private fun initializeDeployment(
+    root: Path,
+    workspace: Path,
+    sesameBinary: Path,
+    fakeFylo: Path,
+): Path {
+    val deployment = workspace.resolve("deployment")
+    val builder = ProcessBuilder(
+        sesameBinary.toString(),
+        "init",
+        "--deployment",
+        deployment.toString(),
+        "--fylo-binary",
+        fakeFylo.toString(),
+        "--issuer",
+        "https://id.example",
+    )
+        .directory(root.toFile())
+        .redirectOutput(ProcessBuilder.Redirect.DISCARD)
+        .redirectError(ProcessBuilder.Redirect.INHERIT)
+    check(builder.start().waitFor() == 0) { "sesame init failed" }
+    return deployment
+}
+
 fun main() {
     val root = repositoryRoot()
     val workspace = Files.createTempDirectory("sesame-kotlin-contract-")
@@ -68,13 +92,12 @@ fun main() {
         val fakeFylo = build(
             root, workspace, "fake-fylo", "./internal/adapters/fylo/testdata/fakefylo",
         )
-        val fyloRoot = Files.createDirectory(workspace.resolve("root"))
+        val deployment = initializeDeployment(root, workspace, sesameBinary, fakeFylo)
 
         Client(
             Options(
                 binary = sesameBinary.toString(),
-                fyloBinary = fakeFylo.toString(),
-                fyloRoot = fyloRoot.toString(),
+                deployment = deployment.toString(),
             ),
         ).use { client ->
             // System operations report a storage-backed process.
@@ -188,9 +211,57 @@ fun main() {
                 codeOf { client.request("identity.unknown") },
                 "unknown operation",
             )
+
+            standardsDispatchScenario(client)
         }
         println("ok\tkotlin contract scenario\t$checks checks")
     } finally {
         workspace.toFile().walkBottomUp().forEach(File::delete)
     }
+}
+
+private fun standardsDispatchScenario(client: Client) {
+    val endpoints = mapOf(
+        "authorization_endpoint" to "/authorize",
+        "token_endpoint" to "/token",
+        "jwks_uri" to "/.well-known/jwks.json",
+        "introspection_endpoint" to "/introspect",
+        "revocation_endpoint" to "/revoke",
+        "end_session_endpoint" to "/logout",
+    )
+    val discovery = client.standardsDispatch(
+        mapOf(
+            "contract_version" to "unsupported",
+            "endpoint" to "oidc.discovery",
+            "method" to "GET",
+            "endpoints" to endpoints,
+        ),
+    )
+    areEqual("1", field(discovery, "contract_version"), "standards contract version")
+    areEqual(200L, field(discovery, "status"), "standards discovery status")
+    areEqual(
+        "application/json",
+        field(field(discovery, "headers"), "content-type"),
+        "standards discovery content type",
+    )
+    areEqual(
+        "https://id.example",
+        field(field(discovery, "body"), "issuer"),
+        "standards discovery issuer",
+    )
+    areEqual(
+        "https://id.example/token",
+        field(field(discovery, "body"), "token_endpoint"),
+        "standards discovery token endpoint",
+    )
+
+    areEqual(
+        "invalid_request",
+        codeOf {
+            client.standardsDispatch(
+                mapOf("endpoint" to "oidc.userinfo", "method" to "GET"),
+            )
+        },
+        "unknown standards endpoint",
+    )
 }

@@ -64,6 +64,27 @@ begin
   are_equal('sesame', client.version['name'], 'version name')
   are_equal(true, client.metrics['storage_configured'], 'storage configured')
 
+  # Standards dispatch pins contract v1 and rejects boundary injection.
+  standards = client.standards_dispatch(
+    'contract_version' => 'unsupported',
+    'endpoint' => 'oidc.token',
+    'method' => 'GET'
+  )
+  are_equal('1', standards['contract_version'], 'standards contract version')
+  are_equal(405, standards['status'], 'standards method status')
+  are_equal('POST', standards.dig('headers', 'allow'), 'standards allowed method')
+  are_equal('application/json', standards.dig('headers', 'content-type'),
+            'standards content type')
+  are_equal({ 'error' => 'invalid_request' }, standards['body'], 'standards error body')
+  are_equal('invalid_request', code_of do
+    client.standards_dispatch(
+      'contract_version' => 'unsupported',
+      'endpoint' => 'oidc.token',
+      'method' => 'POST',
+      'authorization' => "Basic safe\r\nX-Injected: yes"
+    )
+  end, 'standards boundary injection')
+
   # Tenant and principal.
   tenant_id = client.tenant_bootstrap('acme')['tenant']['tenant_id']
   principal = client.principal_create(tenant_id, 'human', 'email', 'Alice@Example.com')
