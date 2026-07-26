@@ -1,0 +1,123 @@
+<style>
+  #home-content {
+    display: none;
+  }
+</style>
+
+<div class="doc-page">
+  <div class="docs-shell w-container w-container--xl">
+    <docs-sidebar />
+    <div class="docs-main">
+      <a class="doc-back" href="/docs">← Docs</a>
+      <span class="eyebrow">Guide</span>
+      <h1>Authentication and tokens</h1>
+      <p class="doc-lede">
+        How a password becomes a session, and how a session becomes a JWT — with
+        a working call sequence for each step in all ten languages.
+      </p>
+
+      <div class="doc-section">
+        <h2>1. Password to session</h2>
+        <p>
+          Authentication is a persisted transaction, not a single call. It
+          survives a restart, it bounds its own attempts, and it is what a second
+          factor attaches to.
+        </p>
+        <code-tabs flow="password-login" />
+        <p>
+          <code>authn.begin</code> succeeds whether or not the identifier
+          resolves. That is deliberate: an endpoint that failed differently for
+          unknown accounts would be an enumeration oracle, so the difference only
+          appears when a factor is verified.
+        </p>
+        <p>
+          The session secret is returned exactly once. SESAME stores a SHA-256
+          digest, never the secret, so a stolen FYLO root does not yield usable
+          sessions.
+        </p>
+      </div>
+
+      <div class="doc-section">
+        <h2>2. Using and ending a session</h2>
+        <code-tabs flow="session" />
+        <p>
+          Revocation is durable and immediate. It survives a restart, and it also
+          revokes every refresh-token family issued on that session — otherwise
+          signing out would leave long-lived tokens alive behind it.
+        </p>
+      </div>
+
+      <div class="doc-section">
+        <h2>3. Session to JWT</h2>
+        <p>
+          SESAME opens no port, so your application owns the
+          <code>/authorize</code>, <code>/token</code>, and callback routes. The
+          engine makes every protocol decision behind them; your routes move
+          bytes and run your own login page.
+        </p>
+        <p>
+          Tokens come from the authorization-code flow rather than directly from
+          a password, and that is what binds them to one client, one redirect
+          URI, and one request. An OIDC client here has no
+          <code>grant_types</code> field at all, so the password and implicit
+          grants cannot be switched on by configuration or by mistake.
+        </p>
+        <code-tabs flow="session-to-jwt" />
+        <p>
+          Three properties are worth knowing. The authorization request is
+          validated <em>before</em> anyone is shown a login form, so a broken or
+          hostile request fails early rather than after someone has typed a
+          password. The interaction secret authorizes completing exactly one
+          interaction, which is what stops a confused-deputy attack across
+          clients. And the code is single-use and short-lived: redeeming it twice
+          is refused.
+        </p>
+        <p>
+          Every token-exchange failure returns one undifferentiated
+          <code>invalid_grant</code>. A caller that could tell a spent code from a
+          wrong verifier from a mismatched redirect URI would learn the shape of
+          the flow.
+        </p>
+      </div>
+
+      <div class="doc-section">
+        <h2>4. Refreshing</h2>
+        <p>
+          Request the <code>offline_access</code> scope and the token response
+          carries a refresh token. Refresh tokens rotate: each response replaces
+          the token you presented, and presenting a spent one revokes the entire
+          family — that is how a stolen token is detected rather than merely
+          expired.
+        </p>
+        <pre class="code-block"><code>tokens = client.token_exchange(&#123;
+    "grant_type": "refresh_token",
+    "refresh_token": previous_refresh_token,
+    "client_id": client_id,
+    "client_secret": client_secret,
+&#125;)
+
+# The new refresh_token replaces the old one. Store it before you use it;
+# a crash between the two leaves you holding a token that is already spent.</code></pre>
+        <p>
+          A refresh checks that the underlying session is <em>unrevoked</em>,
+          not merely unexpired. Otherwise <code>offline_access</code> would
+          outlive signing out, which would make revocation meaningless.
+        </p>
+      </div>
+
+      <div class="doc-section">
+        <h2>What to read next</h2>
+        <ul>
+          <li><a href="/docs/mfa">MFA and step-up</a> — add a second factor to the transaction above.</li>
+          <li><a href="https://github.com/d31ma/sesame/blob/main/api/machine/v1/README.md" target="_blank" rel="noopener">Machine protocol reference</a> — every parameter and error code for these operations.</li>
+          <li><a href="https://github.com/d31ma/sesame/tree/main/examples/hostserver" target="_blank" rel="noopener">Example host server</a> — the routes and the demo login form, in full.</li>
+        </ul>
+        <p class="doc-note">
+          SESAME implements OpenID Connect but is <strong>not OpenID
+          certified</strong>. The conformance profiles drive real browser
+          redirects against a deployed host, and that suite has not been run.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>

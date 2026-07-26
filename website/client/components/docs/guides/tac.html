@@ -1,0 +1,24 @@
+<div class="doc-section doc-section--wide">
+  <h2>Guides</h2>
+  <p>
+    Each of these is a working call sequence, not a description of one. Every
+    snippet was executed against a real engine and a real FYLO runtime before it
+    was written down.
+  </p>
+
+  <div class="w-grid-row">
+    <loop :for="let guide of guides">
+      <div class="w-grid-col-12 w-grid-col-sm-6">
+        <a :href="guide.href" class="guide-card w-card w-card--variant-outlined"
+           :target="guide.external ? '_blank' : ''"
+           :rel="guide.external ? 'noopener' : ''">
+          <h3>{guide.title} <span class="guide-arrow" aria-hidden="true">→</span></h3>
+          <p>{guide.text}</p>
+          <logic :if="guide.external">
+            <span class="guide-tag">on GitHub</span>
+          </logic>
+        </a>
+      </div>
+    </loop>
+  </div>
+</div>

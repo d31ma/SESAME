@@ -1,0 +1,252 @@
+<style>
+  #home-content {
+    display: none;
+  }
+</style>
+
+<div class="doc-page">
+  <div class="docs-shell w-container w-container--xl">
+    <docs-sidebar />
+    <div class="docs-main">
+      <a class="doc-back" href="/docs">← Docs</a>
+      <span class="eyebrow">Guide</span>
+      <h1>Device grant, PAR, and DPoP</h1>
+      <p class="doc-lede">
+        Three OAuth extensions for the cases the plain code flow does not cover:
+        a device with no browser, an authorization request you do not want the
+        browser to be able to edit, and an access token you do not want to be a
+        bearer token.
+      </p>
+
+      <div class="doc-section">
+        <h2>Which one you need</h2>
+        <p>
+          These are independent. You can use any, all, or none of them, and none
+          of them changes how the ordinary authorization code flow behaves for a
+          client that does not opt in.
+        </p>
+        <ul>
+          <li>
+            <strong>Device grant (RFC 8628)</strong> — the input has no browser.
+            A television, a CLI on a headless box, a thing with four buttons.
+          </li>
+          <li>
+            <strong>PAR (RFC 9126)</strong> — you want the authorization request
+            fixed before a user agent ever sees it, so nothing between your
+            client and the person can rewrite it.
+          </li>
+          <li>
+            <strong>DPoP (RFC 9449)</strong> — you want a captured access token
+            to be worthless to whoever captured it.
+          </li>
+        </ul>
+      </div>
+
+      <div class="doc-section">
+        <h2>Device grant</h2>
+        <p>
+          The device shows a short code, the person types it on a phone, and the
+          device polls until they approve. Four operations, and the shape of each
+          is decided by one fact: the user code is typed by a human, so it is
+          short — which makes it the only guessable credential in SESAME.
+        </p>
+        <code-tabs flow="device-grant" />
+        <p>
+          That is why the user code is drawn from a twenty-symbol alphabet with
+          no <code>O</code>, <code>0</code>, <code>I</code>, <code>l</code>,
+          <code>1</code>, <code>S</code>, <code>5</code>, or <code>U</code>;
+          why wrong guesses are bounded at five before the whole authorization is
+          denied; and why the flow lives ten minutes rather than the tens of
+          minutes RFC 8628 permits.
+        </p>
+        <h3>The three polling outcomes</h3>
+        <p>
+          The token endpoint's answers are deliberately asymmetric, and they keep
+          RFC 8628's own spelling because off-the-shelf device libraries branch
+          on those exact strings.
+        </p>
+        <ul>
+          <li>
+            <code>authorization_pending</code> — the only outcome that invites
+            another poll.
+          </li>
+          <li>
+            <code>slow_down</code> — you are polling faster than the interval you
+            were issued. Add five seconds and keep going; this is guidance, not a
+            refusal, because a device polling too fast is usually badly written
+            rather than hostile.
+          </li>
+          <li>
+            <code>access_denied</code> — refused, expired, or never existed. One
+            code for all three, so a device cannot probe your verification page
+            through the token endpoint.
+          </li>
+        </ul>
+        <p class="doc-note">
+          Approval takes a <em>session</em>, not a principal ID. This is the
+          moment a person's identity attaches to a device they are holding, and a
+          caller that could merely assert a principal could attach any device to
+          anyone. Revoking that session stops the device collecting tokens
+          afterwards, even if it was already approved.
+        </p>
+      </div>
+
+      <div class="doc-section">
+        <h2>Pushed authorization requests</h2>
+        <p>
+          In a plain code flow every parameter — the scopes, the redirect URI,
+          the PKCE challenge — travels through the user agent. That means it
+          lands in history, in referrer headers, in proxy logs, and within reach
+          of anything that can rewrite a URL. PAR moves the whole request onto a
+          back channel your client authenticates on, and hands back one opaque
+          reference to put in the redirect.
+        </p>
+        <code-tabs flow="pushed-authorization" />
+        <h3>Why a reference beside parameters is refused</h3>
+        <p>
+          RFC 9126 forbids merging a <code>request_uri</code> with loose
+          parameters. SESAME goes further and refuses the request outright with
+          <code>request_uri_conflict</code> — including when the loose value is
+          byte-identical to the pushed one.
+        </p>
+        <p>
+          Ignoring them would be quieter and worse. A client could not tell
+          whether the values it sent had been used, and something that appended a
+          parameter on the way through would look like it had succeeded. A
+          refusal is the only answer that tells you the truth.
+        </p>
+        <h3>The reference is not a secret</h3>
+        <p>
+          It reaches the browser, so it reaches everything the browser touches.
+          What makes that harmless is not secrecy — it is that the reference is
+          single-use, bound to the client that pushed it, and lives ninety
+          seconds, which is the gap between building a redirect and issuing it.
+        </p>
+        <p>
+          Unknown, expired, already-spent, and belonging-to-another-client all
+          come back as one <code>request_uri_not_found</code>. A browser-facing
+          endpoint that told them apart would report on requests other clients
+          had pushed.
+        </p>
+        <p class="doc-note">
+          The reference is spent when the authorization starts, not when the flow
+          succeeds. Spending it only on success would leave a window in which a
+          reference somebody observed in a redirect is still live — and that
+          window is exactly what an attacker wants.
+        </p>
+      </div>
+
+      <div class="doc-section">
+        <h2>DPoP</h2>
+        <p>
+          A bearer token is whoever holds it. Every layer between your client and
+          your resource — a proxy, an access log, a browser extension, a leaked
+          backup — is somewhere it can be picked up and replayed, and nothing
+          about the token objects.
+        </p>
+        <p>
+          DPoP fixes that by having the client keep a key pair and sign a fresh
+          proof for every request. The token carries the key's thumbprint in
+          <code>cnf.jkt</code>, so a token captured without the private key is
+          worth nothing.
+        </p>
+        <code-tabs flow="dpop" />
+        <h3>What the engine cannot see</h3>
+        <p>
+          This is the part to read twice. <strong>SESAME opens no listener and
+          speaks no HTTP.</strong> A proof claims an HTTP method and URI, and the
+          engine checks them against the <code>http_method</code> and
+          <code>http_uri</code> <em>you</em> report — not against a request it
+          observed.
+        </p>
+        <p>
+          A host that reports the wrong URI defeats the binding exactly as one
+          that skipped the check would. Pass what the request actually was, from
+          your framework's own request object, not a constant you typed once.
+        </p>
+        <p>
+          What the engine guarantees on its own is narrower and still worth
+          having: whatever URI you report must belong to this deployment's issuer
+          origin, or the proof is refused with <code>dpop_foreign_origin</code>.
+          A proof minted for somebody else's authorization server is refused even
+          by a host that reported it faithfully.
+        </p>
+        <h3>Three bindings, all enforced</h3>
+        <ul>
+          <li>
+            <strong>To one request.</strong> <code>htm</code> and
+            <code>htu</code> pin the proof to a method and a URI, so it cannot be
+            lifted from a cheap endpoint onto an expensive one. Query strings and
+            fragments are excluded; a trailing slash, a traversal segment, and a
+            percent-escape are <em>not</em> normalised away.
+          </li>
+          <li>
+            <strong>To one token.</strong> <code>ath</code> is the hash of the
+            access token. A proof presented alongside a token but carrying no
+            <code>ath</code> is refused rather than accepted as unbound.
+          </li>
+          <li>
+            <strong>To one use.</strong> The proof's <code>jti</code> is spent
+            durably, so a replay is refused for the proof's whole one-minute
+            window — and across a restart.
+          </li>
+        </ul>
+        <h3>The token type changes</h3>
+        <p>
+          A key-bound token comes back as <code>"token_type": "DPoP"</code>, not
+          <code>"Bearer"</code>, and must be presented as
+          <code>Authorization: DPoP &lt;token&gt;</code>. The different scheme is
+          the point: a DPoP token handed to a resource server expecting a bearer
+          token fails loudly instead of being accepted without the proof that is
+          the whole reason for the binding.
+        </p>
+        <h3>Refresh tokens stay bound</h3>
+        <p>
+          A refresh token issued to a key is refused without a proof
+          (<code>dpop_required</code>) and refused under a different key
+          (<code>dpop_key_mismatch</code>), and its successor carries the same
+          thumbprint. Without that, a stolen refresh token could be exchanged for
+          an unbound bearer token, and the binding would be something an attacker
+          simply declines to carry forward.
+        </p>
+        <p class="doc-note">
+          DPoP protects a token separated from its key. It does nothing for a
+          client whose private key is taken — that client is compromised, and the
+          answer is revocation, which stays durable and outranks key possession.
+          A revoked session reports <code>active: false</code> no matter how good
+          the proof is.
+        </p>
+      </div>
+
+      <div class="doc-section">
+        <h2>What is not implemented</h2>
+        <ul>
+          <li>
+            <code>use_dpop_nonce</code>. A server-supplied nonce would narrow the
+            proof window below the client's clock plus skew. It needs a nonce
+            issuance surface and a host-side retry contract, and neither exists
+            yet.
+          </li>
+          <li>
+            Per-client policy. There is no switch that makes DPoP or PAR
+            mandatory for a given client; both are per request.
+          </li>
+          <li>
+            <code>pushed_authorization_request_endpoint</code> in discovery. The
+            endpoint is one of your routes, and the host owns every route.
+          </li>
+          <li>JAR — the signed <code>request</code> object — is not supported.</li>
+        </ul>
+      </div>
+
+      <div class="doc-section">
+        <h2>What to read next</h2>
+        <ul>
+          <li><a href="/docs/errors">Reason and error codes</a> — every code these flows can return.</li>
+          <li><a href="/docs/authentication">Authentication and tokens</a> — the code flow these extend.</li>
+          <li><a href="https://github.com/d31ma/sesame/blob/main/docs/THREAT_MODEL.md" target="_blank" rel="noopener">Threat model</a> — what a stolen access token is worth, with and without DPoP.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>

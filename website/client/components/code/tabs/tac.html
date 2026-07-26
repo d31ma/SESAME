@@ -1,0 +1,14 @@
+<div class="code-tabs">
+  <div class="qs-tabs" role="tablist" aria-label="Language">
+    <loop :for="let language of languages">
+      <button
+        type="button"
+        role="tab"
+        :class="'w-btn w-btn--sm ' + (language === active ? 'w-btn-filled' : 'w-btn-text')"
+        :aria-selected="language === active"
+        on:click="select(language)"
+      >{language}</button>
+    </loop>
+  </div>
+  <pre class="code-block"><code>{snippet}</code></pre>
+</div>

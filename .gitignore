@@ -1,0 +1,39 @@
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+secrets/
+*.key
+
+# Runtime state: FYLO data must never be committed
+data/
+.sesame/
+
+# Build and test output
+bin/
+dist/
+coverage/
+*.test
+*.prof
+*.out
+/sesame
+
+# Tool caches
+.cache/
+.claude/
+.graphify*
+graphify-out/
+
+# Editors and operating systems
+.DS_Store
+.idea/
+.vscode/
+
+# SDK contract-test build artifacts
+clients/rust/sesame-rust-contract
+clients/java/build/
+clients/kotlin/*.jar
+clients/csharp/bin/
+clients/csharp/obj/
+__pycache__/
+dist/

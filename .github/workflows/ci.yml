@@ -1,0 +1,318 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Native tests (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up Go
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Run tests
+        run: go test -count=1 ./...
+
+      - name: Run vet
+        run: go vet ./...
+
+      # Named separately so a security regression is reported as one, rather
+      # than as "some test failed" among hundreds.
+      - name: Run the protocol adversarial suite
+        run: go test -count=1 -v ./test/adversarial
+
+      # A ratchet, not an aspiration: each package group carries its own floor,
+      # set just below where it stands, so a drop fails the build while a
+      # single module-wide number would have been meaningless.
+      - name: Check coverage floors
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          go test -count=1 -covermode=set -coverprofile=coverage.out ./internal/...
+          go run ./tools/coverage -profile coverage.out
+
+      - name: Upload the coverage profile
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: coverage-profile
+          path: coverage.out
+          retention-days: 14
+
+  sdk-interop:
+    name: SDK contract corpus (Go, Node, Python)
+    # Every SDK runs the same scenario against real compiled binaries, so a
+    # divergence fails the language that drifted rather than hiding in a mock.
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up Go
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Set up Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22
+
+      - name: Set up Python
+        uses: actions/setup-python@e797f83bcb11b83ae66e0230d5156d7c80228e7c # v6
+        with:
+          python-version: "3.12"
+
+      - name: Run Go SDK contract corpus
+        run: go test -count=1 -run TestSDKContractScenario ./clients/go/sesame
+
+      - name: Run Node SDK contract corpus
+        working-directory: clients/node
+        run: node --test
+
+      - name: Run Python SDK contract corpus
+        working-directory: clients/python
+        run: python3 -m unittest -v test_contract
+
+  sdk-interop-extended:
+    name: SDK contract corpus (Rust, Java, Kotlin, C#, PHP, Ruby, Dart)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up Go
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Set up Java
+        uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        with:
+          php-version: "8.3"
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@a4effe49ee8ee5b8b5091268c473a4628afb5651 # v1
+        with:
+          ruby-version: "3.3"
+
+      - name: Set up Dart
+        uses: dart-lang/setup-dart@65eb853c7ba17dde3be364c3d2858773e7144260 # v1
+
+      - name: Run Rust SDK contract corpus
+        working-directory: clients/rust
+        run: |
+          rustc --edition 2021 --test contract_test.rs -o sesame-rust-contract
+          ./sesame-rust-contract --nocapture
+
+      - name: Run Java SDK contract corpus
+        working-directory: clients/java
+        run: |
+          javac -d build Sesame.java SesameContractTest.java
+          java -cp build ma.del.sesame.SesameContractTest
+
+      - name: Set up Kotlin
+        run: |
+          curl -fsSL -o kotlin.zip \
+            https://github.com/JetBrains/kotlin/releases/download/v2.1.10/kotlin-compiler-2.1.10.zip
+          unzip -q kotlin.zip -d "$HOME"
+          echo "$HOME/kotlinc/bin" >> "$GITHUB_PATH"
+
+      - name: Run Kotlin SDK contract corpus
+        working-directory: clients/kotlin
+        run: |
+          kotlinc Sesame.kt ContractTest.kt -include-runtime -d sesame-kotlin-contract.jar
+          java -jar sesame-kotlin-contract.jar
+
+      - name: Run C# SDK contract corpus
+        working-directory: clients/csharp
+        run: dotnet run --project SesameContractTest.csproj
+
+      - name: Run PHP SDK contract corpus
+        run: php clients/php/contract_test.php
+
+      - name: Run Ruby SDK contract corpus
+        run: ruby clients/ruby/contract_test.rb
+
+      - name: Run Dart SDK contract corpus
+        run: dart run clients/dart/contract_test.dart
+
+  sdk-bundle:
+    name: Verify the client bundle can be consumed
+    # SESAME distributes clients as one file per language inside
+    # sesame-clients.tar.gz, with no package manifests and no registry. That
+    # makes this the only check between a release and a client nobody can use:
+    # it builds the tarball, extracts it, and copies each shim into a
+    # throwaway project exactly as a developer would.
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up Go
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Set up Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22
+
+      - name: Set up Python
+        uses: actions/setup-python@e797f83bcb11b83ae66e0230d5156d7c80228e7c # v6
+        with:
+          python-version: "3.12"
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Set up Java
+        uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        with:
+          php-version: "8.3"
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@a4effe49ee8ee5b8b5091268c473a4628afb5651 # v1
+        with:
+          ruby-version: "3.3"
+
+      - name: Set up Dart
+        uses: dart-lang/setup-dart@65eb853c7ba17dde3be364c3d2858773e7144260 # v1
+
+      - name: Set up Kotlin
+        run: |
+          curl -fsSL -o kotlin.zip \
+            https://github.com/JetBrains/kotlin/releases/download/v2.1.10/kotlin-compiler-2.1.10.zip
+          unzip -q kotlin.zip -d "$HOME"
+          echo "$HOME/kotlinc/bin" >> "$GITHUB_PATH"
+
+      - name: Build and consume the client bundle
+        run: tools/verify-sdk-install.sh dist/sesame-clients.tar.gz
+
+      - name: Upload the client bundle
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: sesame-clients
+          path: dist/sesame-clients.tar.gz
+          if-no-files-found: error
+
+  quality:
+    name: Formatting, race, static analysis, and vulnerabilities
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up Go
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Check formatting
+        shell: bash
+        run: test -z "$(gofmt -l .)"
+
+      - name: Run race detector
+        run: go test -race -count=1 ./...
+
+      - name: Run staticcheck
+        shell: bash
+        run: |
+          GOTOOLCHAIN=local go install honnef.co/go/tools/cmd/staticcheck@v0.7.0
+          staticcheck ./...
+
+      - name: Run govulncheck
+        shell: bash
+        run: |
+          GOTOOLCHAIN=local go install golang.org/x/vuln/cmd/govulncheck@v1.6.0
+          govulncheck ./...
+
+  cross-build:
+    name: Cross-compile only (${{ matrix.goos }}/${{ matrix.goarch }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+            suffix: ""
+          - goos: linux
+            goarch: arm64
+            suffix: ""
+          - goos: darwin
+            goarch: amd64
+            suffix: ""
+          - goos: darwin
+            goarch: arm64
+            suffix: ""
+          - goos: windows
+            goarch: amd64
+            suffix: .exe
+          - goos: windows
+            goarch: arm64
+            suffix: .exe
+    steps:
+      - name: Check out source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up Go
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Cross-compile SESAME
+        shell: bash
+        env:
+          CGO_ENABLED: "0"
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: go build -trimpath -o "sesame-${GOOS}-${GOARCH}${{ matrix.suffix }}" ./cmd/sesame

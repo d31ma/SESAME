@@ -1,0 +1,36 @@
+<section class="hero" aria-labelledby="hero-heading">
+  <div class="w-container w-container--lg">
+    <h1 id="hero-heading">
+      <span class="hero-grad">Identity your application owns.</span>
+      <span class="hero-plain">Not a server you have to trust.</span>
+    </h1>
+
+    <p class="hero-sub">
+      SESAME is a headless authentication and authorization engine. It opens no port and
+      ships no UI — your application owns every listener and drives the engine over a
+      versioned protocol on stdin and stdout. Sessions, tokens, policy, and audit stay
+      inside your own stack, in any of {sdkCount} languages.
+    </p>
+
+    <div class="hero-install" role="button" tabindex="0" on:click="copyInstall()" aria-label="Copy install command">
+      <span class="hero-prompt" aria-hidden="true">❯</span>
+      <code class="hero-cmd">{installCmd}</code>
+      <logic :if="installCopied">
+        <span class="hero-copied">copied ✓</span>
+      </logic><logic else="">
+        <span class="hero-copy-hint">copy</span>
+      </logic>
+    </div>
+
+    <div class="hero-actions">
+      <a class="w-btn w-btn-filled w-btn--lg" href="/docs">Get started <span aria-hidden="true">→</span></a>
+      <a class="w-btn w-btn-outlined w-btn--lg" href="/download">Download</a>
+    </div>
+
+    <div class="hero-ticks" role="list">
+      <loop :for="let tick of ticks">
+        <span class="hero-tick" role="listitem">✓ {tick}</span>
+      </loop>
+    </div>
+  </div>
+</section>

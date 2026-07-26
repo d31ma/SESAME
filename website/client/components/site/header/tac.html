@@ -1,0 +1,35 @@
+<header class="w-app-bar w-app-bar--sticky site-header">
+  <div class="w-container w-container--xl header-row">
+    <a href="/" class="brand" aria-label="SESAME home">
+      <svg class="brand-mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+        <rect x="3" y="3" width="26" height="26" rx="7" fill="rgba(139,124,246,0.12)" stroke="#8b7cf6" stroke-width="1.8" />
+        <circle cx="16" cy="13.5" r="3.6" fill="none" stroke="#8b7cf6" stroke-width="1.8" />
+        <path d="M14.4 16.6 13 23.5h6l-1.4-6.9" fill="none" stroke="#8b7cf6" stroke-width="1.8" stroke-linejoin="round" />
+      </svg>
+      <span class="brand-name">SESAME</span>
+    </a>
+
+    <nav class="header-nav w-hide-mobile" aria-label="Primary navigation">
+      <a class="w-btn w-btn-text w-btn--sm" href="/docs">Docs</a>
+      <a class="w-btn w-btn-text w-btn--sm" href="/download">Download</a>
+      <a class="w-btn w-btn-text w-btn--sm" href="https://github.com/d31ma/sesame" target="_blank" rel="noopener">GitHub</a>
+    </nav>
+
+    <button type="button" class="w-btn w-btn-icon" w-theme-toggle aria-label="Switch color theme">
+      <span w-theme-icon aria-hidden="true"></span>
+    </button>
+
+    <a class="w-btn w-btn-filled w-btn--sm w-hide-mobile" href="/download">Download</a>
+
+    <button type="button" class="w-btn w-btn-icon header-burger" w-menu-toggle aria-label="Menu" aria-expanded="false" aria-controls="mobile-menu">
+      <span class="burger-open" aria-hidden="true">☰</span>
+      <span class="burger-close" aria-hidden="true">✕</span>
+    </button>
+  </div>
+
+  <nav id="mobile-menu" class="header-mobile-menu" aria-label="Mobile navigation">
+    <a class="w-btn w-btn-text" href="/docs">Docs</a>
+    <a class="w-btn w-btn-text" href="/download">Download</a>
+    <a class="w-btn w-btn-text" href="https://github.com/d31ma/sesame" target="_blank" rel="noopener">GitHub</a>
+  </nav>
+</header>

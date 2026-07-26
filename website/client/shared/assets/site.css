@@ -1,0 +1,1372 @@
+/* ── SESAME brand theme over DuVay tokens ──────────────────────────────── */
+html[w-theme] {
+  --w-primary: #8b7cf6;
+  --w-on-primary: #100b26;
+  --w-primary-container: rgba(139, 124, 246, 0.16);
+  --w-on-primary-container: #a99bff;
+  --w-radius-sm: 6px;
+  --w-radius: 10px;
+  --w-radius-md: 12px;
+  --w-radius-lg: 14px;
+  --w-radius-xl: 20px;
+
+  /* A second accent so gradients have somewhere to travel. Monochrome violet
+     reads as flat no matter how many layers are stacked on it. */
+  --accent: #8b7cf6;
+  --accent-soft: #a99bff;
+  --accent-far: #4f8ff7;
+  --accent-glow: rgba(139, 124, 246, 0.55);
+
+  /* One ramp for lifted surfaces, so a card, a code block and a callout all
+     sit at the same depth instead of each inventing one. */
+  --lift-border: rgba(139, 124, 246, 0.18);
+  --lift-border-strong: rgba(139, 124, 246, 0.4);
+  --lift-highlight: rgba(255, 255, 255, 0.06);
+  --lift-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px -12px rgba(0, 0, 0, 0.6);
+  --lift-shadow-hover: 0 1px 2px rgba(0, 0, 0, 0.4), 0 18px 40px -16px rgba(79, 60, 190, 0.55);
+  --grid-line: rgba(139, 124, 246, 0.07);
+}
+
+html[w-theme='dark'] {
+  --w-surface: #08080c;
+  --w-surface-container-low: #101018;
+  --w-surface-container-high: #171722;
+  --w-border: rgba(139, 124, 246, 0.16);
+  --w-divider: rgba(255, 255, 255, 0.08);
+}
+
+html[w-theme='light'] {
+  /* The same ramp inverted. Light needs less glow and more contrast in the
+     hairlines, or every surface dissolves into the page. */
+  --lift-border: rgba(80, 60, 180, 0.14);
+  --lift-border-strong: rgba(80, 60, 180, 0.32);
+  --lift-highlight: rgba(255, 255, 255, 0.9);
+  --lift-shadow: 0 1px 2px rgba(30, 20, 70, 0.06), 0 8px 24px -14px rgba(30, 20, 70, 0.18);
+  --lift-shadow-hover: 0 1px 2px rgba(30, 20, 70, 0.08), 0 18px 40px -18px rgba(79, 60, 190, 0.28);
+  --grid-line: rgba(80, 60, 180, 0.06);
+  --accent-glow: rgba(139, 124, 246, 0.3);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  /* Nothing should be able to scroll the page sideways. Wide children —
+     code blocks, tables — scroll inside their own container instead.
+     `clip`, not `hidden`: hidden makes the body a scroll container, which
+     silently breaks the sticky header. */
+  overflow-x: clip;
+  background: var(--w-surface);
+  color: var(--w-text);
+  font-family:
+    ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+/* ── Layout helpers ────────────────────────────────────────────────────── */
+.section {
+  padding: clamp(2.75rem, 7vw, 4.5rem) clamp(1rem, 4vw, 1.5rem);
+}
+.section--tight {
+  padding: 3rem 1rem;
+}
+.section-head {
+  max-width: 46rem;
+  margin: 0 auto 2.75rem;
+  text-align: center;
+}
+.section-head h2 {
+  margin: 0.4rem 0 0.75rem;
+  font-size: clamp(1.6rem, 3.5vw, 2.25rem);
+  letter-spacing: -0.02em;
+}
+.section-head p {
+  margin: 0;
+  color: var(--w-text-subtle);
+  line-height: 1.7;
+}
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--w-primary);
+}
+
+/* ── Code blocks ───────────────────────────────────────────────────────── */
+.code-block {
+  margin: 0;
+  padding: 1.1rem 1.25rem;
+  overflow-x: auto;
+  border: 1px solid var(--w-border);
+  border-radius: var(--w-radius-lg);
+  background: var(--w-surface-container-low);
+  font-family: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.85rem;
+  line-height: 1.7;
+  color: var(--w-text);
+  white-space: pre;
+  text-align: left;
+}
+
+/* ── Header ────────────────────────────────────────────────────────────── */
+/*
+ * Tachyon wraps every component in its own element, and a sticky child can
+ * only travel within its parent — so the header's wrapper, being exactly as
+ * tall as the header, made `position: sticky` a no-op. `display: contents`
+ * removes the wrapper from layout so the header's containing block is the
+ * body, which is what it has to be to stay put while the page scrolls.
+ */
+body > div:has(> .site-header) {
+  display: contents;
+}
+
+.site-header {
+  border-bottom: 1px solid var(--w-divider);
+  background: color-mix(in srgb, var(--w-surface) 88%, transparent);
+  backdrop-filter: blur(10px);
+}
+.header-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding-block: 0.55rem;
+}
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin-right: auto;
+  text-decoration: none;
+  color: var(--w-text);
+}
+.brand-mark {
+  width: 28px;
+  height: 28px;
+}
+.brand-name {
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  font-size: 0.95rem;
+}
+.header-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+}
+.header-burger {
+  display: none;
+}
+.header-mobile-menu {
+  display: none;
+  flex-direction: column;
+  padding: 0.5rem 1rem 1rem;
+  border-top: 1px solid var(--w-divider);
+}
+.site-header.menu-open .header-mobile-menu {
+  display: flex;
+}
+.burger-close {
+  display: none;
+}
+.site-header.menu-open .burger-open {
+  display: none;
+}
+.site-header.menu-open .burger-close {
+  display: inline;
+}
+@media (max-width: 767px) {
+  .header-burger {
+    display: inline-flex;
+  }
+}
+
+/* ── Hero ──────────────────────────────────────────────────────────────── */
+.hero {
+  padding: clamp(2.5rem, 8vw, 5rem) clamp(1rem, 4vw, 1.5rem) clamp(2.25rem, 6vw, 3.5rem);
+  text-align: center;
+  background:
+    radial-gradient(60rem 26rem at 50% -6rem, rgba(139, 124, 246, 0.16), transparent 70%);
+}
+.hero h1 {
+  margin: 0 0 1rem;
+  font-size: clamp(1.75rem, 7vw, 3.6rem);
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+}
+.hero-grad {
+  display: block;
+  background: linear-gradient(100deg, #a99bff, #8b7cf6 55%, #5f8dfa);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.hero-plain {
+  display: block;
+}
+.hero-sub {
+  max-width: 44rem;
+  margin: 0 auto 2rem;
+  color: var(--w-text-subtle);
+  font-size: clamp(0.95rem, 1.2vw + 0.7rem, 1.05rem);
+  line-height: 1.65;
+  text-wrap: pretty;
+}
+.hero-install {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  max-width: 100%;
+  margin-bottom: 1.75rem;
+  padding: 0.6rem 0.9rem;
+  border: 1px solid var(--w-border);
+  border-radius: var(--w-radius-lg);
+  background: var(--w-surface-container-low);
+  cursor: pointer;
+  overflow-x: auto;
+}
+.hero-prompt {
+  color: var(--w-primary);
+}
+.hero-cmd {
+  font-family: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+.hero-copy-hint,
+.hero-copied {
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--w-text-subtle);
+}
+.hero-copied {
+  color: var(--w-primary);
+}
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.7rem;
+  margin-bottom: 2rem;
+}
+.hero-ticks {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem 1.25rem;
+}
+.hero-tick {
+  font-size: 0.85rem;
+  color: var(--w-text-subtle);
+}
+
+/* ── Stats ─────────────────────────────────────────────────────────────── */
+.stats {
+  padding: 0 1rem 3rem;
+}
+.stat {
+  padding: 1rem 0.5rem;
+  text-align: center;
+}
+.stat-value {
+  font-size: clamp(1.5rem, 4vw, 2.1rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--w-primary);
+}
+.stat-label {
+  margin-top: 0.15rem;
+  font-size: 0.82rem;
+  color: var(--w-text-subtle);
+}
+
+/* ── Cards ─────────────────────────────────────────────────────────────── */
+/* A capability card is one per column, so filling the column is what makes a
+   row of them line up. Proof cards stack several to a column, where the same
+   rule would make each one as tall as the whole column. */
+.cap-card {
+  height: 100%;
+}
+.cap-card,
+.proof-card {
+  padding: 1.35rem;
+  margin-bottom: 1.25rem;
+}
+.cap-card h3,
+.proof-card h3 {
+  margin: 0.7rem 0 0.5rem;
+  font-size: 1.02rem;
+}
+.cap-card p,
+.proof-card p {
+  margin: 0;
+  color: var(--w-text-subtle);
+  font-size: 0.92rem;
+  line-height: 1.65;
+}
+
+/* ── Proof / honesty section ───────────────────────────────────────────── */
+.proof {
+  background: var(--w-surface-container-low);
+  border-block: 1px solid var(--w-divider);
+}
+/* Neither column is labelled, so the not-yet-built one is drawn rather than
+   captioned: a dashed edge reads as provisional at a glance, and unlike a
+   column position it still reads that way once the two stack on a phone. */
+.proof-col--open .proof-card {
+  border-style: dashed;
+  /* Weighted for the light theme, where the built cards are already almost
+     the page colour and a fainter dash disappears into them entirely. */
+  border-color: color-mix(in srgb, var(--w-text-subtle) 60%, transparent);
+  background: transparent;
+}
+.proof-col--open .proof-card h3 {
+  color: var(--w-text-subtle);
+}
+.proof-note {
+  max-width: 46rem;
+  margin: 2.25rem auto 0;
+  padding: 1rem 1.2rem;
+  border-left: 3px solid var(--w-primary);
+  background: var(--w-surface-container-high);
+  border-radius: var(--w-radius);
+  color: var(--w-text-subtle);
+  font-size: 0.92rem;
+  line-height: 1.7;
+}
+
+/* ── Architecture ──────────────────────────────────────────────────────── */
+.arch-flow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  justify-content: center;
+  gap: 0.75rem;
+  margin-bottom: 2.5rem;
+}
+.arch-node {
+  flex: 1 1 13rem;
+  max-width: 17rem;
+  padding: 1.1rem;
+  border: 1px solid var(--w-border);
+  border-radius: var(--w-radius-lg);
+  background: var(--w-surface-container-low);
+  text-align: center;
+}
+.arch-node strong {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-size: 0.95rem;
+}
+.arch-node span {
+  font-size: 0.85rem;
+  color: var(--w-text-subtle);
+  line-height: 1.6;
+}
+.arch-arrow {
+  align-self: center;
+  color: var(--w-primary);
+  font-size: 1.1rem;
+}
+
+/* ── Quickstart tabs ───────────────────────────────────────────────────── */
+.qs-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 1rem;
+}
+.qs-panel {
+  max-width: 52rem;
+  margin: 0 auto;
+}
+
+/* ── Call to action ────────────────────────────────────────────────────── */
+.cta {
+  padding: 4rem 1rem;
+  text-align: center;
+  background:
+    radial-gradient(45rem 20rem at 50% 120%, rgba(139, 124, 246, 0.18), transparent 70%);
+}
+.cta h2 {
+  margin: 0 0 0.75rem;
+  font-size: clamp(1.6rem, 4vw, 2.3rem);
+  letter-spacing: -0.02em;
+}
+.cta p {
+  max-width: 38rem;
+  margin: 0 auto 1.75rem;
+  color: var(--w-text-subtle);
+  line-height: 1.7;
+}
+.cta-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.7rem;
+}
+
+/* ── Footer ────────────────────────────────────────────────────────────── */
+.site-footer {
+  padding: 3rem 1rem 2rem;
+  border-top: 1px solid var(--w-divider);
+}
+.footer-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2.5rem;
+  justify-content: space-between;
+}
+.footer-brand p {
+  max-width: 22rem;
+  margin: 0.6rem 0 0;
+  color: var(--w-text-subtle);
+  font-size: 0.88rem;
+  line-height: 1.65;
+}
+.footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2.5rem;
+}
+.footer-col h4 {
+  margin: 0 0 0.6rem;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--w-text-subtle);
+}
+.footer-col a {
+  display: block;
+  margin-bottom: 0.4rem;
+  color: var(--w-text);
+  text-decoration: none;
+  font-size: 0.9rem;
+}
+.footer-col a:hover {
+  color: var(--w-primary);
+}
+.footer-base {
+  margin-top: 2.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--w-divider);
+  color: var(--w-text-subtle);
+  font-size: 0.82rem;
+}
+
+/* ── Docs and download pages ───────────────────────────────────────────── */
+.doc-page {
+  padding: clamp(1.75rem, 5vw, 3rem) clamp(1rem, 4vw, 1.5rem) clamp(2.5rem, 6vw, 4rem);
+}
+.doc-page h1 {
+  margin: 0 0 0.75rem;
+  font-size: clamp(1.6rem, 5.5vw, 2.6rem);
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+.doc-lede {
+  max-width: 44rem;
+  margin: 0 0 2.5rem;
+  color: var(--w-text-subtle);
+  line-height: 1.75;
+}
+.doc-section {
+  max-width: 52rem;
+  margin: 0 0 2.75rem;
+}
+.doc-section h2 {
+  margin: 0 0 0.6rem;
+  font-size: 1.25rem;
+  letter-spacing: -0.01em;
+}
+.doc-section > p {
+  margin: 0 0 1rem;
+  overflow-wrap: break-word;
+  color: var(--w-text-subtle);
+  line-height: 1.75;
+}
+.doc-section ul {
+  margin: 0 0 1rem;
+  padding-left: 1.15rem;
+  color: var(--w-text-subtle);
+  line-height: 1.8;
+}
+/* Inline links take the accent; a button already carries its own colours,
+   and tinting it paints primary text onto a primary background. */
+.doc-section a:not(.w-btn) {
+  color: var(--w-primary);
+}
+.platform-card {
+  padding: 1.1rem 1.25rem;
+  margin-bottom: 1rem;
+}
+.platform-card strong {
+  display: block;
+  font-size: 0.98rem;
+}
+.platform-card span {
+  font-size: 0.86rem;
+  color: var(--w-text-subtle);
+}
+
+/* ── Docs shell and sidebar ────────────────────────────────────────────── */
+/* Two columns on a wide screen, one on a narrow one, with the nav collapsed
+   behind a button below the breakpoint — a fixed 15rem rail on a phone would
+   eat half the reading width. */
+.docs-shell {
+  display: grid;
+  grid-template-columns: 15rem minmax(0, 1fr);
+  gap: clamp(1.5rem, 4vw, 3rem);
+  align-items: start;
+}
+.docs-main {
+  min-width: 0;
+}
+.docs-sidebar {
+  position: sticky;
+  /* Clears the sticky header rather than sliding under it. */
+  top: 5rem;
+  max-height: calc(100vh - 6.5rem);
+  padding-right: 0.5rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.docs-sidebar-toggle {
+  display: none;
+  width: 100%;
+  margin-bottom: 1rem;
+}
+.docs-sidebar-section {
+  margin-bottom: 1.5rem;
+}
+.docs-sidebar-subhead {
+  margin: 0 0 0.2rem;
+  padding: 0 0.65rem;
+  color: var(--w-text-subtle);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  line-height: 1.4;
+  text-transform: uppercase;
+}
+.docs-sidebar-summary {
+  margin: 0 0 0.55rem;
+  padding: 0 0.65rem;
+  color: var(--w-text-very-subtle, var(--w-text-subtle));
+  font-size: 0.74rem;
+  line-height: 1.45;
+  opacity: 0.75;
+}
+.docs-sidebar-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.docs-sidebar-list li {
+  margin-bottom: 1px;
+}
+.docs-sidebar-list a {
+  display: block;
+  padding: 0.4rem 0.65rem;
+  border-left: 2px solid transparent;
+  border-radius: 0 var(--w-radius) var(--w-radius) 0;
+  color: var(--w-text-subtle);
+  font-size: 0.86rem;
+  line-height: 1.45;
+  text-decoration: none;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.docs-sidebar-list a:hover {
+  background: color-mix(in srgb, var(--w-primary) 8%, transparent);
+  color: var(--w-text);
+}
+.docs-sidebar-list a.is-current {
+  border-left-color: var(--w-primary);
+  background: color-mix(in srgb, var(--w-primary) 12%, transparent);
+  color: var(--w-primary);
+  font-weight: 600;
+}
+.docs-sidebar-out {
+  margin-left: 0.3rem;
+  font-size: 0.75em;
+  opacity: 0.6;
+}
+
+@media (max-width: 1023px) {
+  .docs-shell {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .docs-sidebar {
+    position: static;
+    max-height: none;
+    padding-right: 0;
+    overflow: visible;
+    margin-bottom: 1.5rem;
+  }
+  .docs-sidebar-toggle {
+    display: block;
+  }
+  .docs-sidebar-nav {
+    display: none;
+  }
+  .docs-sidebar.is-open .docs-sidebar-nav {
+    display: block;
+    padding: 0.75rem 0.25rem;
+    border: 1px solid var(--w-divider);
+    border-radius: var(--w-radius);
+    background: var(--w-surface-container-low);
+  }
+}
+
+/* ── Guides ────────────────────────────────────────────────────────────── */
+.doc-section--wide {
+  max-width: none;
+}
+.doc-back {
+  /* Block, not inline-block: the eyebrow that follows belongs on its own
+     line, and an inline back link pulls it up alongside. */
+  display: block;
+  margin-bottom: 1.25rem;
+  color: var(--w-text-subtle);
+  text-decoration: none;
+  font-size: 0.88rem;
+}
+.doc-back:hover {
+  color: var(--w-primary);
+}
+.guide-card {
+  display: block;
+  height: 100%;
+  padding: 1.25rem;
+  margin-bottom: 1.25rem;
+  text-decoration: none;
+  color: inherit;
+  transition:
+    border-color 120ms ease,
+    transform 120ms ease;
+}
+.guide-card:hover {
+  border-color: var(--w-primary);
+  transform: translateY(-2px);
+}
+.guide-card h3 {
+  margin: 0 0 0.45rem;
+  font-size: 1rem;
+}
+.guide-card p {
+  margin: 0;
+  color: var(--w-text-subtle);
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+.guide-arrow {
+  color: var(--w-primary);
+}
+.guide-tag {
+  display: inline-block;
+  margin-top: 0.6rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--w-text-subtle);
+}
+
+/* ── Callouts ──────────────────────────────────────────────────────────── */
+.doc-callout {
+  max-width: 52rem;
+  margin: 0 0 2.5rem;
+  padding: 1.1rem 1.3rem;
+  border-left: 3px solid var(--w-primary);
+  border-radius: var(--w-radius);
+  background: var(--w-surface-container-low);
+}
+.doc-callout--warn {
+  border-left-color: var(--w-warning, #fbbf24);
+  margin: 1.5rem 0;
+}
+.doc-callout strong {
+  display: block;
+  margin-bottom: 0.5rem;
+}
+.doc-callout p {
+  margin: 0;
+  color: var(--w-text-subtle);
+  line-height: 1.7;
+  font-size: 0.93rem;
+}
+.doc-note {
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--w-divider);
+  color: var(--w-text-subtle);
+  font-size: 0.88rem;
+  line-height: 1.7;
+}
+.code-tabs {
+  margin-bottom: 1.25rem;
+}
+.doc-section code {
+  padding: 0.1rem 0.35rem;
+  border-radius: var(--w-radius-sm);
+  background: var(--w-surface-container-high);
+  font-family: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.88em;
+}
+.code-block code {
+  padding: 0;
+  background: none;
+  font-size: inherit;
+}
+
+/* ── Reference tables ──────────────────────────────────────────────────── */
+.code-table {
+  width: 100%;
+  margin: 0 0 2rem;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+.code-table th {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--w-border);
+  text-align: left;
+  font-size: 0.76rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--w-text-subtle);
+}
+.code-table td {
+  padding: 0.6rem 0.75rem;
+  border-bottom: 1px solid var(--w-divider);
+  vertical-align: top;
+  line-height: 1.6;
+}
+.code-table td:first-child {
+  width: 18rem;
+  white-space: nowrap;
+}
+.code-table td:last-child {
+  color: var(--w-text-subtle);
+}
+.code-group {
+  margin: 2rem 0 0.3rem;
+  font-size: 1.05rem;
+}
+.code-group-note {
+  margin: 0 0 0.9rem;
+  color: var(--w-text-subtle);
+  font-size: 0.9rem;
+}
+@media (max-width: 767px) {
+  .code-table td:first-child {
+    width: auto;
+    white-space: normal;
+  }
+}
+
+/* ══ Surface and depth ══════════════════════════════════════════════════ */
+/*
+ * The page had one plane and everything sat on it. Three layers fix that
+ * without adding an image: an aurora behind the fold, a faint grid that gives
+ * the dark a texture to catch, and a shared lift ramp for anything raised.
+ */
+body::before,
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* The aurora. Two offset ellipses read as light with a direction, where one
+   centred blob reads as a smudge. */
+body::before {
+  background:
+    radial-gradient(75rem 38rem at 15% -14%, var(--accent-glow), transparent 64%),
+    radial-gradient(58rem 32rem at 88% -8%, rgba(79, 143, 247, 0.4), transparent 62%),
+    radial-gradient(40rem 24rem at 55% 8%, rgba(139, 124, 246, 0.18), transparent 70%);
+  opacity: 0.9;
+}
+
+/* The grid. Masked so it fades before it reaches the content and never
+   competes with text. */
+body::after {
+  background-image:
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: radial-gradient(60rem 40rem at 50% 0%, #000 0%, transparent 75%);
+  -webkit-mask-image: radial-gradient(60rem 40rem at 50% 0%, #000 0%, transparent 75%);
+}
+
+html[w-theme='light'] body::before {
+  opacity: 0.5;
+}
+
+/* ── Selection, focus, and scrollbar ───────────────────────────────────── */
+::selection {
+  background: color-mix(in srgb, var(--accent) 32%, transparent);
+  color: var(--w-text);
+}
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--w-radius-sm);
+}
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--accent) 40%, transparent) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  background-clip: content-box;
+  border-radius: 999px;
+  background-color: color-mix(in srgb, var(--accent) 35%, transparent);
+}
+*::-webkit-scrollbar-thumb:hover {
+  background-color: color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
+/* The header is sticky, so an anchor jump would otherwise land under it. */
+[id] {
+  scroll-margin-top: 5rem;
+}
+
+/* ── Lifted surfaces ───────────────────────────────────────────────────── */
+/*
+ * One treatment, applied everywhere something is raised: a hairline that is
+ * brightest at the top edge, as though lit from above.
+ */
+.w-card,
+.code-block,
+.arch-node,
+.doc-callout,
+.proof-note,
+.hero-install {
+  position: relative;
+  border-color: var(--lift-border);
+  box-shadow: var(--lift-shadow);
+}
+.w-card::before,
+.code-block::before,
+.arch-node::before,
+.hero-install::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 1px;
+  border-radius: inherit;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--lift-highlight) 18%,
+    var(--lift-highlight) 82%,
+    transparent
+  );
+  pointer-events: none;
+}
+
+/* ── Buttons ───────────────────────────────────────────────────────────── */
+.w-btn-filled {
+  background-image: linear-gradient(180deg, var(--accent-soft), var(--accent));
+  border: 1px solid color-mix(in srgb, var(--accent) 70%, #000);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.25),
+    0 6px 18px -8px var(--accent-glow);
+  transition:
+    transform 120ms ease,
+    box-shadow 160ms ease,
+    filter 160ms ease;
+}
+.w-btn-filled:hover {
+  filter: brightness(1.06);
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    0 10px 26px -8px var(--accent-glow);
+}
+.w-btn-filled:active {
+  transform: translateY(0);
+}
+.w-btn-outlined {
+  border-color: var(--lift-border-strong);
+  background: color-mix(in srgb, var(--w-surface-container-low) 70%, transparent);
+  backdrop-filter: blur(6px);
+  transition:
+    border-color 160ms ease,
+    transform 120ms ease;
+}
+.w-btn-outlined:hover {
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+/* ══ Hero ═══════════════════════════════════════════════════════════════ */
+.hero {
+  position: relative;
+  /* The aurora now lives on the body, so the section only needs to not fight
+     it. Its own gradient was doubling up and muddying both. */
+  background: none;
+}
+.hero h1 {
+  font-weight: 700;
+}
+.hero-grad {
+  background: linear-gradient(100deg, var(--accent-soft) 0%, var(--accent) 45%, var(--accent-far) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  /* A gradient clipped to text loses its descenders to overflow without a
+     little breathing room. */
+  padding-bottom: 0.08em;
+}
+
+
+/* ── The install command ───────────────────────────────────────────────── */
+/*
+ * This is the primary action on the page and it read as a caption. It now
+ * has the presence of a control: a real surface, a copy affordance that looks
+ * pressable, and feedback that lands where the eye already is.
+ */
+.hero-install {
+  gap: 0.75rem;
+  padding: 0.7rem 0.7rem 0.7rem 1rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--w-surface-container-low) 88%, transparent);
+  backdrop-filter: blur(10px);
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+.hero-install:hover {
+  border-color: var(--lift-border-strong);
+  box-shadow: var(--lift-shadow-hover);
+}
+.hero-install::before {
+  border-radius: 999px;
+}
+.hero-cmd {
+  font-size: 0.9rem;
+  color: var(--w-text);
+}
+.hero-copy-hint,
+.hero-copied {
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent-soft);
+  font-weight: 600;
+  font-size: 0.68rem;
+}
+.hero-copied {
+  background: color-mix(in srgb, #4ade80 18%, transparent);
+  color: #4ade80;
+}
+
+.hero-tick {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+/* ── Stats ─────────────────────────────────────────────────────────────── */
+/*
+ * Four numbers floating in space read as debris. In a single panel with
+ * dividers they read as one claim with four parts.
+ */
+.stats {
+  padding-bottom: clamp(2rem, 5vw, 3rem);
+}
+.stats .w-grid-row {
+  border: 1px solid var(--lift-border);
+  border-radius: var(--w-radius-xl);
+  background: color-mix(in srgb, var(--w-surface-container-low) 70%, transparent);
+  backdrop-filter: blur(10px);
+  box-shadow: var(--lift-shadow);
+  margin-inline: 0;
+  overflow: hidden;
+}
+.stat {
+  position: relative;
+  padding: 1.4rem 0.75rem;
+}
+.stat-value {
+  background: linear-gradient(180deg, var(--accent-soft), var(--accent));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-variant-numeric: tabular-nums;
+}
+.stat-label {
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+}
+
+/* ── Section heads ─────────────────────────────────────────────────────── */
+.eyebrow::before {
+  content: '';
+  width: 1.4rem;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--accent));
+}
+.section-head h2 {
+  font-weight: 700;
+}
+
+/* ══ Code ═══════════════════════════════════════════════════════════════ */
+.code-block {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--accent) 4%, transparent), transparent 40%),
+    var(--w-surface-container-low);
+  border-radius: var(--w-radius-lg);
+  /* A little more air than prose: code is scanned in blocks, not read in
+     lines, and cramped monospace is what makes a snippet look hostile. */
+  padding: 1.15rem 1.3rem;
+  line-height: 1.75;
+  tab-size: 4;
+}
+/* Comment lines carry the reasoning in these snippets, so they should read as
+   supporting text rather than compete with the calls. Applied by the shared
+   colour rather than per-token highlighting, which would need a parser. */
+.code-block code {
+  color: var(--w-text);
+}
+
+/* ── Language tabs ─────────────────────────────────────────────────────── */
+/*
+ * Ten loose buttons read as a pile. Inside one recessed track they read as a
+ * segmented control, and the selected language is obvious at a glance.
+ */
+.qs-tabs {
+  padding: 0.3rem;
+  border: 1px solid var(--lift-border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--w-surface-container-low) 75%, transparent);
+  backdrop-filter: blur(8px);
+  width: fit-content;
+  max-width: 100%;
+}
+.qs-tabs .w-btn {
+  border-radius: 999px;
+  transition:
+    background-color 140ms ease,
+    color 140ms ease;
+}
+.qs-tabs .w-btn-text {
+  color: var(--w-text-subtle);
+}
+.qs-tabs .w-btn-text:hover {
+  color: var(--w-text);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+.qs-tabs .w-btn-filled {
+  /* The selected pill sits inside a track, so it needs no drop shadow of its
+     own — only the lift of a lighter fill. */
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+/* ── Inline code ───────────────────────────────────────────────────────── */
+.doc-section code,
+.doc-lede code,
+.code-table code {
+  border: 1px solid var(--lift-border);
+  background: color-mix(in srgb, var(--accent) 9%, transparent);
+  color: var(--accent-soft);
+}
+html[w-theme='light'] .doc-section code,
+html[w-theme='light'] .doc-lede code,
+html[w-theme='light'] .code-table code {
+  color: color-mix(in srgb, var(--accent) 75%, #000);
+}
+.code-block code {
+  border: 0;
+  background: none;
+}
+
+/* ══ Cards ══════════════════════════════════════════════════════════════ */
+.cap-card,
+.proof-card,
+.guide-card,
+.platform-card {
+  background: color-mix(in srgb, var(--w-surface-container-low) 65%, transparent);
+  backdrop-filter: blur(8px);
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
+}
+.cap-card:hover,
+.guide-card:hover {
+  border-color: var(--lift-border-strong);
+  box-shadow: var(--lift-shadow-hover);
+}
+.guide-card {
+  /* The arrow leads the eye on hover rather than the whole card moving far. */
+  transform: none;
+}
+.guide-card:hover {
+  transform: translateY(-2px);
+}
+.guide-card .guide-arrow {
+  display: inline-block;
+  transition: transform 180ms ease;
+}
+.guide-card:hover .guide-arrow {
+  transform: translateX(3px);
+}
+
+/* ── Architecture nodes ────────────────────────────────────────────────── */
+.arch-node {
+  background: color-mix(in srgb, var(--w-surface-container-low) 70%, transparent);
+  backdrop-filter: blur(8px);
+}
+.arch-node strong {
+  color: var(--w-text);
+}
+
+/* ── The honest-claims section ─────────────────────────────────────────── */
+.proof {
+  /* Set into the page rather than raised, so it reads as a different kind of
+     content: the part that is checked rather than sold. */
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--accent) 3%, transparent), transparent 30%),
+    var(--w-surface-container-low);
+}
+
+/* ── Footer ────────────────────────────────────────────────────────────── */
+.site-footer {
+  position: relative;
+  background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--accent) 4%, transparent));
+}
+.footer-col a {
+  transition: color 140ms ease;
+}
+
+/* ── Header ────────────────────────────────────────────────────────────── */
+.site-header {
+  /* A hairline that brightens toward the middle reads as a lit edge rather
+     than a drawn line. */
+  border-bottom: 0;
+  box-shadow: 0 1px 0 var(--w-divider);
+}
+.brand-mark {
+  transition: transform 200ms ease;
+}
+.brand:hover .brand-mark {
+  transform: scale(1.06);
+}
+
+/*
+ * This block is last on purpose. Media queries add no specificity, so a
+ * responsive override only wins if it comes after the rule it adjusts — and
+ * everything above it is the thing being adjusted.
+ */
+/* ══ Responsive behaviour ═══════════════════════════════════════════════ */
+/*
+ * Most sizing above is fluid, so these blocks handle only what a clamp()
+ * cannot: layout that has to change shape, and affordances that have to grow
+ * for a finger.
+ */
+
+/* ── Very wide screens ─────────────────────────────────────────────────── */
+/*
+ * Prose stays at a readable measure however wide the window, but reference
+ * tables and card grids are the opposite problem: cramming 66 error codes
+ * into 52rem beside a metre of empty screen helps nobody.
+ */
+.doc-section--wide {
+  max-width: 78rem;
+}
+
+/* ── Touch targets ─────────────────────────────────────────────────────── */
+/*
+ * A coarse pointer needs a target it can actually hit. The tab strips carry
+ * ten languages, so on a phone they are both the smallest and the most-used
+ * controls on the page.
+ */
+/*
+ * Keyed on both pointer type and width. `pointer: coarse` is the accurate
+ * signal, but it is not universal — a small window on a hybrid device, or a
+ * browser in responsive mode, reports a fine pointer at phone widths and
+ * would otherwise get 32px targets.
+ */
+@media (pointer: coarse), (max-width: 767px) {
+  .qs-tabs .w-btn,
+  .header-mobile-menu .w-btn,
+  .w-app-bar .w-btn {
+    min-height: 44px;
+  }
+  .qs-tabs {
+    gap: 0.45rem;
+  }
+}
+
+/* ── Tablet and below ──────────────────────────────────────────────────── */
+@media (max-width: 1023px) {
+  .arch-flow {
+    /* The arrows read as a left-to-right pipeline. Once the nodes wrap into
+       a column the arrows point the wrong way, so turn them downward. */
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .arch-node {
+    /* flex: 1 1 13rem is right in a row, where it shares the width. Stacked,
+       the same grow factor stretches every node to fill the column's height
+       and leaves each one mostly empty. */
+    flex: 0 0 auto;
+    max-width: none;
+  }
+  .arch-arrow {
+    transform: rotate(90deg);
+  }
+}
+
+/* ── Phones ────────────────────────────────────────────────────────────── */
+@media (max-width: 767px) {
+  /* The install command is a copy button. Letting it scroll sideways hides
+     the "copy" label at the far end, which is the one part that says the
+     control does anything — so on a phone it wraps instead. */
+  .hero-install {
+    flex-wrap: wrap;
+    overflow-x: visible;
+    justify-content: flex-start;
+    text-align: left;
+    /* A pill radius on a box that has wrapped to three lines reads as a
+       blob. Once it stops being one line, it stops being a pill. */
+    border-radius: var(--w-radius-lg);
+    padding: 0.85rem 1rem;
+  }
+  .hero-install::before {
+    border-radius: var(--w-radius-lg);
+  }
+  .hero-prompt {
+    /* Stays on the first line beside the command rather than centring on a
+       line of its own once the command wraps. */
+    flex: 0 0 auto;
+    align-self: flex-start;
+  }
+  .hero-cmd {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    /* flex-basis 0 with min-width 0 lets it shrink and wrap inside the row
+       instead of forcing its own. */
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .hero-copy-hint,
+  .hero-copied {
+    width: 100%;
+    text-align: right;
+  }
+
+  .hero-actions .w-btn,
+  .cta-actions .w-btn {
+    flex: 1 1 100%;
+  }
+
+  .code-block {
+    padding: 0.9rem 1rem;
+    font-size: 0.8rem;
+    /* Code keeps its formatting and scrolls; momentum scrolling makes that
+       bearable on a touch screen. */
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .footer-row,
+  .footer-links {
+    gap: 1.75rem;
+  }
+  .footer-links {
+    width: 100%;
+  }
+  .footer-col {
+    flex: 1 1 8rem;
+  }
+
+  .doc-callout {
+    padding: 0.9rem 1rem;
+  }
+  .proof-note {
+    padding: 0.9rem 1rem;
+  }
+}
+
+/* ── Small phones ──────────────────────────────────────────────────────── */
+@media (max-width: 400px) {
+  .brand-name {
+    /* The mark alone identifies the site; the wordmark is what crowds out
+       the theme and menu controls at this width. */
+    display: none;
+  }
+  .stat-value {
+    font-size: 1.35rem;
+  }
+  .qs-tabs .w-btn {
+    font-size: 0.78rem;
+    padding-inline: 0.55rem;
+  }
+}
+
+/* ── Short and wide (landscape phones) ─────────────────────────────────── */
+@media (max-height: 460px) and (orientation: landscape) {
+  .hero {
+    padding-top: 2rem;
+    padding-bottom: 1.75rem;
+  }
+  .hero-sub {
+    margin-bottom: 1.25rem;
+  }
+}
+
+/* ── Reference tables on narrow screens ────────────────────────────────── */
+@media (max-width: 767px) {
+  .code-table,
+  .code-table thead,
+  .code-table tbody,
+  .code-table tr,
+  .code-table td {
+    display: block;
+    width: auto;
+  }
+  .code-table thead {
+    /* The column headings only make sense beside their columns. Stacked,
+       each row already reads as "code, then meaning". */
+    display: none;
+  }
+  .code-table tr {
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--w-divider);
+  }
+  .code-table td {
+    padding: 0;
+    border: 0;
+  }
+  .code-table td:first-child {
+    margin-bottom: 0.3rem;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}
+
+/* ── Motion ────────────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .guide-card {
+    transition: none;
+  }
+  .guide-card:hover {
+    transform: none;
+  }
+}

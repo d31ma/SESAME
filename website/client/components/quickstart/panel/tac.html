@@ -1,0 +1,29 @@
+<section class="section" id="quickstart" aria-labelledby="quickstart-heading">
+  <div class="w-container w-container--lg">
+    <div class="section-head">
+      <span class="eyebrow">In your language</span>
+      <h2 id="quickstart-heading">{heading}</h2>
+      <p>
+        Copy one file into your project. It spawns the engine, speaks the protocol, and gets
+        out of the way. There is no registry to depend on and no lockfile entry to resolve —
+        and with <code>SESAME_DEPLOYMENT</code> set, no path in your code either.
+      </p>
+    </div>
+
+    <div class="qs-panel">
+      <div class="qs-tabs" role="tablist" aria-label="SDK language">
+        <loop :for="let language of languages">
+          <button
+            type="button"
+            role="tab"
+            :class="'w-btn w-btn--sm ' + (language === active ? 'w-btn-filled' : 'w-btn-text')"
+            :aria-selected="language === active"
+            on:click="select(language)"
+          >{language}</button>
+        </loop>
+      </div>
+
+      <pre class="code-block"><code>{snippet}</code></pre>
+    </div>
+  </div>
+</section>

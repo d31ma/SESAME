@@ -1,0 +1,125 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/d31ma/sesame/blob/main/api/schema/machine-v1.schema.json",
+  "title": "SESAME machine protocol v1",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/request"
+    },
+    {
+      "$ref": "#/$defs/success_response"
+    },
+    {
+      "$ref": "#/$defs/error_response"
+    }
+  ],
+  "$defs": {
+    "request_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+    },
+    "request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocol_version",
+        "request_id",
+        "operation",
+        "parameters"
+      ],
+      "properties": {
+        "protocol_version": {
+          "const": "1"
+        },
+        "request_id": {
+          "$ref": "#/$defs/request_id"
+        },
+        "operation": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "parameters": {
+          "type": "object"
+        }
+      }
+    },
+    "success_response": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocol_version",
+        "request_id",
+        "ok",
+        "result"
+      ],
+      "properties": {
+        "protocol_version": {
+          "const": "1"
+        },
+        "request_id": {
+          "$ref": "#/$defs/request_id"
+        },
+        "ok": {
+          "const": true
+        },
+        "result": {}
+      }
+    },
+    "error_response": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocol_version",
+        "request_id",
+        "ok",
+        "error"
+      ],
+      "properties": {
+        "protocol_version": {
+          "const": "1"
+        },
+        "request_id": {
+          "type": "string"
+        },
+        "ok": {
+          "const": false
+        },
+        "error": {
+          "$ref": "#/$defs/error"
+        }
+      }
+    },
+    "error": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "code",
+        "message",
+        "retryable"
+      ],
+      "properties": {
+        "code": {
+          "type": "string",
+          "enum": [
+            "frame_too_large",
+            "invalid_json",
+            "invalid_request",
+            "unsupported_protocol",
+            "operation_not_found",
+            "internal_error"
+          ]
+        },
+        "message": {
+          "type": "string"
+        },
+        "retryable": {
+          "type": "boolean"
+        },
+        "details": {
+          "type": "object"
+        }
+      }
+    }
+  }
+}

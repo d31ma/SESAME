@@ -1,0 +1,85 @@
+<style>
+  #home-content {
+    display: none;
+  }
+</style>
+
+<div class="doc-page">
+  <div class="docs-shell w-container w-container--xl">
+    <docs-sidebar />
+    <div class="docs-main">
+      <a class="doc-back" href="/docs">← Docs</a>
+      <span class="eyebrow">Reference</span>
+      <h1>Reason and error codes</h1>
+      <p class="doc-lede">
+        Every code SESAME can return, what it means, and what to do about it.
+        These are a compatibility boundary: branch on the code, never on the
+        message.
+      </p>
+
+      <div class="doc-section doc-section--wide">
+        <h2>Decision reasons</h2>
+        <p>
+          Returned on every authorization decision alongside
+          <code>allow</code> or <code>deny</code>. A decision is not an error —
+          a denial is a successful call with a negative answer.
+        </p>
+        <table class="code-table">
+          <thead><tr><th>Reason</th><th>Meaning</th></tr></thead>
+          <tbody>
+            <loop :for="let reason of reasons">
+              <tr>
+                <td><code>{reason.code}</code></td>
+                <td>{reason.meaning}</td>
+              </tr>
+            </loop>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="doc-section doc-section--wide">
+        <h2>Protocol errors</h2>
+        <p>
+          Returned as <code>&#123;"ok": false, "error": &#123;"code": ..., "message": ..., "retryable": ...&#125;&#125;</code>.
+          Your SDK raises these as a typed error carrying the code.
+        </p>
+        <loop :for="let group of groups">
+          <h3 class="code-group">{group.title}</h3>
+          <p class="code-group-note">{group.note}</p>
+          <table class="code-table">
+            <thead><tr><th>Code</th><th>Meaning</th></tr></thead>
+            <tbody>
+              <loop :for="let entry of group.codes">
+                <tr>
+                  <td><code>{entry.code}</code></td>
+                  <td>{entry.meaning}</td>
+                </tr>
+              </loop>
+            </tbody>
+          </table>
+        </loop>
+      </div>
+
+      <div class="doc-section">
+        <h2>Codes that are deliberately vague</h2>
+        <p>
+          Three refusals collapse many causes into one code on purpose. A caller
+          able to tell them apart would learn the shape of a security flow.
+        </p>
+        <ul>
+          <li><code>invalid_grant</code> — every token-exchange failure: spent code, wrong verifier, mismatched redirect URI, unknown client.</li>
+          <li><code>assertion_rejected</code> and <code>saml_assertion_rejected</code> — every federated assertion failure. The specific reason goes to the audit ledger instead.</li>
+          <li>Unknown identifiers at <code>authn.begin</code> — no error at all. Beginning succeeds regardless, so the endpoint cannot be used to enumerate accounts.</li>
+        </ul>
+      </div>
+
+      <div class="doc-section">
+        <h2>What to read next</h2>
+        <ul>
+          <li><a href="https://github.com/d31ma/sesame/blob/main/api/machine/v1/README.md" target="_blank" rel="noopener">Machine protocol reference</a> — which operation returns which code.</li>
+          <li><a href="/docs/authorization">Authorization</a> — where the decision reasons come from.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>

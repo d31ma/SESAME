@@ -1,0 +1,83 @@
+<style>
+  #home-content {
+    display: none;
+  }
+</style>
+
+<div class="doc-page">
+  <div class="w-container w-container--xl">
+    <span class="eyebrow">Download</span>
+    <h1>Get SESAME</h1>
+    <p class="doc-lede">
+      Every release ships native binaries, the language shims, an SPDX SBOM, checksums, and
+      build provenance. This is a developer preview: it is not supported for production use,
+      and no release has passed an independent security review.
+    </p>
+
+    <div class="doc-section">
+      <h2>Install from source</h2>
+      <p>The shortest path if you already have Go 1.26.</p>
+      <pre class="code-block"><code>go install github.com/d31ma/sesame/cmd/sesame@latest</code></pre>
+    </div>
+
+    <div class="doc-section">
+      <h2>Release binaries</h2>
+      <p>
+        Cross-compiled artifacts are published on every tag. A binary built for a platform is
+        not the same as support for it: SESAME claims a platform only with native packaging,
+        crash, restore, and upgrade evidence run on that operating system.
+      </p>
+      <div class="w-grid-row">
+        <loop :for="let platform of platforms">
+          <div class="w-grid-col-12 w-grid-col-sm-4">
+            <div class="w-card w-card--variant-outlined platform-card">
+              <strong>{platform.label}</strong>
+              <span>{platform.arches}</span>
+            </div>
+          </div>
+        </loop>
+      </div>
+      <p>
+        <a class="w-btn w-btn-filled w-btn--lg" href="https://github.com/d31ma/sesame/releases" target="_blank" rel="noopener">All releases on GitHub</a>
+      </p>
+    </div>
+
+    <div class="doc-section">
+      <h2>Language clients</h2>
+      <p>
+        The shims ship as one archive beside the binaries. There is no package registry and no
+        per-ecosystem manifest — you copy the single file for your language into your project,
+        paired with the exact release whose protocol it speaks. Go is the one exception, since
+        it resolves from the module tag.
+      </p>
+      <pre class="code-block"><code>tar xzf sesame-clients.tar.gz
+ls clients/
+# csharp  dart  go  java  kotlin  node  php  python  ruby  rust</code></pre>
+      <p>
+        <a href="https://github.com/d31ma/sesame/blob/main/docs/SDK_DISTRIBUTION.md" target="_blank" rel="noopener">SDK distribution</a>
+        records the install steps, how a release is verified, and what this model costs you.
+      </p>
+    </div>
+
+    <div class="doc-section">
+      <h2>Verify what you downloaded</h2>
+      <p>
+        Every release is attested with build provenance. Check it before you run it, and check
+        every subject in the attestation rather than the first one — one statement covers all
+        of a release's assets.
+      </p>
+      <pre class="code-block"><code>shasum -a 256 -c SHA256SUMS
+gh attestation verify sesame-linux-amd64 --repo d31ma/sesame</code></pre>
+    </div>
+
+    <div class="doc-section">
+      <h2>You also need FYLO</h2>
+      <p>
+        SESAME stores every authoritative record in <a href="https://fylo.del.ma" target="_blank" rel="noopener">FYLO</a>
+        and drives it as a subprocess. Install a FYLO runtime for your platform, then point
+        <code>sesame init</code> at the binary. <code>sesame doctor</code> verifies the runtime
+        version and build target and refuses a mismatch.
+      </p>
+    </div>
+  </div>
+</div>

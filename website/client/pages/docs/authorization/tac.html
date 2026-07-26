@@ -1,0 +1,177 @@
+<style>
+  #home-content {
+    display: none;
+  }
+</style>
+
+<div class="doc-page">
+  <div class="docs-shell w-container w-container--xl">
+    <docs-sidebar />
+    <div class="docs-main">
+      <a class="doc-back" href="/docs">← Docs</a>
+      <span class="eyebrow">Guide</span>
+      <h1>Authorization</h1>
+      <p class="doc-lede">
+        Default deny over roles, grants, groups, and bounded conditions. Every
+        answer carries a stable reason and the policy version it was decided
+        under, so an audit can say <em>why</em> and not just <em>no</em>.
+      </p>
+
+      <div class="doc-section">
+        <h2>Asking a question</h2>
+        <p>
+          A decision names the tenant, the principal, the action, and the
+          resource. Nothing is implied: with no matching grant, the answer is
+          <code>deny</code> with <code>deny_no_grant</code>.
+        </p>
+        <code-tabs flow="decide" />
+        <p>
+          Actions and resources are opaque strings that you choose. The
+          convention in the examples — <code>doc:read</code> on
+          <code>project:alpha</code> — is only a convention; SESAME never parses
+          them for meaning, which is what keeps your model out of its vocabulary.
+        </p>
+      </div>
+
+      <div class="doc-section">
+        <h2>Granting</h2>
+        <p>
+          Create an immutable role, then grant it. A role's permissions are
+          action–resource pairs, and either side may be the wildcard
+          <code>*</code>.
+        </p>
+        <pre class="code-block"><code># A role is immutable: changing what it means in place would silently
+# rewrite the meaning of every grant pointing at it.
+role = client.role_create(tenant_id, "editor", [
+    &#123;"action": "doc:read", "resource": "project:*"&#125;,
+    &#123;"action": "doc:write", "resource": "project:alpha"&#125;,
+])
+
+grant = client.grant_create(tenant_id, principal_id, role["role_id"])
+
+# Revoking is immediate and durable; the next decision reflects it.
+client.grant_revoke(grant["grant_id"])</code></pre>
+        <p>
+          A wildcard matches one segment or the whole value, and it never matches
+          across a boundary you did not write — <code>project:*</code> covers
+          <code>project:alpha</code>, not <code>projectile</code>.
+        </p>
+      </div>
+
+      <div class="doc-section">
+        <h2>Groups</h2>
+        <p>
+          Grant a role to a group and every member inherits it. Membership is
+          resolved at decision time, so adding someone to a group takes effect on
+          their next request rather than their next login.
+        </p>
+        <pre class="code-block"><code>group = client.group_create(tenant_id, "engineering")
+client.group_member_add(group["group_id"], principal_id)
+
+# Grants attach to the group exactly as they attach to a principal.
+client.grant_create(tenant_id, group["group_id"], role["role_id"])
+
+# An allow through a group is reported as such, not as a role grant.
+# &#123;"decision": "allow", "reason_code": "allow_group_grant", ...&#125;</code></pre>
+        <p>
+          The reason distinguishes <code>allow_role_grant</code> from
+          <code>allow_group_grant</code> deliberately: when you are working out
+          why someone has access they should not have, the difference between a
+          direct grant and an inherited one is the whole question.
+        </p>
+      </div>
+
+      <div class="doc-section">
+        <h2>Conditions</h2>
+        <p>
+          A permission may carry equality conditions on context. The caller
+          supplies context with the request; every condition must match for the
+          permission to apply.
+        </p>
+        <pre class="code-block"><code>role = client.role_create(tenant_id, "regional-editor", [&#123;
+    "action": "doc:write",
+    "resource": "project:*",
+    "conditions": &#123;"region": "eu"&#125;,
+&#125;])
+
+decision = client.decide(&#123;
+    "tenant_id": tenant_id, "principal_id": principal_id,
+    "action": "doc:write", "resource": "project:alpha",
+    "context": &#123;"region": "eu"&#125;,
+&#125;)</code></pre>
+        <p>
+          Two refusals are worth telling apart. A supplied value that does not
+          match denies with <code>deny_no_grant</code> — from the caller's side
+          that is simply no applicable grant. An attribute that was never supplied
+          denies with <code>deny_missing_context</code>, and that code
+          <em>names the missing attribute only when every value you did supply
+          already matched</em>. Naming it otherwise would be false advice: it
+          would suggest adding a key that still would not grant access.
+        </p>
+      </div>
+
+      <div class="doc-section">
+        <h2>Trusted context, and why you cannot supply it</h2>
+        <p>
+          Some context is too important to accept from the caller. Pass a session
+          instead of a principal and the engine verifies it and derives context
+          itself under the reserved <code>session.</code> prefix — currently
+          <code>session.assurance</code>.
+        </p>
+        <code-tabs flow="step-up" />
+        <p>
+          A caller-supplied key beginning with <code>session.</code> is
+          <strong>rejected, not ignored</strong>. That refusal is the whole
+          reason the condition is worth trusting: if the engine quietly dropped
+          such a key, a caller could not tell whether its own value had been
+          used. An unusable session denies with
+          <code>deny_session_invalid</code>.
+        </p>
+        <p class="doc-note">
+          All ten SDKs can express this. Python, Node.js, and Go take a request
+          object, so a session is just another key; the other seven carry a named
+          <code>decideForSession</code> beside their positional
+          <code>decide</code>. A contract test asserts every shim can reach the
+          capability, because a shim that cannot is the same kind of drift as a
+          missing operation.
+        </p>
+      </div>
+
+      <div class="doc-section">
+        <h2>Batches and repeatability</h2>
+        <p>
+          Rendering a page usually means asking many questions at once. A batch
+          answers them under a single policy version, so a policy change
+          mid-render cannot produce a half-old, half-new page.
+        </p>
+        <pre class="code-block"><code>decisions = client.decide_batch([
+    &#123;"tenant_id": t, "principal_id": p, "action": "doc:read", "resource": "project:alpha"&#125;,
+    &#123;"tenant_id": t, "principal_id": p, "action": "doc:write", "resource": "project:alpha"&#125;,
+])
+
+# Pin an earlier version to reproduce a past answer exactly.
+replay = client.decide(request, policy_version=4)</code></pre>
+      </div>
+
+      <div class="doc-section">
+        <h2>Where to enforce</h2>
+        <p>
+          SESAME decides; your application enforces. A decision is advice until
+          your code acts on it, and the engine cannot stop a handler that never
+          asked. Put the call at the boundary that owns the resource — not in a
+          UI layer, which only controls what is offered rather than what is
+          reachable.
+        </p>
+      </div>
+
+      <div class="doc-section">
+        <h2>What to read next</h2>
+        <ul>
+          <li><a href="/docs/errors">Reason and error codes</a> — every code these operations can return.</li>
+          <li><a href="/docs/mfa">MFA and step-up</a> — raising the assurance a condition can require.</li>
+          <li><a href="https://github.com/d31ma/sesame/blob/main/api/machine/v1/decisions.golden.json" target="_blank" rel="noopener">Golden decision corpus</a> — the shared cases every SDK asserts against.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,164 @@
+<style>
+  #home-content {
+    display: none;
+  }
+</style>
+
+<div class="doc-page">
+  <div class="docs-shell w-container w-container--xl">
+    <docs-sidebar />
+    <div class="docs-main">
+      <a class="doc-back" href="/docs">← Docs</a>
+      <span class="eyebrow">Guide</span>
+      <h1>Concepts</h1>
+      <p class="doc-lede">
+        Nine words that mean something specific in SESAME. If you read only one
+        page before writing code, read this one — most confusion later is a word
+        that meant something slightly different in the last system you used.
+      </p>
+
+      <div class="doc-section">
+        <h2>Tenant</h2>
+        <p>
+          The strongest isolation boundary in a shared deployment. Every
+          tenant-bound record carries its tenant, and the check happens
+          <em>below</em> the query you construct, so a caller cannot reach across
+          a boundary by asking cleverly.
+        </p>
+        <p>
+          If you are building a single-organisation product, you still have one
+          tenant. Bootstrap it once; it is idempotent per normalised name, so a
+          retry after a timeout returns the existing tenant rather than making a
+          second one.
+        </p>
+      </div>
+
+      <div class="doc-section">
+        <h2>Principal</h2>
+        <p>
+          A human or a workload — the thing that authenticates and that decisions
+          are made about. Not a "user": a service account is a principal too, and
+          having one word for both is what keeps the authorization model from
+          growing a parallel path for machines.
+        </p>
+        <p>
+          A principal is <code>active</code> or <code>suspended</code>.
+          Suspension is durable and immediate: it survives a restart and denies
+          with <code>deny_principal_suspended</code> rather than falling through
+          to a grant check.
+        </p>
+      </div>
+
+      <div class="doc-section">
+        <h2>Identifier</h2>
+        <p>
+          A namespaced handle a principal can be found by —
+          <code>email:alice@example.com</code>, <code>login:alice</code>,
+          <code>employee_id:1234</code>. The namespace is yours to choose.
+        </p>
+        <p>
+          Identifiers are normalised and claimed atomically and uniquely within a
+          tenant. Two concurrent creations for the same normalised value cannot
+          both win; one gets <code>identifier_conflict</code>.
+        </p>
+      </div>
+
+      <div class="doc-section">
+        <h2>Authenticator</h2>
+        <p>
+          A credential or factor belonging to a principal: a password, a TOTP
+          secret, a set of recovery codes, a passkey. A principal may hold
+          several, and which ones were used determines the session's assurance.
+        </p>
+      </div>
+
+      <div class="doc-section">
+        <h2>Authentication transaction</h2>
+        <p>
+          The short-lived, <em>persisted</em> state machine a login runs in. It
+          exists because a login is rarely one call — a password, then a second
+          factor, then completion — and because that sequence has to survive a
+          restart and bound its own attempts.
+        </p>
+        <p>
+          You will see it in every login snippet as <code>transaction_id</code>.
+          It is not a session; it becomes one only at <code>authn.complete</code>.
+        </p>
+      </div>
+
+      <div class="doc-section">
+        <h2>Session</h2>
+        <p>
+          A bounded, revocable authenticated context. It is two values: an
+          <code>session_id</code>, which is a handle, and a
+          <code>session_secret</code>, which is the proof. The secret is returned
+          exactly once and stored only as a SHA-256 digest, so a stolen data root
+          does not yield usable sessions.
+        </p>
+        <p>
+          Revocation is durable and immediate, and it cascades: revoking a session
+          revokes every refresh-token family issued on it.
+        </p>
+      </div>
+
+      <div class="doc-section">
+        <h2>Assurance</h2>
+        <p>
+          How strongly the session's holder was authenticated. Three levels:
+        </p>
+        <ul>
+          <li><code>password</code> — one factor SESAME verified itself.</li>
+          <li><code>mfa</code> — two factors, or one passkey with user verification.</li>
+          <li><code>federated</code> — an external provider vouched for them and SESAME did not witness the credential.</li>
+        </ul>
+        <p>
+          <code>federated</code> is deliberately not <code>password</code>.
+          Collapsing them would let a federated login walk past a policy that
+          requires a second factor, however the provider actually authenticated
+          the person.
+        </p>
+      </div>
+
+      <div class="doc-section">
+        <h2>Role, permission, grant</h2>
+        <p>
+          A <strong>permission</strong> is an action–resource pair, optionally
+          with equality conditions on context. A <strong>role</strong> is an
+          immutable, named set of permissions. A <strong>grant</strong> attaches a
+          role to a principal or to a group.
+        </p>
+        <p>
+          Roles are immutable on purpose: changing what a role means in place
+          would silently rewrite the meaning of every grant that points at it.
+          Create a new role and move grants instead.
+        </p>
+      </div>
+
+      <div class="doc-section">
+        <h2>Decision and policy version</h2>
+        <p>
+          A <strong>decision</strong> answers one question — may this principal
+          perform this action on this resource — with
+          <code>allow</code>/<code>deny</code>, a stable
+          <code>reason_code</code>, and the <code>policy_version</code> it was
+          decided under.
+        </p>
+        <p>
+          The policy version is the sequence number of the last policy-changing
+          event. Pin it and you get repeatable decisions across a batch; read it
+          back and you can prove which rules produced an answer in an audit. See
+          <a href="/docs/authorization">Authorization</a>.
+        </p>
+      </div>
+
+      <div class="doc-section">
+        <h2>What to read next</h2>
+        <ul>
+          <li><a href="/docs/authentication">Authentication and tokens</a> — transactions, sessions, and JWTs in code.</li>
+          <li><a href="/docs/authorization">Authorization</a> — roles, grants, groups, conditions, and decisions.</li>
+          <li><a href="/docs/mfa">MFA and step-up</a> — raising assurance and requiring it.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>

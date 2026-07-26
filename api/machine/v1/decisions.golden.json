@@ -1,0 +1,201 @@
+{
+  "comment": "Deterministic golden decision corpus. The Go engine test and the Go, Node, and Python SDK suites all build this fixture and assert these exact outcomes, so no implementation or client can drift from the documented semantics. Identifiers are placeholders resolved at setup by the name fields.",
+  "setup": {
+    "tenant": "acme",
+    "other_tenant": "rival",
+    "principals": [
+      { "name": "alice", "kind": "human", "namespace": "email", "value": "alice@example.com" },
+      { "name": "bob", "kind": "human", "namespace": "email", "value": "bob@example.com" },
+      { "name": "carol", "kind": "workload", "namespace": "login", "value": "carol" },
+      { "name": "dave", "kind": "human", "namespace": "email", "value": "dave@example.com" }
+    ],
+    "roles": [
+      {
+        "name": "reader",
+        "permissions": [
+          { "action": "doc:read", "resource": "project:*" },
+          { "action": "doc:list", "resource": "*" }
+        ]
+      },
+      {
+        "name": "auditor",
+        "permissions": [
+          { "action": "audit:read", "resource": "*", "conditions": { "channel": "internal" } }
+        ]
+      },
+      {
+        "name": "deployer",
+        "permissions": [
+          {
+            "action": "deploy:run",
+            "resource": "env:staging",
+            "conditions": { "channel": "internal", "mfa": "true" }
+          }
+        ]
+      }
+    ],
+    "groups": [{ "name": "readers", "members": ["bob"] }],
+    "grants": [
+      { "role": "reader", "principal": "alice" },
+      { "role": "reader", "group": "readers" },
+      { "role": "auditor", "principal": "carol" },
+      { "role": "deployer", "principal": "carol" }
+    ],
+    "suspended": ["dave"]
+  },
+  "cases": [
+    {
+      "name": "direct grant allows an exact action and resource",
+      "principal": "alice",
+      "action": "doc:read",
+      "resource": "project:alpha",
+      "decision": "allow",
+      "reason_code": "allow_role_grant"
+    },
+    {
+      "name": "trailing wildcard matches nested resource segments",
+      "principal": "alice",
+      "action": "doc:read",
+      "resource": "project:alpha:file",
+      "decision": "allow",
+      "reason_code": "allow_role_grant"
+    },
+    {
+      "name": "bare wildcard resource matches any concrete resource",
+      "principal": "alice",
+      "action": "doc:list",
+      "resource": "anything:at:all",
+      "decision": "allow",
+      "reason_code": "allow_role_grant"
+    },
+    {
+      "name": "action outside the role denies by default",
+      "principal": "alice",
+      "action": "doc:delete",
+      "resource": "project:alpha",
+      "decision": "deny",
+      "reason_code": "deny_no_grant"
+    },
+    {
+      "name": "resource outside the pattern denies by default",
+      "principal": "alice",
+      "action": "doc:read",
+      "resource": "billing:invoice",
+      "decision": "deny",
+      "reason_code": "deny_no_grant"
+    },
+    {
+      "name": "wildcard does not match a shorter resource",
+      "principal": "alice",
+      "action": "doc:read",
+      "resource": "project",
+      "decision": "deny",
+      "reason_code": "deny_no_grant"
+    },
+    {
+      "name": "group membership allows through a group grant",
+      "principal": "bob",
+      "action": "doc:read",
+      "resource": "project:beta",
+      "decision": "allow",
+      "reason_code": "allow_group_grant"
+    },
+    {
+      "name": "suspension outranks an action the role never allowed",
+      "principal": "dave",
+      "action": "doc:read",
+      "resource": "project:alpha",
+      "decision": "deny",
+      "reason_code": "deny_principal_suspended"
+    },
+    {
+      "name": "satisfied context condition allows",
+      "principal": "carol",
+      "action": "audit:read",
+      "resource": "log:january",
+      "context": { "channel": "internal" },
+      "decision": "allow",
+      "reason_code": "allow_role_grant"
+    },
+    {
+      "name": "absent required context attribute denies and names the attribute",
+      "principal": "carol",
+      "action": "audit:read",
+      "resource": "log:january",
+      "decision": "deny",
+      "reason_code": "deny_missing_context",
+      "missing_context_key": "channel"
+    },
+    {
+      "name": "wrong context value denies without naming an attribute",
+      "principal": "carol",
+      "action": "audit:read",
+      "resource": "log:january",
+      "context": { "channel": "external" },
+      "decision": "deny",
+      "reason_code": "deny_no_grant"
+    },
+    {
+      "name": "one of several required attributes absent denies",
+      "principal": "carol",
+      "action": "deploy:run",
+      "resource": "env:staging",
+      "context": { "channel": "internal" },
+      "decision": "deny",
+      "reason_code": "deny_missing_context",
+      "missing_context_key": "mfa"
+    },
+    {
+      "name": "all required attributes present allows",
+      "principal": "carol",
+      "action": "deploy:run",
+      "resource": "env:staging",
+      "context": { "channel": "internal", "mfa": "true" },
+      "decision": "allow",
+      "reason_code": "allow_role_grant"
+    },
+    {
+      "name": "unrelated context attributes are ignored",
+      "principal": "alice",
+      "action": "doc:read",
+      "resource": "project:alpha",
+      "context": { "channel": "external", "region": "eu" },
+      "decision": "allow",
+      "reason_code": "allow_role_grant"
+    },
+    {
+      "name": "suspension denies even with a matching grant",
+      "principal": "dave",
+      "action": "doc:list",
+      "resource": "project:alpha",
+      "decision": "deny",
+      "reason_code": "deny_principal_suspended"
+    },
+    {
+      "name": "a principal of another tenant is not found in this tenant",
+      "principal": "alice",
+      "tenant": "other",
+      "action": "doc:read",
+      "resource": "project:alpha",
+      "decision": "deny",
+      "reason_code": "deny_principal_not_found"
+    },
+    {
+      "name": "an unknown principal denies",
+      "principal_id": "prn_00000000000000000000000000000000",
+      "action": "doc:read",
+      "resource": "project:alpha",
+      "decision": "deny",
+      "reason_code": "deny_principal_not_found"
+    },
+    {
+      "name": "an unknown tenant denies",
+      "principal": "alice",
+      "tenant_id": "tnt_00000000000000000000000000000000",
+      "action": "doc:read",
+      "resource": "project:alpha",
+      "decision": "deny",
+      "reason_code": "deny_tenant_not_found"
+    }
+  ]
+}

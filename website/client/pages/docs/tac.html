@@ -1,0 +1,141 @@
+<style>
+  #home-content {
+    display: none;
+  }
+</style>
+
+<div class="doc-page">
+  <div class="docs-shell w-container w-container--xl">
+    <docs-sidebar />
+    <div class="docs-main">
+      <span class="eyebrow">Documentation</span>
+      <h1>Get started</h1>
+      <p class="doc-lede">
+        SESAME runs as a subprocess of your application. This page takes you from an empty
+        directory to a first authorization decision. The full operator guides live in the
+        repository and are linked from each section.
+      </p>
+
+      <div class="doc-section">
+        <h2>1. Build the engine</h2>
+        <p>
+          SESAME needs Go 1.26 and a <a href="https://fylo.del.ma" target="_blank" rel="noopener">FYLO</a>
+          runtime binary for the platform you are running on. Release builds are published for
+          Linux, macOS, and Windows — see <a href="/download">Download</a>.
+        </p>
+        <pre class="code-block"><code>go install github.com/d31ma/sesame/cmd/sesame@latest
+sesame version</code></pre>
+      </div>
+
+      <div class="doc-section">
+        <h2>2. Create a deployment</h2>
+        <p>
+          A deployment directory holds validated configuration and the key boundary: the
+          ES256 signing key, the sealed-secrets key, and the snapshot key. They are written
+          outside FYLO documents with restrictive permissions, because a key that lives in
+          the same store as the data it protects is not a boundary.
+        </p>
+        <p>
+          Name the deployment once in the environment. Every <code>sesame</code> command
+          reads it, and so does the engine your application starts, so no path is repeated
+          on a command line or hard-coded in source.
+        </p>
+        <pre class="code-block"><code>export SESAME_DEPLOYMENT=./deploy
+
+sesame init --fylo-binary /path/to/fylo \
+  --issuer https://id.example.com
+
+sesame doctor</code></pre>
+        <p>
+          The FYLO path stays a flag on <code>init</code> rather than an exported variable.
+          <code>init</code> records it in the deployment's <code>config.json</code>, so every
+          later command already knows it — and <code>FYLO_BINARY</code> in the environment
+          means <em>run without a deployment</em>, which is the other mode. Exporting both is
+          refused rather than silently resolved, because there would be no honest answer to
+          which one wins.
+        </p>
+        <p>
+          <code>doctor</code> is the readiness check: it verifies the FYLO runtime version and
+          build target, the key permissions, and that the ledger replays. Run it before you
+          trust a deployment.
+        </p>
+      </div>
+
+      <div class="doc-section">
+        <h2>3. Bootstrap a tenant and an administrator</h2>
+        <p>
+          A tenant is the strongest isolation boundary in a shared deployment. Bootstrap is
+          idempotent per normalized name, so retrying after a timeout returns the existing
+          tenant rather than creating a second one.
+        </p>
+        <pre class="code-block"><code>sesame admin bootstrap --name acme \
+  --identifier-namespace email \
+  --identifier-value admin@acme.example</code></pre>
+      </div>
+
+      <div class="doc-section">
+        <h2>4. Point your process at it</h2>
+        <p>
+          Your application needs one more variable: where the engine binary is. It
+          inherits <code>SESAME_DEPLOYMENT</code> from step 2, so no path appears in
+          application code and the same program moves between a laptop, a container,
+          and CI by changing its environment rather than its source.
+        </p>
+        <pre class="code-block"><code>export SESAME_BINARY=/usr/local/bin/sesame</code></pre>
+        <p>
+          An explicit flag or SDK option always beats the environment — an operator
+          debugging one command on a host that already exports
+          <code>SESAME_DEPLOYMENT</code> can point it elsewhere without unsetting
+          anything. A deployment directory that does not exist, or that was never
+          initialised, is refused at startup with a message naming the remedy —
+          and the SDKs surface it, so a volume that failed to mount says so
+          instead of reporting a dead process. See
+          <a href="https://github.com/d31ma/sesame/blob/main/docs/CONFIGURATION.md" target="_blank" rel="noopener">Configuration and keys</a>.
+        </p>
+      </div>
+
+      <div class="doc-section">
+        <h2>5. Drive it from your application</h2>
+        <p>
+          Copy the shim for your language out of <code>sesame-clients.tar.gz</code> into your
+          project. It is one file with no dependencies. It owns the subprocess, the protocol
+          handshake, timeouts, cancellation, and typed errors — and never an authentication or
+          authorization decision.
+        </p>
+        <pre class="code-block"><code>tar xzf sesame-clients.tar.gz
+cp clients/python/sesame.py yourapp/</code></pre>
+        <p>
+          The shim verifies the engine's protocol version at startup and refuses a mismatched
+          binary, so a partial upgrade fails loudly instead of behaving strangely.
+        </p>
+      </div>
+
+      <div class="doc-section">
+        <h2>6. Ask a question</h2>
+        <p>
+          Authorization is default deny. A request names the principal, the tenant, the action,
+          the resource, and any context; the answer carries a stable reason and the policy
+          version it was decided under.
+        </p>
+        <pre class="code-block"><code>decision = client.decide(&#123;
+    "tenant_id": tenant_id,
+    "principal_id": principal_id,
+    "action": "doc:read",
+    "resource": "project:alpha",
+&#125;)
+
+# &#123;"decision": "deny", "reason_code": "deny_no_grant", "policy_version": 4, ...&#125;</code></pre>
+        <p>
+          The same question is available from the CLI, which is the fastest way to check a
+          policy without writing any code:
+        </p>
+        <pre class="code-block"><code>sesame authorize decide \
+  --tenant-id tnt_... --principal-id prn_... \
+  --action doc:read --resource project:alpha</code></pre>
+      </div>
+
+      <docs-guides />
+
+    </div>
+  </div>
+</div>

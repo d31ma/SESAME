@@ -1,0 +1,40 @@
+<section class="section proof" id="proof" aria-labelledby="proof-heading">
+  <div class="w-container w-container--xl">
+    <div class="section-head">
+      <span class="eyebrow">Features</span>
+      <h2 id="proof-heading">Everything it does. And everything it does not.</h2>
+      <p>
+        A security project that overstates itself is worse than one that ships less. On the left
+        is what exists — each of them with code, negative-path tests, operator documentation, and
+        recovery evidence behind it. On the right is what does not exist yet, written down here
+        rather than left for you to find out in production.
+      </p>
+    </div>
+
+    <div class="w-grid-row">
+      <div class="w-grid-col-12 w-grid-col-lg-6">
+        <loop :for="let item of proven">
+          <div class="w-card w-card--variant-outlined proof-card">
+            <h3>{item.area}</h3>
+            <p>{item.detail}</p>
+          </div>
+        </loop>
+      </div>
+
+      <div class="w-grid-col-12 w-grid-col-lg-6 proof-col--open">
+        <loop :for="let item of notClaimed">
+          <div class="w-card w-card--variant-outlined proof-card">
+            <h3>{item.area}</h3>
+            <p>{item.detail}</p>
+          </div>
+        </loop>
+      </div>
+    </div>
+
+    <p class="proof-note">
+      Every attack case in SESAME's adversarial suite runs against a real compiled binary over
+      the shipped protocol, against a real deployment with real keys — because a defence that
+      only exists inside a package boundary is not a defence.
+    </p>
+  </div>
+</section>

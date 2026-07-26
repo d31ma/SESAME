@@ -1,0 +1,124 @@
+<style>
+  #home-content {
+    display: none;
+  }
+</style>
+
+<div class="doc-page">
+  <div class="docs-shell w-container w-container--xl">
+    <docs-sidebar />
+    <div class="docs-main">
+      <a class="doc-back" href="/docs">← Docs</a>
+      <span class="eyebrow">Guide</span>
+      <h1>MFA and step-up</h1>
+      <p class="doc-lede">
+        A second factor attaches to the same authentication transaction a password
+        does, and raises the session's assurance from <code>password</code> to
+        <code>mfa</code>. Authorization policy can then require that level for
+        individual actions.
+      </p>
+
+      <div class="doc-section">
+        <h2>TOTP</h2>
+        <p>
+          Enrolment is two steps on purpose. <code>totp_enroll</code> issues the
+          shared secret; the factor does not exist until
+          <code>totp_activate</code> proves an authenticator app actually holds
+          it. A half-finished enrolment therefore cannot lock anyone out.
+        </p>
+        <code-tabs flow="totp" />
+
+        <div class="doc-callout doc-callout--warn">
+          <strong>A code is spent when it is used — including by activation.</strong>
+          <p>
+            A successful code durably consumes its 30-second time step. That is
+            what makes replay fail inside the code's own window and across a
+            restart, and it has one consequence worth knowing while you are
+            building: the code you activate with cannot then be used to log in
+            until the next window. In a test, wait for the next time step rather
+            than reusing the code — the second attempt is refused and assurance
+            stays at <code>password</code>.
+          </p>
+        </div>
+
+        <p>
+          The shared secret has to be readable to compute the expected code, so
+          unlike a password it cannot be a one-way hash. It is sealed with
+          AES-256-GCM under the deployment's <code>secrets.key</code>, which lives
+          outside every FYLO document. Without that key the engine fails closed
+          rather than falling back to plaintext.
+        </p>
+      </div>
+
+      <div class="doc-section">
+        <h2>Recovery codes</h2>
+        <p>
+          Ten single-use codes, shown once, stored only as SHA-256 digests.
+          Reissuing retires the previous set, so a leaked list is revoked by
+          handing out a new one rather than by deleting anything.
+        </p>
+        <code-tabs flow="recovery" />
+        <p>
+          A recovery code is a second factor, not a first one. Presenting one
+          before any first factor is refused — and the refusal does not spend the
+          code, so an attacker cannot burn somebody's recovery set by guessing at
+          it.
+        </p>
+      </div>
+
+      <div class="doc-section">
+        <h2>Passkeys</h2>
+        <p>
+          WebAuthn passkeys register against a principal and are verified against
+          a challenge carried on the transaction. A passkey with user
+          verification satisfies <code>mfa</code> on its own, with no prior
+          factor — the authenticator already proved possession and user presence.
+        </p>
+        <pre class="code-block"><code># Registration: the challenge is issued by the engine, never by the browser.
+options = client.passkey_register_begin(principal_id)
+credential = client.passkey_register_finish(
+    principal_id, attestation_object, client_data_json)
+
+# Login: the challenge lives on the transaction, so it cannot be replayed
+# against a different attempt.
+tx = client.authn_begin(tenant_id, "email", "alice@example.com")
+options = client.passkey_options(tx["transaction_id"])
+state = client.authn_verify_passkey(
+    tx["transaction_id"], credential_id,
+    authenticator_data, client_data_json, signature)</code></pre>
+        <p>
+          Only <code>none</code> attestation and ES256 are accepted, and the
+          sign counter is checked on every assertion: a counter that goes
+          backwards indicates a cloned authenticator and is refused.
+        </p>
+      </div>
+
+      <div class="doc-section">
+        <h2>Requiring a second factor for one action</h2>
+        <p>
+          Assurance is not just recorded — it is enforceable. Attach a condition
+          on <code>session.assurance</code> to a permission, then pass the session
+          rather than the principal when you ask.
+        </p>
+        <code-tabs flow="step-up" />
+        <p>
+          The engine verifies the session and <em>derives</em> the context itself
+          under the reserved <code>session.</code> prefix. A caller-supplied key
+          with that prefix is <strong>rejected, not ignored</strong> — that
+          refusal is what makes the condition worth trusting. An unusable session
+          denies with <code>deny_session_invalid</code> rather than falling back
+          to a lower assurance.
+        </p>
+      </div>
+
+      <div class="doc-section">
+        <h2>What to read next</h2>
+        <ul>
+          <li><a href="/docs/authentication">Authentication and tokens</a> — the transaction these factors attach to.</li>
+          <li><a href="https://github.com/d31ma/sesame/blob/main/api/machine/v1/README.md" target="_blank" rel="noopener">Machine protocol reference</a> — every parameter and error code.</li>
+          <li><a href="https://github.com/d31ma/sesame/blob/main/docs/CONFIGURATION.md" target="_blank" rel="noopener">Configuration and keys</a> — where <code>secrets.key</code> comes from.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>

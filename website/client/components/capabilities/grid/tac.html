@@ -1,0 +1,24 @@
+<section class="section" id="capabilities" aria-labelledby="capabilities-heading">
+  <div class="w-container w-container--xl">
+    <div class="section-head">
+      <span class="eyebrow">What it does</span>
+      <h2 id="capabilities-heading">One place for who, what, and why.</h2>
+      <p>
+        Principals, credentials, sessions, tokens, policy, and audit — with the decision
+        boundary in the same engine as the identities it decides about.
+      </p>
+    </div>
+
+    <div class="w-grid-row">
+      <loop :for="let capability of capabilities">
+        <div class="w-grid-col-12 w-grid-col-sm-6 w-grid-col-lg-4">
+          <div class="w-card w-card--variant-outlined cap-card">
+            <span :class="'w-chip w-chip-tonal w-chip--x-small w-chip-' + capability.color">{capability.area}</span>
+            <h3>{capability.title}</h3>
+            <p>{capability.text}</p>
+          </div>
+        </div>
+      </loop>
+    </div>
+  </div>
+</section>

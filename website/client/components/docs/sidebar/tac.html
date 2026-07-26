@@ -1,0 +1,33 @@
+<aside class="docs-sidebar" aria-label="Documentation">
+  <button
+    type="button"
+    class="w-btn w-btn-outlined w-btn--sm docs-sidebar-toggle"
+    w-docs-toggle
+    aria-expanded="false"
+    aria-controls="docs-sidebar-nav"
+  >
+    <span aria-hidden="true">☰</span> Documentation menu
+  </button>
+
+  <nav id="docs-sidebar-nav" class="docs-sidebar-nav" aria-label="Documentation sections">
+    <loop :for="let section of sections">
+      <section class="docs-sidebar-section">
+        <h2 class="docs-sidebar-subhead">{section.title}</h2>
+        <p class="docs-sidebar-summary">{section.summary}</p>
+        <ul class="docs-sidebar-list">
+          <loop :for="let link of section.links">
+            <li>
+              <logic :if="link.external">
+                <a :href="link.href" target="_blank" rel="noopener">
+                  {link.title}<span class="docs-sidebar-out" aria-label="opens on GitHub">↗</span>
+                </a>
+              </logic><logic else="">
+                <a :href="link.href">{link.title}</a>
+              </logic>
+            </li>
+          </loop>
+        </ul>
+      </section>
+    </loop>
+  </nav>
+</aside>

@@ -1,0 +1,43 @@
+<section class="section" id="architecture" aria-labelledby="arch-heading">
+  <div class="w-container w-container--lg">
+    <div class="section-head">
+      <span class="eyebrow">How it fits</span>
+      <h2 id="arch-heading">A subprocess, not a service.</h2>
+      <p>
+        Most identity servers ask you to run one more thing on the network and trust it with
+        your users. SESAME is a binary your application starts. It has no listener to expose,
+        no admin console to leak, and no origin to be confused about.
+      </p>
+    </div>
+
+    <div class="arch-flow">
+      <div class="arch-node">
+        <strong>Your application</strong>
+        <span>Owns every listener, TLS boundary, route, and middleware chain. Nothing about that changes.</span>
+      </div>
+      <span class="arch-arrow" aria-hidden="true">→</span>
+      <div class="arch-node">
+        <strong>SDK shim</strong>
+        <span>One dependency-free file. Owns the subprocess, timeouts, cancellation, and typed errors — never a security decision.</span>
+      </div>
+      <span class="arch-arrow" aria-hidden="true">→</span>
+      <div class="arch-node">
+        <strong>SESAME engine</strong>
+        <span>NDJSON on stdin and stdout. Every protocol decision, every policy evaluation, every audit record.</span>
+      </div>
+      <span class="arch-arrow" aria-hidden="true">→</span>
+      <div class="arch-node">
+        <strong>FYLO</strong>
+        <span>Documents are authoritative. Indexes, caches, and projections are derived and rebuildable.</span>
+      </div>
+    </div>
+
+    <div class="section-head" style="margin-bottom: 0">
+      <p>
+        The architecture is enforced, not documented: a test inspects the linked dependency
+        graph of the shipped binary and fails the build if an HTTP package, a template engine,
+        or an unexpected module ever appears in it.
+      </p>
+    </div>
+  </div>
+</section>

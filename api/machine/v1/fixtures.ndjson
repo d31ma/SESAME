@@ -1,0 +1,24 @@
+{"protocol_version":"1","request_id":"fixture-ping","operation":"system.ping","parameters":{}}
+{"protocol_version":"1","request_id":"fixture-ping","ok":true,"result":{"status":"ok"}}
+{"protocol_version":"1","request_id":"fixture-missing","operation":"identity.create","parameters":{}}
+{"protocol_version":"1","request_id":"fixture-missing","ok":false,"error":{"code":"operation_not_found","message":"operation not found","retryable":false}}
+{"protocol_version":"1","request_id":"fixture-tenant-nostorage","operation":"tenant.bootstrap","parameters":{"name":"acme"}}
+{"protocol_version":"1","request_id":"fixture-tenant-nostorage","ok":false,"error":{"code":"storage_not_configured","message":"tenant operations require a configured FYLO root","retryable":false}}
+{"protocol_version":"1","request_id":"fixture-tenant-get-ambiguous","operation":"tenant.get","parameters":{"name":"acme","tenant_id":"tnt_00000000000000000000000000000000"}}
+{"protocol_version":"1","request_id":"fixture-tenant-get-ambiguous","ok":false,"error":{"code":"invalid_request","message":"exactly one of tenant_id or name is required","retryable":false}}
+{"protocol_version":"1","request_id":"fixture-metrics","operation":"system.metrics","parameters":{}}
+{"protocol_version":"1","request_id":"fixture-metrics","ok":true,"result":{"uptime_seconds":0.1,"goroutines":4,"heap_alloc_bytes":1048576,"storage_configured":false,"requests_total":{"system.ping":1},"errors_total":{}}}
+{"protocol_version":"1","request_id":"fixture-principal-nostorage","operation":"principal.create","parameters":{"tenant_id":"tnt_00000000000000000000000000000000","kind":"human","identifier_namespace":"email","identifier_value":"alice@example.com"}}
+{"protocol_version":"1","request_id":"fixture-principal-nostorage","ok":false,"error":{"code":"storage_not_configured","message":"principal operations require a configured FYLO root","retryable":false}}
+{"protocol_version":"1","request_id":"fixture-principal-get-ambiguous","operation":"principal.get","parameters":{}}
+{"protocol_version":"1","request_id":"fixture-principal-get-ambiguous","ok":false,"error":{"code":"invalid_request","message":"exactly one of principal_id or tenant_id with identifier_namespace and identifier_value is required","retryable":false}}
+{"protocol_version":"1","request_id":"fixture-decide-nostorage","operation":"authorize.decide","parameters":{"tenant_id":"tnt_00000000000000000000000000000000","principal_id":"prn_00000000000000000000000000000000","action":"doc:read","resource":"file:a"}}
+{"protocol_version":"1","request_id":"fixture-decide-nostorage","ok":false,"error":{"code":"storage_not_configured","message":"authorization operations require a configured FYLO root","retryable":false}}
+{"protocol_version":"1","request_id":"fixture-grant-ambiguous","operation":"grant.create","parameters":{"tenant_id":"tnt_00000000000000000000000000000000","principal_id":"prn_00000000000000000000000000000000","group_id":"grp_00000000000000000000000000000000","role_id":"rol_00000000000000000000000000000000"}}
+{"protocol_version":"1","request_id":"fixture-grant-ambiguous","ok":false,"error":{"code":"invalid_request","message":"exactly one of principal_id or group_id is required","retryable":false}}
+{"protocol_version":"1","request_id":"fixture-authn-nostorage","operation":"authn.begin","parameters":{"tenant_id":"tnt_00000000000000000000000000000000","identifier_namespace":"email","identifier_value":"alice@example.com"}}
+{"protocol_version":"1","request_id":"fixture-authn-nostorage","ok":false,"error":{"code":"storage_not_configured","message":"authentication operations require a configured FYLO root","retryable":false}}
+{"protocol_version":"1","request_id":"fixture-session-unknown","operation":"session.verify","parameters":{"session_id":"ses_00000000000000000000000000000000","session_secret":"nope"}}
+{"protocol_version":"1","request_id":"fixture-session-unknown","ok":false,"error":{"code":"session_not_found","message":"session not found","retryable":false}}
+{"protocol_version":"1","request_id":"fixture-totp-nosecrets","operation":"authenticator.totp_enroll","parameters":{"principal_id":"prn_00000000000000000000000000000000"}}
+{"protocol_version":"1","request_id":"fixture-totp-nosecrets","ok":false,"error":{"code":"storage_not_configured","message":"authentication operations require a configured FYLO root","retryable":false}}
