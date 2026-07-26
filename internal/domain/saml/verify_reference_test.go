@@ -61,10 +61,20 @@ func newTestSigner(t *testing.T) *testSigner {
 // sign builds a signed assertion, canonicalizing with xmllint throughout.
 func (s *testSigner) sign(t *testing.T, unsigned string) string {
 	t.Helper()
+	return s.signWith(t, unsigned, referenceCanonical)
+}
+
+// signWith builds a signed assertion using the supplied canonicalizer.
+func (s *testSigner) signWith(
+	t *testing.T,
+	unsigned string,
+	canonical func(*testing.T, string) string,
+) string {
+	t.Helper()
 
 	// 1. Digest the assertion as it stands, before any signature exists.
 	//    This is what the enveloped-signature transform will reproduce.
-	digest := sha256.Sum256([]byte(referenceCanonical(t, unsigned)))
+	digest := sha256.Sum256([]byte(canonical(t, unsigned)))
 
 	// 2. Build SignedInfo naming that digest.
 	signedInfo := `<ds:SignedInfo xmlns:ds="http://www.w3.org/2000/09/xmldsig#">` +
@@ -80,7 +90,7 @@ func (s *testSigner) sign(t *testing.T, unsigned string) string {
 		`</ds:SignedInfo>`
 
 	// 3. Sign its canonical form, again per libxml2.
-	signedInfoDigest := sha256.Sum256([]byte(referenceCanonical(t, signedInfo)))
+	signedInfoDigest := sha256.Sum256([]byte(canonical(t, signedInfo)))
 	signature, err := rsa.SignPKCS1v15(rand.Reader, s.key, crypto.SHA256, signedInfoDigest[:])
 	if err != nil {
 		t.Fatalf("sign: %v", err)
@@ -99,6 +109,16 @@ func (s *testSigner) sign(t *testing.T, unsigned string) string {
 	return unsigned[:insertAt] + element + unsigned[insertAt:]
 }
 
+func sesameCanonical(t *testing.T, document string) string {
+	t.Helper()
+
+	canonical, err := canonicalizeBytes([]byte(document), true, nil)
+	if err != nil {
+		t.Fatalf("canonicalize test document: %v", err)
+	}
+	return string(canonical)
+}
+
 func unsignedAssertion() string {
 	return `<saml:Assertion xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion" ID="_a1">` +
 		`<saml:Issuer>` + testIssuer + `</saml:Issuer>` +
@@ -111,6 +131,55 @@ func unsignedAssertion() string {
 		`<saml:AudienceRestriction><saml:Audience>` + testAudience +
 		`</saml:Audience></saml:AudienceRestriction></saml:Conditions>` +
 		`</saml:Assertion>`
+}
+
+// TestVerifyMechanicsWithoutExternalTools keeps the verifier's deterministic
+// mechanics covered on every CI runner. It deliberately uses SESAME's own
+// canonicalizer, so it is not interoperability evidence; the libxml2 tests
+// below remain the independent conformance proof.
+func TestVerifyMechanicsWithoutExternalTools(t *testing.T) {
+	t.Parallel()
+
+	signer := newTestSigner(t)
+	document := signer.signWith(t, unsignedAssertion(), sesameCanonical)
+
+	t.Run("accepts an intact assertion", func(t *testing.T) {
+		signed, err := Verify([]byte(document), signer.certificate)
+		if err != nil {
+			t.Fatalf("Verify() error = %v", err)
+		}
+		if signed.ID != "_a1" {
+			t.Fatalf("verified element ID = %q", signed.ID)
+		}
+	})
+
+	t.Run("refuses content tampering", func(t *testing.T) {
+		tampered := strings.Replace(document, "alice@example.com", "attacker@example.com", 1)
+		if _, err := Verify([]byte(tampered), signer.certificate); !errors.Is(
+			err, ErrDigestMismatch) {
+			t.Fatalf("Verify() error = %v, want ErrDigestMismatch", err)
+		}
+	})
+
+	t.Run("refuses another key", func(t *testing.T) {
+		other := newTestSigner(t)
+		if _, err := Verify([]byte(document), other.certificate); !errors.Is(
+			err, ErrSignatureInvalid) {
+			t.Fatalf("Verify() error = %v, want ErrSignatureInvalid", err)
+		}
+	})
+
+	t.Run("refuses wrapping", func(t *testing.T) {
+		forgery := strings.Replace(
+			strings.Replace(unsignedAssertion(), `ID="_a1"`, `ID="_a2"`, 1),
+			"alice@example.com", "attacker@example.com", 1)
+		wrapped := `<samlp:Response xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol">` +
+			document + forgery + `</samlp:Response>`
+		if _, err := Verify([]byte(wrapped), signer.certificate); !errors.Is(
+			err, ErrAmbiguous) {
+			t.Fatalf("Verify() error = %v, want ErrAmbiguous", err)
+		}
+	})
 }
 
 // TestVerifyAcceptsALibxml2SignedAssertion is the end-to-end proof that

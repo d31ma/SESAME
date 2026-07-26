@@ -52,6 +52,7 @@ func TestStandardsDispatchStartsOnlyValidatedAuthorizationInteractions(t *testin
 	if rejected.Status != 400 || string(rejected.Body) != `{"error":"invalid_request"}` {
 		t.Fatalf("duplicate parameter dispatch = %#v", rejected)
 	}
+	assertNoStore(t, rejected)
 
 	untrusted := cloneStandardsRequest(t, base)
 	untrusted["query"].(map[string][]string)["redirect_uri"] = []string{"https://evil.example/callback"}
@@ -61,6 +62,98 @@ func TestStandardsDispatchStartsOnlyValidatedAuthorizationInteractions(t *testin
 	}
 	if _, present := rejected.Headers["location"]; present {
 		t.Fatalf("an untrusted redirect produced Location: %#v", rejected.Headers)
+	}
+	assertNoStore(t, rejected)
+}
+
+func TestStandardsDispatchExecutesProtectedEndpointBoundaries(t *testing.T) {
+	t.Parallel()
+
+	processor, registered := standardsProcessor(t)
+	authorization := testBasicAuthorization(registered.Client.ID, registered.Secret)
+	tests := []struct {
+		name      string
+		request   map[string]any
+		status    int
+		body      string
+		emptyBody bool
+	}{
+		{
+			name: "token",
+			request: map[string]any{
+				"contract_version": "1",
+				"endpoint":         "oidc.token",
+				"method":           "POST",
+				"authorization":    authorization,
+				"form": map[string][]string{
+					"grant_type": {"unsupported"},
+				},
+			},
+			status: 400,
+			body:   `{"error":"invalid_request"}`,
+		},
+		{
+			name: "introspection",
+			request: map[string]any{
+				"contract_version": "1",
+				"endpoint":         "oidc.introspection",
+				"method":           "POST",
+				"authorization":    authorization,
+				"form": map[string][]string{
+					"token": {"not-a-token"},
+				},
+			},
+			status: 200,
+			body:   `{"active":false}`,
+		},
+		{
+			name: "revocation",
+			request: map[string]any{
+				"contract_version": "1",
+				"endpoint":         "oidc.revocation",
+				"method":           "POST",
+				"authorization":    authorization,
+				"form": map[string][]string{
+					"token": {"not-a-token"},
+				},
+			},
+			status:    200,
+			emptyBody: true,
+		},
+		{
+			name: "logout",
+			request: map[string]any{
+				"contract_version": "1",
+				"endpoint":         "oidc.logout",
+				"method":           "GET",
+				"query": map[string][]string{
+					"id_token_hint": {"not-an-id-token"},
+				},
+			},
+			status: 400,
+			body:   `{"error":"invalid_request"}`,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			result := standardsResult(t, runRequests(
+				t,
+				processor,
+				standardsFrame(t, test.name, test.request),
+			)[0])
+			if result.Status != test.status {
+				t.Fatalf("status = %d, want %d: %#v", result.Status, test.status, result)
+			}
+			if test.emptyBody {
+				if len(result.Body) != 0 {
+					t.Fatalf("body = %s, want empty", result.Body)
+				}
+			} else if string(result.Body) != test.body {
+				t.Fatalf("body = %s, want %s", result.Body, test.body)
+			}
+			assertNoStore(t, result)
+		})
 	}
 }
 
@@ -182,6 +275,28 @@ func TestStandardsDispatchRejectsControlCharactersAtTheContractBoundary(t *testi
 	}
 }
 
+func TestStandardsDispatchBoundsTheSerializedEnvelope(t *testing.T) {
+	t.Parallel()
+
+	processor, _ := standardsProcessor(t)
+	values := make([]string, 7)
+	for index := range values {
+		values[index] = strings.Repeat(`"`, maxStandardsValueBytes)
+	}
+	request := map[string]any{
+		"contract_version": "1",
+		"endpoint":         "oidc.token",
+		"method":           "POST",
+		"form": map[string][]string{
+			"escaped": values,
+		},
+	}
+	response := runRequests(t, processor, standardsFrame(t, "serialized-limit", request))[0]
+	if response.OK || response.Error == nil || response.Error.Code != ErrorInvalidRequest {
+		t.Fatalf("oversized serialized envelope response = %#v", response)
+	}
+}
+
 func TestBasicClientAuthenticationDecodesFormEncodedCredentials(t *testing.T) {
 	t.Parallel()
 
@@ -269,6 +384,17 @@ func standardsResult(t *testing.T, response Response) decodedStandardsResult {
 		t.Fatalf("decode standards response: %v", err)
 	}
 	return result
+}
+
+func assertNoStore(t *testing.T, response decodedStandardsResult) {
+	t.Helper()
+
+	if response.Headers["cache-control"] != "no-store" {
+		t.Fatalf("Cache-Control = %q, want no-store", response.Headers["cache-control"])
+	}
+	if response.Headers["pragma"] != "no-cache" {
+		t.Fatalf("Pragma = %q, want no-cache", response.Headers["pragma"])
+	}
 }
 
 func cloneStandardsRequest(t *testing.T, source map[string]any) map[string]any {

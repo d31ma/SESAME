@@ -13,6 +13,8 @@
   "$defs": {
     "multimap": {
       "type": "object",
+      "description": "A duplicate-preserving multimap with at most 64 values in total. x-maxTotalItems is a required SESAME contract constraint because JSON Schema cannot sum items across dynamically named properties.",
+      "x-maxTotalItems": 64,
       "maxProperties": 64,
       "propertyNames": {
         "minLength": 1,

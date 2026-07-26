@@ -39,6 +39,43 @@ func TestPublicRequestURIReportsTheRouteWithoutQuery(t *testing.T) {
 	}
 }
 
+func TestHostRejectsDuplicateSecurityHeadersBeforeDispatch(t *testing.T) {
+	t.Parallel()
+
+	for _, name := range []string{"Authorization", "DPoP"} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			request := httptest.NewRequest(http.MethodGet, "https://id.example/authorize", http.NoBody)
+			request.Header.Add(name, "first")
+			request.Header.Add(name, "second")
+			recorder := httptest.NewRecorder()
+
+			if _, ok := dispatchStandard(
+				recorder,
+				request,
+				nil,
+				"oidc.authorization",
+				nil,
+			); ok {
+				t.Fatalf("duplicate %s header reached SESAME dispatch", name)
+			}
+			if recorder.Code != http.StatusBadRequest {
+				t.Fatalf("status = %d, want %d", recorder.Code, http.StatusBadRequest)
+			}
+			if got := recorder.Header().Get("Cache-Control"); got != "no-store" {
+				t.Fatalf("Cache-Control = %q, want no-store", got)
+			}
+			if got := recorder.Header().Get("Pragma"); got != "no-cache" {
+				t.Fatalf("Pragma = %q, want no-cache", got)
+			}
+			if recorder.Body.String() != "{\"error\":\"invalid_request\"}\n" {
+				t.Fatalf("body = %q", recorder.Body.String())
+			}
+		})
+	}
+}
+
 func TestHostRejectsHeadersOutsideTheContractAllowlist(t *testing.T) {
 	t.Parallel()
 
@@ -50,6 +87,9 @@ func TestHostRejectsHeadersOutsideTheContractAllowlist(t *testing.T) {
 	})
 	if recorder.Code != http.StatusServiceUnavailable {
 		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusServiceUnavailable)
+	}
+	if got := recorder.Header().Get("Cache-Control"); got != "no-store" {
+		t.Fatalf("Cache-Control = %q, want no-store", got)
 	}
 	if cookie := recorder.Header().Get("Set-Cookie"); cookie != "" {
 		t.Fatalf("unapproved response header escaped: %q", cookie)
@@ -102,11 +142,11 @@ func TestAuthorizationActionRejectsInvalidContractResponses(t *testing.T) {
 			if cookies := recorder.Result().Cookies(); len(cookies) != 0 {
 				t.Fatalf("invalid action set cookies: %#v", cookies)
 			}
-			if got := recorder.Header().Get("Cache-Control"); got != "" {
-				t.Fatalf("invalid action applied Cache-Control: %q", got)
+			if got := recorder.Header().Get("Cache-Control"); got != "no-store" {
+				t.Fatalf("failure Cache-Control = %q, want no-store", got)
 			}
-			if got := recorder.Header().Get("Pragma"); got != "" {
-				t.Fatalf("invalid action applied Pragma: %q", got)
+			if got := recorder.Header().Get("Pragma"); got != "no-cache" {
+				t.Fatalf("failure Pragma = %q, want no-cache", got)
 			}
 			if strings.Contains(recorder.Body.String(), response.Action.InteractionSecret) {
 				t.Fatal("interaction secret reached the failure response")

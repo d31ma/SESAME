@@ -45,7 +45,10 @@ the host's responsibility.
 
 The envelope accepts no arbitrary header bag, cookies, remote address, or
 framework object. It is bounded to 64 names and 64 total values per multimap,
-128 KiB overall, 128-byte names, and 16 KiB values.
+128 KiB of serialized JSON overall, 128-byte names, and 16 KiB decoded values.
+The schema records the cross-property value limit with the required
+`x-maxTotalItems` extension because standard JSON Schema cannot sum array items
+across dynamically named properties.
 
 ## Endpoints
 

@@ -84,6 +84,10 @@ type StandardsAction struct {
 // error; a valid HTTP request that the protocol refuses is a StandardsResponse
 // the host can serve.
 func (p *Processor) handleStandardsDispatch(ctx context.Context, request Request) Response {
+	if len(request.Parameters) > maxStandardsRequestBytes {
+		return errorResponse(request.RequestID, ErrorInvalidRequest,
+			"standards request exceeds its maximum serialized size")
+	}
 	var parameters StandardsRequest
 	if err := decodeParameters(request.Parameters, &parameters); err != nil {
 		return errorResponse(request.RequestID, ErrorInvalidRequest, err.Error())
@@ -234,7 +238,7 @@ func (p *Processor) dispatchDiscoveryEndpoint(
 ) StandardsResponse {
 	if len(request.Query) != 0 || len(request.Form) != 0 ||
 		request.Authorization != "" || request.DPoP != "" || request.HTTPURI != "" {
-		return oauthError(400, "invalid_request", false)
+		return oauthError(400, "invalid_request")
 	}
 	parameters := StandardsEndpoints{}
 	if request.Endpoints != nil {
@@ -250,7 +254,7 @@ func (p *Processor) dispatchJWKSEndpoint(
 	request StandardsRequest,
 ) StandardsResponse {
 	if !emptyStandardInput(request) {
-		return oauthError(400, "invalid_request", false)
+		return oauthError(400, "invalid_request")
 	}
 	response := p.handleTokenJWKS(machineRequest(requestID, map[string]any{}))
 	return publicResult(response, 200, false)
@@ -263,10 +267,10 @@ func (p *Processor) dispatchAuthorizationEndpoint(
 ) StandardsResponse {
 	if len(request.Form) != 0 || request.Authorization != "" ||
 		request.DPoP != "" || request.HTTPURI != "" || request.Endpoints != nil {
-		return oauthError(400, "invalid_request", false)
+		return oauthError(400, "invalid_request")
 	}
 	if hasDuplicate(request.Query) {
-		return oauthError(400, "invalid_request", false)
+		return oauthError(400, "invalid_request")
 	}
 	parameters := map[string]any{
 		"client_id":             first(request.Query, "client_id"),
@@ -281,11 +285,11 @@ func (p *Processor) dispatchAuthorizationEndpoint(
 	}
 	response := p.handleAuthorize(ctx, machineRequest(requestID, parameters))
 	if response.Error != nil {
-		return oauthError(400, "invalid_request", true)
+		return oauthError(400, "invalid_request")
 	}
 	started, ok := response.Result.(identity.StartedInteraction)
 	if !ok {
-		return oauthError(503, "server_error", true)
+		return oauthError(503, "server_error")
 	}
 	return StandardsResponse{
 		ContractVersion: StandardsContractVersion,
@@ -309,14 +313,14 @@ func (p *Processor) dispatchTokenEndpoint(
 	request StandardsRequest,
 ) StandardsResponse {
 	if len(request.Query) != 0 || request.Endpoints != nil || hasDuplicate(request.Form) {
-		return oauthError(400, "invalid_request", true)
+		return oauthError(400, "invalid_request")
 	}
 	clientID, clientSecret, authentication := clientAuthentication(request)
 	if authentication == clientAuthenticationInvalid {
 		return invalidClient()
 	}
 	if authentication == clientAuthenticationMultiple {
-		return oauthError(400, "invalid_request", true)
+		return oauthError(400, "invalid_request")
 	}
 	parameters := map[string]any{
 		"grant_type":    first(request.Form, "grant_type"),
@@ -346,14 +350,14 @@ func (p *Processor) dispatchIntrospectionEndpoint(
 ) StandardsResponse {
 	if len(request.Query) != 0 || request.Endpoints != nil ||
 		request.DPoP != "" || request.HTTPURI != "" || hasDuplicate(request.Form) {
-		return oauthError(400, "invalid_request", true)
+		return oauthError(400, "invalid_request")
 	}
 	clientID, clientSecret, authentication := clientAuthentication(request)
 	if authentication == clientAuthenticationInvalid {
 		return invalidClient()
 	}
 	if authentication == clientAuthenticationMultiple {
-		return oauthError(400, "invalid_request", true)
+		return oauthError(400, "invalid_request")
 	}
 	response := p.handleIntrospect(machineRequest(requestID, map[string]any{
 		"token":         first(request.Form, "token"),
@@ -373,14 +377,14 @@ func (p *Processor) dispatchRevocationEndpoint(
 ) StandardsResponse {
 	if len(request.Query) != 0 || request.Endpoints != nil ||
 		request.DPoP != "" || request.HTTPURI != "" || hasDuplicate(request.Form) {
-		return oauthError(400, "invalid_request", true)
+		return oauthError(400, "invalid_request")
 	}
 	clientID, clientSecret, authentication := clientAuthentication(request)
 	if authentication == clientAuthenticationInvalid {
 		return invalidClient()
 	}
 	if authentication == clientAuthenticationMultiple {
-		return oauthError(400, "invalid_request", true)
+		return oauthError(400, "invalid_request")
 	}
 	response := p.handleRevoke(ctx, machineRequest(requestID, map[string]any{
 		"token":         first(request.Form, "token"),
@@ -405,7 +409,7 @@ func (p *Processor) dispatchLogoutEndpoint(
 	if len(request.Form) != 0 || request.Authorization != "" ||
 		request.DPoP != "" || request.HTTPURI != "" ||
 		request.Endpoints != nil || hasDuplicate(request.Query) {
-		return oauthError(400, "invalid_request", true)
+		return oauthError(400, "invalid_request")
 	}
 	response := p.handleLogout(ctx, machineRequest(requestID, map[string]any{
 		"id_token_hint":            first(request.Query, "id_token_hint"),
@@ -413,15 +417,15 @@ func (p *Processor) dispatchLogoutEndpoint(
 		"state":                    first(request.Query, "state"),
 	}))
 	if response.Error != nil {
-		return oauthError(400, "invalid_request", true)
+		return oauthError(400, "invalid_request")
 	}
 	result, ok := response.Result.(identity.LogoutResult)
 	if !ok {
-		return oauthError(503, "server_error", true)
+		return oauthError(503, "server_error")
 	}
 	redirect, err := identity.LogoutRedirect(result)
 	if err != nil {
-		return oauthError(503, "server_error", true)
+		return oauthError(503, "server_error")
 	}
 	if redirect == "" {
 		return jsonResponse(200, map[string]bool{"signed_out": true}, true)
@@ -531,7 +535,7 @@ func first(values map[string][]string, key string) string {
 
 func publicResult(response Response, status int, noStore bool) StandardsResponse {
 	if response.Error != nil {
-		return oauthError(503, "server_error", noStore)
+		return oauthError(503, "server_error")
 	}
 	return jsonResponse(status, response.Result, noStore)
 }
@@ -539,7 +543,7 @@ func publicResult(response Response, status int, noStore bool) StandardsResponse
 func jsonResponse(status int, value any, noStore bool) StandardsResponse {
 	body, err := json.Marshal(value)
 	if err != nil {
-		return oauthError(503, "server_error", noStore)
+		return oauthError(503, "server_error")
 	}
 	headers := map[string]string{
 		"content-type":           "application/json",
@@ -558,10 +562,10 @@ func jsonResponse(status int, value any, noStore bool) StandardsResponse {
 	}
 }
 
-func oauthError(status int, code string, noStore bool) StandardsResponse {
+func oauthError(status int, code string) StandardsResponse {
 	return jsonResponse(status, struct {
 		Error string `json:"error"`
-	}{Error: code}, noStore)
+	}{Error: code}, true)
 }
 
 func tokenEndpointError(code string) StandardsResponse {
@@ -569,15 +573,15 @@ func tokenEndpointError(code string) StandardsResponse {
 	case ErrorClientNotFound, ErrorClientDisabled:
 		return invalidClient()
 	case ErrorInvalidGrant:
-		return oauthError(400, "invalid_grant", true)
+		return oauthError(400, "invalid_grant")
 	case ErrorAuthorizationPending, ErrorSlowDown, ErrorAccessDenied:
-		return oauthError(400, code, true)
+		return oauthError(400, code)
 	case ErrorDPoPProofInvalid, ErrorDPoPProofNotBound, ErrorDPoPProofExpired,
 		ErrorDPoPProofReplayed, ErrorDPoPKeyMismatch, ErrorDPoPForeignOrigin,
 		ErrorDPoPRequired:
-		return oauthError(400, "invalid_dpop_proof", true)
+		return oauthError(400, "invalid_dpop_proof")
 	default:
-		return oauthError(400, "invalid_request", true)
+		return oauthError(400, "invalid_request")
 	}
 }
 
@@ -586,18 +590,18 @@ func clientEndpointError(code string) StandardsResponse {
 	case ErrorClientNotFound, ErrorClientDisabled, ErrorInvalidGrant:
 		return invalidClient()
 	default:
-		return oauthError(400, "invalid_request", true)
+		return oauthError(400, "invalid_request")
 	}
 }
 
 func invalidClient() StandardsResponse {
-	response := oauthError(401, "invalid_client", true)
+	response := oauthError(401, "invalid_client")
 	response.Headers["www-authenticate"] = `Basic realm="sesame"`
 	return response
 }
 
 func methodNotAllowed(allow string) StandardsResponse {
-	response := oauthError(405, "invalid_request", true)
+	response := oauthError(405, "invalid_request")
 	response.Headers["allow"] = allow
 	return response
 }

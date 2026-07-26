@@ -50,6 +50,18 @@ func TestStandardsSchemaNamesTheCompleteClosedEndpointSet(t *testing.T) {
 			t.Errorf("schema occurrence count for %s is not one", endpoint)
 		}
 	}
+
+	definitions, ok := schema["$defs"].(map[string]any)
+	if !ok {
+		t.Fatal("schema has no $defs object")
+	}
+	multimap, ok := definitions["multimap"].(map[string]any)
+	if !ok {
+		t.Fatal("schema has no multimap definition")
+	}
+	if got := multimap["x-maxTotalItems"]; got != float64(64) {
+		t.Fatalf("multimap total-value bound = %#v, want 64", got)
+	}
 }
 
 func TestHostServerDelegatesStandardEndpointSemanticsToTheEngine(t *testing.T) {

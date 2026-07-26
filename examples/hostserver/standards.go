@@ -38,9 +38,16 @@ func dispatchStandard(
 	request.Body = http.MaxBytesReader(writer, request.Body, maxStandardsBodyBytes)
 	if request.Method == http.MethodPost {
 		if err := request.ParseForm(); err != nil {
-			writeJSON(writer, http.StatusBadRequest, map[string]any{"error": "invalid_request"})
+			writeStandardError(writer, http.StatusBadRequest, "invalid_request")
 			return sesame.StandardsResponse{}, false
 		}
+	}
+
+	authorization, authorizationOK := singleSecurityHeader(request.Header, "Authorization")
+	dpop, dpopOK := singleSecurityHeader(request.Header, "DPoP")
+	if !authorizationOK || !dpopOK {
+		writeStandardError(writer, http.StatusBadRequest, "invalid_request")
+		return sesame.StandardsResponse{}, false
 	}
 
 	translated := sesame.StandardsRequest{
@@ -48,8 +55,8 @@ func dispatchStandard(
 		Endpoint:        endpoint,
 		Method:          request.Method,
 		Query:           cloneValues(request.URL.Query()),
-		Authorization:   request.Header.Get("Authorization"),
-		DPoP:            request.Header.Get("DPoP"),
+		Authorization:   authorization,
+		DPoP:            dpop,
 		Endpoints:       endpoints,
 	}
 	if request.Method == http.MethodPost {
@@ -62,10 +69,22 @@ func dispatchStandard(
 	response, err := client.StandardsDispatch(request.Context(), translated)
 	if err != nil {
 		log.Printf("standards dispatch %s: %v", endpoint, err)
-		writeJSON(writer, http.StatusServiceUnavailable, map[string]any{"error": "server_error"})
+		writeStandardError(writer, http.StatusServiceUnavailable, "server_error")
 		return sesame.StandardsResponse{}, false
 	}
 	return response, true
+}
+
+func singleSecurityHeader(header http.Header, name string) (string, bool) {
+	values := header.Values(name)
+	switch len(values) {
+	case 0:
+		return "", true
+	case 1:
+		return values[0], true
+	default:
+		return "", false
+	}
 }
 
 func cloneValues(values url.Values) map[string][]string {
@@ -97,7 +116,7 @@ func serveStandardResponse(writer http.ResponseWriter, response sesame.Standards
 // without emitting the contract status or body first.
 func applyStandardResponseHeaders(writer http.ResponseWriter, response sesame.StandardsResponse) bool {
 	if !validateStandardResponse(response) {
-		writeJSON(writer, http.StatusServiceUnavailable, map[string]any{"error": "server_error"})
+		writeStandardError(writer, http.StatusServiceUnavailable, "server_error")
 		return false
 	}
 	for name, value := range response.Headers {
@@ -121,6 +140,12 @@ func validateStandardResponse(response sesame.StandardsResponse) bool {
 		}
 	}
 	return true
+}
+
+func writeStandardError(writer http.ResponseWriter, status int, code string) {
+	writer.Header().Set("Cache-Control", "no-store")
+	writer.Header().Set("Pragma", "no-cache")
+	writeJSON(writer, status, map[string]any{"error": code})
 }
 
 func writeStandardResponse(writer http.ResponseWriter, response sesame.StandardsResponse) {
