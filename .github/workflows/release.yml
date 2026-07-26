@@ -227,7 +227,6 @@ jobs:
           gh release create "$RELEASE_TAG" \
             --repo "$GITHUB_REPOSITORY" \
             --title "$RELEASE_TAG" \
-            --target "$expected_commit" \
             --verify-tag \
             --generate-notes \
             release-assets/sesame-* release-assets/SHA256SUMS

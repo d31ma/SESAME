@@ -47,7 +47,10 @@ immutable tagged source; it never publishes artifacts built from the workflow
 repair commit. Its SLSA predicate records the default-branch workflow revision
 as builder configuration and the checked-out tag commit as the resolved source
 dependency. Publication revalidates the remote tag immediately before using
-`gh release create --verify-tag`.
+`gh release create --verify-tag`. The active `Immutable release tags`
+repository ruleset rejects updates and deletions for every `v*` tag without a
+bypass actor; release administrators must not weaken or disable that ruleset
+during a release or recovery.
 
 ## Developer-Preview Release Assets
 
