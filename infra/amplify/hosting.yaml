@@ -115,8 +115,6 @@ Resources:
       AppId: !GetAtt WebsiteApp.AppId
       DomainName: sesame.del.ma
       EnableAutoSubDomain: false
-      CertificateSettings:
-        CertificateType: AMPLIFY_MANAGED
       SubDomainSettings:
         - BranchName: production
           Prefix: ""
