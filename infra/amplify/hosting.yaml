@@ -1,0 +1,136 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: SESAME static website hosting and custom domain.
+
+Parameters:
+  Environment:
+    Type: String
+    Default: production
+    AllowedPattern: "^[a-z0-9-]+$"
+  Owner:
+    Type: String
+    Default: DELMA
+    MinLength: 1
+  CostCenter:
+    Type: String
+    Default: DELMA
+    MinLength: 1
+
+Resources:
+  WebsiteApp:
+    Type: AWS::Amplify::App
+    Properties:
+      Name: SESAME
+      Description: SESAME public documentation and product website.
+      Platform: WEB
+      EnableBranchAutoDeletion: false
+      CacheConfig:
+        Type: AMPLIFY_MANAGED_NO_COOKIES
+      CustomRules:
+        - Source: /docs
+          Target: /docs/index.html
+          Status: "200"
+        - Source: /docs/
+          Target: /docs/index.html
+          Status: "200"
+        - Source: /docs/concepts
+          Target: /docs/concepts/index.html
+          Status: "200"
+        - Source: /docs/concepts/
+          Target: /docs/concepts/index.html
+          Status: "200"
+        - Source: /docs/authentication
+          Target: /docs/authentication/index.html
+          Status: "200"
+        - Source: /docs/authentication/
+          Target: /docs/authentication/index.html
+          Status: "200"
+        - Source: /docs/mfa
+          Target: /docs/mfa/index.html
+          Status: "200"
+        - Source: /docs/mfa/
+          Target: /docs/mfa/index.html
+          Status: "200"
+        - Source: /docs/authorization
+          Target: /docs/authorization/index.html
+          Status: "200"
+        - Source: /docs/authorization/
+          Target: /docs/authorization/index.html
+          Status: "200"
+        - Source: /docs/errors
+          Target: /docs/errors/index.html
+          Status: "200"
+        - Source: /docs/errors/
+          Target: /docs/errors/index.html
+          Status: "200"
+        - Source: /docs/oauth-flows
+          Target: /docs/oauth-flows/index.html
+          Status: "200"
+        - Source: /docs/oauth-flows/
+          Target: /docs/oauth-flows/index.html
+          Status: "200"
+        - Source: /download
+          Target: /download/index.html
+          Status: "200"
+        - Source: /download/
+          Target: /download/index.html
+          Status: "200"
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: SESAME
+        - Key: Owner
+          Value: !Ref Owner
+        - Key: CostCenter
+          Value: !Ref CostCenter
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  ProductionBranch:
+    Type: AWS::Amplify::Branch
+    Properties:
+      AppId: !GetAtt WebsiteApp.AppId
+      BranchName: production
+      Description: Manually deployed production website artifacts.
+      EnableAutoBuild: false
+      EnablePerformanceMode: false
+      EnablePullRequestPreview: false
+      Stage: PRODUCTION
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: SESAME
+        - Key: Owner
+          Value: !Ref Owner
+        - Key: CostCenter
+          Value: !Ref CostCenter
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  WebsiteDomain:
+    Type: AWS::Amplify::Domain
+    DependsOn: ProductionBranch
+    Properties:
+      AppId: !GetAtt WebsiteApp.AppId
+      DomainName: sesame.del.ma
+      EnableAutoSubDomain: false
+      CertificateSettings:
+        CertificateType: AMPLIFY_MANAGED
+      SubDomainSettings:
+        - BranchName: production
+          Prefix: ""
+
+Outputs:
+  AppId:
+    Description: Amplify application identifier.
+    Value: !GetAtt WebsiteApp.AppId
+  DefaultDomain:
+    Description: Amplify-managed application domain.
+    Value: !GetAtt WebsiteApp.DefaultDomain
+  ProductionBranch:
+    Description: Branch used for manual production deployments.
+    Value: !GetAtt ProductionBranch.BranchName
+  CustomDomain:
+    Description: Public SESAME website domain.
+    Value: https://sesame.del.ma
