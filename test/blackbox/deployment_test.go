@@ -38,6 +38,14 @@ func TestDeploymentLifecycleNeverLeaksKeyMaterial(t *testing.T) {
 	}
 
 	deploymentDir := filepath.Join(t.TempDir(), "deployment")
+	environmentFile := filepath.Join(t.TempDir(), ".env")
+	if err := os.WriteFile(environmentFile, []byte(strings.Join([]string{
+		"SESAME_DEPLOYMENT=" + deploymentDir,
+		"FYLO_BINARY=" + fakeFYLO,
+		"SESAME_ISSUER=https://id.example.com",
+	}, "\n")+"\n"), 0o600); err != nil {
+		t.Fatalf("write initialization environment: %v", err)
+	}
 	var transcripts []string
 	runCommand := func(stdin string, arguments ...string) (string, string, int) {
 		command := exec.Command(sesameBinary, arguments...)
@@ -53,7 +61,7 @@ func TestDeploymentLifecycleNeverLeaksKeyMaterial(t *testing.T) {
 		return stdout.String(), stderr.String(), command.ProcessState.ExitCode()
 	}
 
-	initOut, initErr, code := runCommand("", "init", "--deployment", deploymentDir, "--fylo-binary", fakeFYLO)
+	initOut, initErr, code := runCommand("", "init", "--env-file", environmentFile)
 	if code != 0 {
 		t.Fatalf("init exit = %d; stderr = %s", code, initErr)
 	}
@@ -63,6 +71,12 @@ func TestDeploymentLifecycleNeverLeaksKeyMaterial(t *testing.T) {
 	}
 	if _, exists := initSummary["snapshot_key"]; exists {
 		t.Fatal("init summary exposes key material")
+	}
+	if initSummary["issuer"] != "https://id.example.com" {
+		t.Fatalf("init did not persist the issuer from the environment file: %#v", initSummary)
+	}
+	if _, err := os.Stat(filepath.Join(deploymentDir, ".env")); !os.IsNotExist(err) {
+		t.Fatalf("initialization environment was copied into the deployment: %v", err)
 	}
 
 	keyBytes, err := os.ReadFile(filepath.Join(deploymentDir, "keys", "snapshot.key"))

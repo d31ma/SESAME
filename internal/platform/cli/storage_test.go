@@ -193,6 +193,168 @@ func TestInitAndDoctorReadTheEnvironment(t *testing.T) {
 	})
 }
 
+// TestInitReadsAnExplicitEnvironmentFile keeps .env input opt-in and verifies
+// its place below both command flags and the exported process environment.
+// These cannot run in parallel because t.Setenv is process-wide.
+func TestInitReadsAnExplicitEnvironmentFile(t *testing.T) {
+	fyloFromFile := executableStandIn(t)
+	fyloFromProcess := executableStandIn(t)
+	deploymentFromFile := filepath.Join(t.TempDir(), "from-file")
+	environmentFile := filepath.Join(t.TempDir(), ".env")
+	contents := strings.Join([]string{
+		EnvDeployment + "=" + deploymentFromFile,
+		EnvFYLOBinary + "=" + fyloFromFile,
+		EnvInitializationIssuer + "=https://file.example.com",
+	}, "\n") + "\n"
+	if err := os.WriteFile(environmentFile, []byte(contents), 0o600); err != nil {
+		t.Fatalf("write environment file: %v", err)
+	}
+
+	t.Run("file supplies initialization values without mutating the process", func(t *testing.T) {
+		t.Setenv(EnvDeployment, "")
+		t.Setenv(EnvFYLOBinary, "")
+		t.Setenv(EnvInitializationIssuer, "")
+
+		var stdout, stderr bytes.Buffer
+		if code := runInit([]string{"--env-file", environmentFile}, &stdout, &stderr); code != ExitSuccess {
+			t.Fatalf("sesame init --env-file: exit %d\n%s", code, stderr.String())
+		}
+		var summary struct {
+			Deployment string `json:"deployment"`
+			FYLOBinary string `json:"fylo_binary"`
+			Issuer     string `json:"issuer"`
+		}
+		if err := json.Unmarshal(stdout.Bytes(), &summary); err != nil {
+			t.Fatalf("decode init summary: %v", err)
+		}
+		if summary.Deployment != deploymentFromFile || summary.FYLOBinary != fyloFromFile ||
+			summary.Issuer != "https://file.example.com" {
+			t.Fatalf("init summary = %#v", summary)
+		}
+		for _, name := range []string{EnvDeployment, EnvFYLOBinary, EnvInitializationIssuer} {
+			if value := os.Getenv(name); value != "" {
+				t.Errorf("%s leaked into the process environment: %q", name, value)
+			}
+		}
+	})
+
+	t.Run("the process environment wins over the file", func(t *testing.T) {
+		deploymentFromProcess := filepath.Join(t.TempDir(), "from-process")
+		t.Setenv(EnvDeployment, deploymentFromProcess)
+		t.Setenv(EnvFYLOBinary, fyloFromProcess)
+		t.Setenv(EnvInitializationIssuer, "https://process.example.com")
+
+		var stdout, stderr bytes.Buffer
+		if code := runInit([]string{"--env-file", environmentFile}, &stdout, &stderr); code != ExitSuccess {
+			t.Fatalf("sesame init --env-file: exit %d\n%s", code, stderr.String())
+		}
+		var summary struct {
+			Deployment string `json:"deployment"`
+			FYLOBinary string `json:"fylo_binary"`
+			Issuer     string `json:"issuer"`
+		}
+		if err := json.Unmarshal(stdout.Bytes(), &summary); err != nil {
+			t.Fatalf("decode init summary: %v", err)
+		}
+		if summary.Deployment != deploymentFromProcess || summary.FYLOBinary != fyloFromProcess ||
+			summary.Issuer != "https://process.example.com" {
+			t.Fatalf("the file overrode the process environment: %#v", summary)
+		}
+	})
+
+	t.Run("flags win over both environment sources", func(t *testing.T) {
+		deploymentFromFlag := filepath.Join(t.TempDir(), "from-flag")
+		t.Setenv(EnvDeployment, filepath.Join(t.TempDir(), "from-process"))
+		t.Setenv(EnvFYLOBinary, fyloFromProcess)
+		t.Setenv(EnvInitializationIssuer, "https://process.example.com")
+
+		var stdout, stderr bytes.Buffer
+		arguments := []string{
+			"--env-file", environmentFile,
+			"--deployment", deploymentFromFlag,
+			"--fylo-binary", fyloFromFile,
+			"--issuer", "https://flag.example.com",
+		}
+		if code := runInit(arguments, &stdout, &stderr); code != ExitSuccess {
+			t.Fatalf("sesame init with flags and --env-file: exit %d\n%s", code, stderr.String())
+		}
+		var summary struct {
+			Deployment string `json:"deployment"`
+			FYLOBinary string `json:"fylo_binary"`
+			Issuer     string `json:"issuer"`
+		}
+		if err := json.Unmarshal(stdout.Bytes(), &summary); err != nil {
+			t.Fatalf("decode init summary: %v", err)
+		}
+		if summary.Deployment != deploymentFromFlag || summary.FYLOBinary != fyloFromFile ||
+			summary.Issuer != "https://flag.example.com" {
+			t.Fatalf("an environment source overrode flags: %#v", summary)
+		}
+	})
+
+	t.Run("a malformed file fails before creating a deployment", func(t *testing.T) {
+		t.Setenv(EnvDeployment, "")
+		t.Setenv(EnvFYLOBinary, "")
+		malformed := filepath.Join(t.TempDir(), ".env")
+		const secretCanary = "do-not-disclose"
+		if err := os.WriteFile(malformed, []byte("FYLO_BINARY=\""+secretCanary+"\n"), 0o600); err != nil {
+			t.Fatalf("write malformed file: %v", err)
+		}
+
+		var stdout, stderr bytes.Buffer
+		if code := runInit([]string{"--env-file", malformed}, &stdout, &stderr); code != ExitFailure {
+			t.Fatalf("malformed env file exit = %d, want %d", code, ExitFailure)
+		}
+		if !strings.Contains(stderr.String(), "environment file") || strings.Contains(stderr.String(), secretCanary) {
+			t.Fatalf("unsafe or unhelpful diagnostic: %q", stderr.String())
+		}
+	})
+
+	t.Run("a missing explicit file fails", func(t *testing.T) {
+		missing := filepath.Join(t.TempDir(), ".env")
+
+		var stdout, stderr bytes.Buffer
+		if code := runInit([]string{"--env-file", missing}, &stdout, &stderr); code != ExitFailure {
+			t.Fatalf("missing env file exit = %d, want %d", code, ExitFailure)
+		}
+		if !strings.Contains(stderr.String(), missing) {
+			t.Fatalf("missing-file diagnostic does not name the selected file: %q", stderr.String())
+		}
+	})
+
+	t.Run("a cwd env file is never discovered implicitly", func(t *testing.T) {
+		t.Setenv(EnvDeployment, "")
+		t.Setenv(EnvFYLOBinary, "")
+		t.Setenv(EnvInitializationIssuer, "")
+		workingDirectory := t.TempDir()
+		t.Chdir(workingDirectory)
+		implicitDeployment := filepath.Join(workingDirectory, "implicit-deployment")
+		contents := EnvDeployment + "=" + implicitDeployment + "\n" +
+			EnvFYLOBinary + "=" + fyloFromFile + "\n"
+		if err := os.WriteFile(filepath.Join(workingDirectory, ".env"), []byte(contents), 0o600); err != nil {
+			t.Fatalf("write cwd environment file: %v", err)
+		}
+
+		var stdout, stderr bytes.Buffer
+		if code := runInit(nil, &stdout, &stderr); code != ExitUsage {
+			t.Fatalf("implicit cwd .env exit = %d, want %d", code, ExitUsage)
+		}
+		if _, err := os.Stat(implicitDeployment); !os.IsNotExist(err) {
+			t.Fatalf("implicit .env created a deployment: %v", err)
+		}
+	})
+}
+
+func executableStandIn(t *testing.T) string {
+	t.Helper()
+
+	path := filepath.Join(t.TempDir(), "fylo")
+	if err := os.WriteFile(path, []byte("#!/bin/sh\nexit 0\n"), 0o700); err != nil {
+		t.Fatalf("write a stand-in FYLO binary: %v", err)
+	}
+	return path
+}
+
 // TestAnExplicitModeSuppressesTheOtherFromTheEnvironment.
 //
 // The deployment directory and the bare binary/root pair are alternatives, and

@@ -69,7 +69,7 @@ Run the fast lifecycle profile:
 go run ./tools/fylo-viability \
   --profile lifecycle \
   --binary /absolute/path/to/fylo \
-  --expected-runtime-version 26.30.06
+  --expected-runtime-version 26.33.02
 ```
 
 Run the complete local Phase 1 profile:
@@ -78,7 +78,7 @@ Run the complete local Phase 1 profile:
 go run ./tools/fylo-viability \
   --profile full \
   --binary /absolute/path/to/fylo \
-  --expected-runtime-version 26.30.06 \
+  --expected-runtime-version 26.33.02 \
   --timeout 5m
 ```
 
@@ -89,7 +89,7 @@ target must be explicit:
 go run ./tools/fylo-viability \
   --profile full \
   --binary /absolute/path/to/local/fylo \
-  --expected-runtime-version 26.30.06 \
+  --expected-runtime-version 26.33.02 \
   --expected-build-target macos-arm64 \
   --allow-development-build \
   --timeout 5m
@@ -130,41 +130,38 @@ upgrade: the pinned binary writes and dies without a clean shutdown, and the
 next candidate binary must replay the identical tenant decisions and continue
 the same hash chain.
 
-## Current Release Candidate
+## Current Pinned Release
 
-On 2026-07-25, the full profile passed ten consecutive runs against the signed
-FYLO v26.30.06 release binary recorded in
-[the native evidence matrix](NATIVE_MATRIX.md). Both sides were native: the
-FYLO process is the released `macos-arm64` artifact and the SESAME harness was
-built for and executed as native `darwin/arm64`, replacing the earlier
-mixed-architecture development evidence. No development-build exception was
-required. The runs observed:
+On 2026-08-11, the lifecycle profile and ten consecutive full-profile runs
+passed against the signed FYLO v26.33.02
+`fylo-macos-x64` release recorded in
+[the native evidence matrix](NATIVE_MATRIX.md). The opt-in FYLO integration
+suite and the TLS/OIDC hostserver interoperability suite passed against the same
+artifact. The host is arm64 and both Go and FYLO executed as x64 under Rosetta
+2, so this is exact-binary compatibility evidence, not native x64 support
+evidence. No development-build exception was used. The runs observed:
 
-- runtime `26.30.06`, protocol `1`, build kind `release`, and commit
-  `39f57b5cf3120c9b9b3b4ead9e749b47b76ac4f0`, agreeing exactly with the
-  GitHub-signed build attestation for the downloaded artifact. That
-  attestation covers all fifteen release assets in one statement, and the
-  `fylo-macos-arm64` subject digest matches the binary in use;
+- runtime `26.33.02`, protocol `1`, build kind `release`, commit
+  `e236162508f6789f980fa7ca136a6671938030cb`, CHEX `26.32.02`, and TTID
+  `26.32.03`, agreeing with the checksum-verified and GitHub-attested artifact;
 - exactly 1 winner and 999 rejections for identifier, authorization-code, and
   refresh-token races;
-- 69 durable security events after the mixed admission sample;
-- successful hash-chain verification, snapshot verification, snapshot-tamper
-  rejection, revocation enforcement, replay equivalence, migration
-  equivalence, and end-to-end decision equivalence;
-- successful recovery at all three SESAME acknowledgement boundaries, after
-  root lease release, after index loss, and after cold local restore;
-- fail-closed authoritative-event corruption detection;
-- exactly 64 accepted and 936 saturated mixed submissions per run;
-- complete ledger retrieval through 5 bounded cursor pages of at most 16
-  events, byte-equivalent to the unpaged result, with a synthetic invalid
-  cursor rejected as typed `EINVALIDCURSOR` in every run;
-- admitted-operation latency across the ten runs of p50 10.6–10.8 ms, p95
-  11.5–12.4 ms, and p99 12.4–17.6 ms.
+- 69 durable security events with hash-chain and snapshot verification,
+  snapshot-tamper rejection, revocation enforcement, replay/migration/decision
+  equivalence, and five-page bounded retrieval;
+- recovery at all three SESAME acknowledgement boundaries, root lease recovery,
+  index rebuild, cold local restore, and fail-closed authoritative-document
+  corruption detection;
+- exactly 64 accepted and 936 saturated mixed submissions per run, cancellation
+  without child loss, and a successful child restart;
+- admitted-operation latency across the ten consecutive runs of p50
+  18.2–21.0 ms, p95 22.5–28.7 ms, and p99 26.2–38.9 ms; and
+- TLS discovery, a complete authorization-code flow, and refusal of an
+  unregistered redirect through the real host adapter.
 
-The opt-in `go test ./test/fylo` full-profile suite also passed against the
-same release binary. Earlier development-candidate evidence from 2026-07-23,
-including the fixed cancellation race and its 20 race-detector repetitions,
-remains recorded in version control history.
+Earlier v26.33.01 translated-x64 and v26.31.06/v26.30.06 native-arm64 evidence
+remains in the matrix. Native v26.33.02 reruns, packaged upgrade/rollback,
+external snapshot restore, and sustained soak evidence remain open gates.
 
 These latency values are smoke evidence from disposable runs, not a supported
 capacity limit or benchmark. Release qualification requires reproducible
@@ -262,37 +259,40 @@ were closed by
   NDJSON contract.
 
 The release additionally provides cursor-based `findDocs`/`findDeletedDocs`
-pagination, whole-root backup/verify/restore through the standalone binary,
-Windows NTFS backup parity, a live S3-compatible backup/restore release gate,
-and signed provenance with an SPDX SBOM. SESAME now requires the advertised
+pagination, native crash/recovery qualification, filesystem snapshot recovery
+guidance, and signed provenance with an SPDX SBOM. SESAME requires the advertised
 `queryPagination` capability (version 1, `ttid-binary-ascending` ordering,
 restart-from-first-page policy) in its fail-closed handshake validation and
 retrieves the security-event ledger exclusively through bounded cursor pages.
-The binary backup surface is not yet consumed; adopting it requires
-provisioned object storage and is tracked Phase 2 work.
+FYLO retired its built-in S3 backup surface in the Rust cutover; SESAME's current
+evidence uses a verified cold filesystem copy, while deployment-specific
+external snapshot and remote-restore drills remain open. FYLO v26.33.02 also
+advertises an embedded queue. SESAME does not consume or claim that capability.
 
 SESAME fails closed when any handshake field differs from its configured
 contract. Development builds require an explicit exception and are reported as
-such. The pinned release candidate is FYLO v26.30.06
-(`fylo-macos-arm64` SHA-256
-`ae39a2b66ea9771766f3f3d6b3d0d1b01e1b3842a45aa0389535109b91bdee50`), verified
+such. The pinned release candidate is FYLO v26.33.02
+(`fylo-macos-x64` SHA-256
+`551e72291a7085536f5de360807dbe93a149826f2c0e6bbd7fe56b2e34abc545`), verified
 against the release `SHA256SUMS` and its signed GitHub attestation before use.
 
 ## Remaining External Evidence
 
-The immutable-release, commit-identity, and provisioned-S3 rows are satisfied
-by FYLO v26.30.06: the artifact is signed and attested, the handshake reports
-the release commit, and FYLO's release workflow now gates every release on a
-live S3-compatible backup/verify/restore/corruption run. The Phase 1 exit gate
-remains open until:
+The immutable-release, commit-identity, and FYLO-native crash/recovery rows are
+satisfied by FYLO v26.33.02: the artifact is signed and attested, the handshake
+reports the release commit and dependency versions, and FYLO's release workflow
+qualifies its internal recovery transitions. The Phase 1 exit gate remains open
+until:
 
 - the full profile passes for every claimed OS, architecture, and filesystem
   using the exact packaged SESAME/FYLO/CHEX/TTID set; only macOS arm64 has
   native release evidence today, and SESAME itself has no packaged release
   artifact yet;
-- FYLO's own release evidence proves process death during each internal
-  transaction phase. SESAME can kill at its acknowledgement boundaries but the
-  public machine binary exposes no transaction failpoint;
+- packaged upgrade and rollback are exercised from the previous pinned FYLO
+  release, including an interrupted upgrade and an explicit shard-layout
+  downgrade procedure;
+- a deployment-specific external filesystem snapshot is restored and verified
+  independently of the source host; and
 - longer mixed-load, disk-growth, and soak tests establish documented supported
   limits.
 

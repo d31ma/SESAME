@@ -250,7 +250,7 @@ func writeIdentity(
 	maxRequestBytes int,
 	maxResponseBytes int,
 ) {
-	runtimeVersion := "26.30.06"
+	runtimeVersion := "26.33.02"
 	if mode == "runtime-mismatch" {
 		runtimeVersion = "99.0.0"
 	}
@@ -289,11 +289,11 @@ func writeIdentity(
 		"buildKind":       buildKind,
 		"dependencies": map[string]any{
 			"chex": map[string]any{
-				"requiredVersion": "26.28.02",
+				"requiredVersion": "26.32.02",
 				"available":       vendorAvailable,
 			},
 			"ttid": map[string]any{
-				"requiredVersion": "26.28.02",
+				"requiredVersion": "26.32.03",
 				"available":       vendorAvailable,
 			},
 		},

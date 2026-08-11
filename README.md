@@ -62,6 +62,19 @@ sesame init --fylo-binary /path/to/fylo \
 sesame doctor
 ```
 
+For programmatic initialization without exporting those values, copy
+[`.env.example`](.env.example), edit it, and pass it explicitly:
+
+```bash
+cp .env.example .env
+sesame init --env-file .env
+```
+
+SESAME never discovers `.env` implicitly. Flags override exported variables,
+which override the file, and the file is read only by `sesame init`; it is not
+copied into the deployment or inherited by FYLO. Export `SESAME_DEPLOYMENT` or
+pass `--deployment` for later commands as usual.
+
 Your application needs one more variable — where the engine binary is — and
 then no path appears in application code:
 
@@ -313,13 +326,15 @@ single-use code and refresh-token redemption, a hash-chained ledger, verified
 snapshots, revocation and replay equivalence, crash-boundary recovery, index
 rebuild, cold local restore, corruption detection, schema upcasting, bounded
 mixed admission, cancellation, restart, and latency/leak reporting. The macOS
-arm64 development candidate has passed it repeatedly.
+arm64 and translated x64 release candidates have passed it repeatedly.
 
-FYLO v26.30.06 supplies immutable release identity and a provisioned S3 release
-gate. The Phase 1 gate remains open for FYLO-native internal transaction-crash
-evidence, a packaged SESAME artifact, remote deployment restore, native runs on
-every claimed platform and filesystem, and sustained release-profile capacity
-results. See the [native evidence matrix](docs/fylo/NATIVE_MATRIX.md).
+FYLO v26.33.02 supplies immutable release identity, internal crash
+qualification, corrected bounded-query ordering, and explicit filesystem
+snapshot recovery guidance. SESAME's cold local restore passes against it. The
+Phase 1 gate remains open for a packaged SESAME/FYLO artifact, an exercised
+external snapshot restore, native v26.33.02 runs on every claimed platform and
+filesystem, and sustained release-profile capacity results. See the
+[native evidence matrix](docs/fylo/NATIVE_MATRIX.md).
 
 If that gate fails, SESAME will improve FYLO rather than weaken identity
 invariants.

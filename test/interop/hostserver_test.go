@@ -58,6 +58,16 @@ func startHostServer(t *testing.T) *provider {
 	if fylo == "" {
 		t.Skip("set FYLO_BINARY to the pinned FYLO runtime")
 	}
+	// The host runs the real `sesame` binary, which requires a FYLO build with
+	// immutable release identity and has no deployment-level opt-out — that
+	// refusal is a security property, not a limitation to work around here.
+	// Say so, rather than failing later with an unreadable "EOF" when the
+	// engine dies during startup.
+	if kind := fyloBuildKind(t, fylo); kind != "release" {
+		t.Skipf("this suite needs a released FYLO binary; %s reports buildKind %q. "+
+			"Point FYLO_BINARY at a signed release.", fylo, kind)
+	}
+
 	workspace := t.TempDir()
 	certificate := filepath.Join(workspace, "tls.crt")
 	key := filepath.Join(workspace, "tls.key")
@@ -114,6 +124,23 @@ func startHostServer(t *testing.T) *provider {
 	}
 	waitForDiscovery(t, instance.client)
 	return instance
+}
+
+// fyloBuildKind asks the runtime what kind of build it is.
+func fyloBuildKind(t *testing.T, binary string) string {
+	t.Helper()
+
+	output, err := exec.Command(binary, "version", "--output", "json").Output()
+	if err != nil {
+		t.Fatalf("read the FYLO build identity from %s: %v", binary, err)
+	}
+	var identity struct {
+		BuildKind string `json:"buildKind"`
+	}
+	if err := json.Unmarshal(output, &identity); err != nil {
+		t.Fatalf("decode the FYLO build identity: %v", err)
+	}
+	return identity.BuildKind
 }
 
 // buildSesame compiles the engine and the example host for this platform.

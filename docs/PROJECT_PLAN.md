@@ -571,9 +571,9 @@ Current evidence:
   cancellation/gating regression is covered by repeated race-detector tests;
 - all locally executable slices are implemented, while the full Phase 1 exit
   gate remains open for release and native-matrix evidence;
-- FYLO v26.30.06 provides the previously blocking machine identity, bounded
-  framing, root-owner lease, immutable release identity, and provisioned S3
-  release-gate contracts;
+- FYLO v26.33.02 provides the previously blocking machine identity, bounded
+  framing, root-owner lease, immutable release identity, corrected ordered
+  pagination, and native crash/recovery release qualification;
 - a packaged SESAME artifact, FYLO-native internal transaction crash evidence,
   remote deployment restore, sustained release-profile load/soak, and the
   remaining native candidate matrix are still outstanding.

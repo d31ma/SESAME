@@ -7,6 +7,49 @@ and releases use UTC-derived CalVer in `YY.WW.DD` form.
 
 ## [Unreleased]
 
+### Added
+
+- Explicit dotenv-backed initialization through `sesame init --env-file FILE`.
+  `SESAME_DEPLOYMENT`, `FYLO_BINARY`, and the new initialization-only
+  `SESAME_ISSUER` resolve below flags and exported variables without mutating
+  the process environment. Dotenv input is UTF-8, bounded to 64 KiB, parsed
+  without interpolation or shell evaluation, and rejected on duplicate or
+  malformed assignments. SESAME never discovers `.env` implicitly, copies it
+  into a deployment, or places generated keys in it.
+
+### Changed
+
+- Pinned the FYLO runtime to signed v26.33.02 (release commit
+  `e236162508f6789f980fa7ca136a6671938030cb`, `fylo-macos-x64` SHA-256
+  `551e72291a7085536f5de360807dbe93a149826f2c0e6bbd7fe56b2e34abc545`) with
+  CHEX v26.32.02 and TTID v26.32.03. Checksum and GitHub attestation were
+  verified before use. The full FYLO integration suite, TLS/OIDC host
+  interoperability, the lifecycle profile, and ten consecutive `full`-profile
+  viability runs pass against the release. Upstream changes since v26.33.01 are
+  confined to FYLO's language clients and web-release tooling; its native
+  storage and machine contract are unchanged. This is translated x64
+  compatibility evidence on an arm64 Mac, not native-platform support evidence.
+- Kept the machine envelope's `durationMs` decoder numeric rather than narrowing
+  it back to an integer. FYLO v26.31.06 emitted fractional milliseconds and
+  v26.32.07 restored the documented whole-number form; SESAME does not consume
+  this telemetry field and safely accepts both shapes.
+- Made the Phase 1 corruption harness find a stored document rather than
+  assume its path. It recognizes the Bun runtime's leading-two layout and every
+  released Rust trailing width from one through four, then performs a contained
+  fallback search so a future layout change cannot turn the corruption test
+  into a false pass. Candidate documents must be regular files; symlinks and
+  collection paths that escape the copied FYLO root are refused before any
+  overwrite.
+
+### Resolved upstream
+
+- FYLO #95 — downgrade across the v26.31.06 shard-position change is now
+  documented and covered by released-binary rollback qualification.
+- FYLO #96 — macOS durability and prefix-index maintenance were corrected. In
+  SESAME's ten repeated v26.33.02 runs, admitted-operation p50 held at
+  18.2–21.0 ms instead of v26.31.06's roughly 160 ms.
+- FYLO #97 — `durationMs` is a whole number again in machine responses.
+
 ## [26.30.07] - 2026-07-26
 
 ### Added

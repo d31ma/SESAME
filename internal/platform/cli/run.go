@@ -213,6 +213,10 @@ const (
 	EnvFYLORoot   = "FYLO_ROOT"
 )
 
+// EnvInitializationIssuer supplies the public issuer to sesame init only. It
+// is persisted after validation; runtime commands read the deployment config.
+const EnvInitializationIssuer = "SESAME_ISSUER"
+
 // fromEnvironment fills unset options from the environment.
 //
 // An explicit flag always wins. That ordering matters more than it looks: an
@@ -262,6 +266,16 @@ func orEnvironment(value, variable string) string {
 		return value
 	}
 	return os.Getenv(variable)
+}
+
+// orInitializationEnvironment adds an explicitly loaded dotenv file beneath
+// flags and the real process environment. Empty values do not configure a
+// required setting, matching the existing environment behavior.
+func orInitializationEnvironment(value, variable string, fileValues map[string]string) string {
+	if resolved := orEnvironment(value, variable); resolved != "" {
+		return resolved
+	}
+	return fileValues[variable]
 }
 
 func (o storageOptions) configured() bool {
@@ -356,8 +370,19 @@ func runInit(args []string, stdout, stderr io.Writer) int {
 	fyloBinary := flags.String("fylo-binary", "",
 		"absolute path to the pinned FYLO executable (default "+EnvFYLOBinary+")")
 	issuer := flags.String("issuer", "", "https base URL tokens are issued under, for example https://id.example")
+	environmentFile := flags.String("env-file", "",
+		"dotenv file supplying initialization values below flags and exported environment variables")
 	if err := flags.Parse(args); err != nil {
 		return ExitUsage
+	}
+	fileValues := map[string]string{}
+	if *environmentFile != "" {
+		loaded, err := loadInitializationEnvironment(*environmentFile)
+		if err != nil {
+			_, _ = fmt.Fprintf(stderr, "sesame init: environment file %s: %v\n", *environmentFile, err)
+			return ExitFailure
+		}
+		fileValues = loaded
 	}
 	// init reads the same environment every other command does. An operator
 	// who has exported SESAME_DEPLOYMENT should not have to repeat it here of
@@ -367,16 +392,18 @@ func runInit(args []string, stdout, stderr io.Writer) int {
 	// options' mode selection: for init the deployment and the FYLO binary are
 	// both required together, so the exclusivity that governs a running engine
 	// would be exactly backwards here.
-	deploymentDir := orEnvironment(*dir, EnvDeployment)
-	runtimeBinary := orEnvironment(*fyloBinary, EnvFYLOBinary)
+	deploymentDir := orInitializationEnvironment(*dir, EnvDeployment, fileValues)
+	runtimeBinary := orInitializationEnvironment(*fyloBinary, EnvFYLOBinary, fileValues)
+	configuredIssuer := orInitializationEnvironment(*issuer, EnvInitializationIssuer, fileValues)
 	if flags.NArg() != 0 || deploymentDir == "" || runtimeBinary == "" {
 		_, _ = fmt.Fprintln(stderr,
-			"usage: sesame init [--deployment DIR] [--fylo-binary PATH] [--issuer URL]\n"+
-				"       "+EnvDeployment+" and "+EnvFYLOBinary+" supply either flag when it is omitted")
+			"usage: sesame init [--env-file FILE] [--deployment DIR] [--fylo-binary PATH] [--issuer URL]\n"+
+				"       "+EnvDeployment+", "+EnvFYLOBinary+", and "+EnvInitializationIssuer+
+				" may be exported or read from --env-file; flags always win")
 		return ExitUsage
 	}
 
-	created, err := deployment.Init(deploymentDir, runtimeBinary, *issuer)
+	created, err := deployment.Init(deploymentDir, runtimeBinary, configuredIssuer)
 	if err != nil {
 		_, _ = fmt.Fprintf(stderr, "sesame init: %v\n", err)
 		return ExitFailure
@@ -1113,7 +1140,7 @@ func writeUsage(writer io.Writer) {
 	_, _ = io.WriteString(writer, `SESAME headless authentication and authorization engine
 
 Usage:
-  sesame init --deployment DIR --fylo-binary PATH [--issuer https://id.example]
+  sesame init [--env-file FILE] [--deployment DIR] [--fylo-binary PATH] [--issuer https://id.example]
   sesame doctor --deployment DIR
   sesame exec --loop [--deployment DIR | --fylo-binary PATH --fylo-root PATH]
   sesame tenant bootstrap --name NAME (--deployment DIR | --fylo-binary PATH --fylo-root PATH)
