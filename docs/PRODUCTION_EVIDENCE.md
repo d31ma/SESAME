@@ -49,9 +49,10 @@ resolves both principals again, and requires the same allow and deny outcomes.
 This catches a restore that loses policy, grant revocation, the authoritative
 event chain, snapshot state, or deployment keys.
 
-This is a cold local restore. A provisioned S3-compatible FYLO
-backup/verify/restore run and a separately protected deployment-key backup
-remain required production-environment evidence.
+This is a cold local restore. FYLO retired its built-in S3 surface in the Rust
+cutover, so a provisioned deployment-specific filesystem snapshot/restore run
+and a separately protected deployment-key backup remain required
+production-environment evidence.
 
 ## Upgrade and rollback fixture
 

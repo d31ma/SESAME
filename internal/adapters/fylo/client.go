@@ -27,10 +27,10 @@ const (
 	// ProtocolVersion is the FYLO machine protocol version supported by SESAME.
 	ProtocolVersion = 1
 	// PhaseOneRuntimeVersion is the FYLO candidate pinned for the Phase 1 gate.
-	PhaseOneRuntimeVersion = "26.30.06"
+	PhaseOneRuntimeVersion = "26.33.02"
 
-	requiredCHEXVersion       = "26.28.02"
-	requiredTTIDVersion       = "26.28.02"
+	requiredCHEXVersion       = "26.32.02"
+	requiredTTIDVersion       = "26.32.03"
 	defaultMaxRequestBytes    = 1 << 20
 	defaultMaxResponseBytes   = 8 << 20
 	maxMachineFrameBytes      = 64 << 20
@@ -870,13 +870,19 @@ func localRuntimeTarget() string {
 }
 
 type machineResponse struct {
-	ProtocolVersion int             `json:"protocolVersion"`
-	OK              bool            `json:"ok"`
-	Operation       *string         `json:"op"`
-	RequestID       *string         `json:"requestId"`
-	DurationMS      int64           `json:"durationMs"`
-	Result          json.RawMessage `json:"result,omitempty"`
-	Failure         *machineError   `json:"error,omitempty"`
+	ProtocolVersion int     `json:"protocolVersion"`
+	OK              bool    `json:"ok"`
+	Operation       *string `json:"op"`
+	RequestID       *string `json:"requestId"`
+	// DurationMS is telemetry, and the two engines disagree about its type:
+	// the Bun-compiled runtime sent whole milliseconds, and the Rust one sends
+	// a fraction (elapsed().as_secs_f64() * 1000.0), which FYLO's own README
+	// still documents as `"durationMs": 4`. Reported upstream. A float accepts
+	// both, and nothing here reads it — refusing a whole response over a
+	// timing field would be the wrong trade in either direction.
+	DurationMS float64         `json:"durationMs"`
+	Result     json.RawMessage `json:"result,omitempty"`
+	Failure    *machineError   `json:"error,omitempty"`
 }
 
 type machineError struct {

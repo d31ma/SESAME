@@ -92,18 +92,23 @@ func copyRegularFile(source, destination string, mode fs.FileMode) error {
 	return errors.Join(copyErr, closeErr)
 }
 
+// corruptDocument overwrites one stored document with unparseable bytes, so
+// recovery can be proven against a root that really is damaged.
+//
+// The shard directory is found rather than assumed. The Bun runtime used the
+// first two identifier characters. Rust releases use a collection-specific
+// width of one to four trailing characters, with two as the v26.31.06 default
+// and one from v26.32.07 onward. More than one layout can therefore exist in
+// roots that cross a release or contain differently configured collections.
 func corruptDocument(root, collection, id string) error {
 	if len(id) < 2 {
 		return errors.New("FYLO document ID is too short")
 	}
-	target := filepath.Join(
-		root,
-		".collections",
-		collection,
-		"docs",
-		id[:2],
-		id+".json",
-	)
+	documents := filepath.Join(root, ".collections", collection, "docs")
+	target, err := findDocumentFile(documents, id)
+	if err != nil {
+		return err
+	}
 	expectedPrefix := filepath.Join(filepath.Clean(root), ".collections") + string(os.PathSeparator)
 	if !strings.HasPrefix(filepath.Clean(target), expectedPrefix) {
 		return fmt.Errorf("refuse to corrupt document outside FYLO root: %s", target)
@@ -112,4 +117,71 @@ func corruptDocument(root, collection, id string) error {
 		return fmt.Errorf("corrupt copied event document: %w", err)
 	}
 	return nil
+}
+
+// findDocumentFile locates a stored document under whichever shard FYLO chose.
+func findDocumentFile(documents, id string) (string, error) {
+	name := id + ".json"
+	// Try every released layout before falling back to a contained walk. The
+	// walk remains important because this proving harness must detect a future
+	// layout change by finding and corrupting the actual authoritative record.
+	shards := []string{id[:2]}
+	for width := 1; width <= 4 && width <= len(id); width++ {
+		shards = append(shards, id[len(id)-width:])
+	}
+	for _, shard := range shards {
+		candidate := filepath.Join(documents, shard, name)
+		regular, err := regularDocumentCandidate(candidate)
+		if err != nil {
+			return "", err
+		}
+		if regular {
+			return candidate, nil
+		}
+	}
+	return findDocumentByWalk(documents, name, id)
+}
+
+func regularDocumentCandidate(candidate string) (bool, error) {
+	info, err := os.Lstat(candidate)
+	if errors.Is(err, os.ErrNotExist) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("inspect document candidate %s: %w", candidate, err)
+	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		return false, fmt.Errorf("refuse document symlink %s", candidate)
+	}
+	return info.Mode().IsRegular(), nil
+}
+
+func findDocumentByWalk(documents, name, id string) (string, error) {
+	// A scheme neither of those covers is a change worth failing loudly on,
+	// but not one worth failing the whole run over if the document is there.
+	var found string
+	walkErr := filepath.WalkDir(documents, func(path string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() || entry.Name() != name {
+			return nil
+		}
+		regular, err := regularDocumentCandidate(path)
+		if err != nil {
+			return err
+		}
+		if !regular {
+			return nil
+		}
+		found = path
+		return fs.SkipAll
+	})
+	if walkErr != nil {
+		return "", fmt.Errorf("search %s for document %s: %w", documents, id, walkErr)
+	}
+	if found == "" {
+		return "", fmt.Errorf("document %s is not stored anywhere under %s", id, documents)
+	}
+	return found, nil
 }

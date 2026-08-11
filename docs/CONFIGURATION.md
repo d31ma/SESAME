@@ -9,12 +9,14 @@ SESAME is configured in three places, and it is worth knowing which is which:
    at configuration; they are not configuration themselves.
 3. **Flags and SDK options** — a per-invocation override of the above.
 
-The precedence is always the same: **an explicit flag or option wins, then the
-environment, then the built-in default.** That ordering is deliberate. An
-operator debugging one command on a host that already exports
-`SESAME_DEPLOYMENT` has to be able to point it somewhere else without
-unsetting anything, and silently preferring the environment would make the
-flag they just typed a lie.
+The runtime precedence is always the same: **an explicit flag or option wins,
+then the environment, then the built-in default.** `sesame init` may also read
+an explicitly named dotenv file; for that command the file sits below the real
+process environment: **flag, exported environment, env file, default.** That
+ordering is deliberate. An operator debugging one command on a host that
+already exports `SESAME_DEPLOYMENT` has to be able to point it somewhere else
+without unsetting anything, and silently preferring the environment would make
+the flag they just typed a lie.
 
 ## Environment variables
 
@@ -24,23 +26,61 @@ flag they just typed a lie.
 | `SESAME_DEPLOYMENT` | `--deployment` | the engine and every `sesame` command |
 | `FYLO_BINARY` | `--fylo-binary` | the engine and every `sesame` command |
 | `FYLO_ROOT` | `--fylo-root` | the engine and every `sesame` command |
+| `SESAME_ISSUER` | `--issuer` | `sesame init` only; then persisted in the deployment |
 
 Only `SESAME_BINARY` is read by the shim, because the shim is what decides
 which executable to run. Everything else is read by the engine out of the
 environment it inherits, which is why all ten SDKs support it identically and
 none of them had to implement it.
 
-**Every** command reads them, `sesame init` and `sesame doctor` included.
-Those two were once the exceptions and it was the wrong way round: `init` is
-the command that decides what every later command will find, so an operator
-who has already exported `SESAME_DEPLOYMENT` has no reason to expect to repeat
-it there of all places.
+Every storage-aware command reads the applicable storage variables, including
+`sesame init` and `sesame doctor`. Those two were once the exceptions and it
+was the wrong way round: `init` is the command that decides what every later
+command will find, so an operator who has already exported
+`SESAME_DEPLOYMENT` has no reason to expect to repeat it there of all places.
+`SESAME_ISSUER` is initialization input, not runtime configuration.
 
 An explicit flag always wins over the environment. That ordering is what makes
 the environment safe to export: an operator debugging one command on a host
 that already sets `SESAME_DEPLOYMENT` can point it somewhere else without
 unsetting anything, and preferring the environment would make the flag they
 just typed a lie.
+
+## Initialization from `.env`
+
+`sesame init` can read its three initialization values from a dotenv file:
+
+```dotenv
+SESAME_DEPLOYMENT=./deploy
+FYLO_BINARY=/absolute/path/to/fylo
+SESAME_ISSUER=https://id.example.com
+```
+
+```bash
+sesame init --env-file .env
+```
+
+The file is deliberately explicit. SESAME does not search the current or
+parent directories for `.env`, because changing directories must not silently
+select a different FYLO executable or deployment. A missing or malformed file
+fails before any deployment or keys are created.
+
+The accepted file is UTF-8 and bounded to 64 KiB. Blank lines, comments,
+optional `export` prefixes, and unquoted, single-quoted, or double-quoted
+values are accepted. Duplicate variables, invalid names, unterminated quotes,
+NUL bytes, and trailing content after a quoted value are refused. SESAME never
+performs variable interpolation, command substitution, or shell evaluation.
+
+Only `SESAME_DEPLOYMENT`, `FYLO_BINARY`, and `SESAME_ISSUER` are consumed by
+initialization. The parser does not add any file value to `os.Environ`, so
+unrelated application settings and secrets do not become visible to SESAME or
+the FYLO child. The file is not copied into the deployment. Generated signing,
+sealing, and snapshot keys must never be placed in `.env`; `sesame init`
+creates those directly in the deployment's private key directory.
+
+The repository's [`.env.example`](../.env.example) is safe to copy. Actual
+`.env` files are ignored by Git; the example is the deliberate tracked
+exception.
 
 `SESAME_DEPLOYMENT` and the `FYLO_*` pair are alternatives, exactly as their
 flags are. Setting both is refused rather than silently resolved.

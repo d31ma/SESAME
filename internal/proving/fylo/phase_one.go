@@ -149,8 +149,8 @@ func runCompletePhaseOne(
 	options Options,
 ) (report PhaseOneReport, runErr error) {
 	report.Limitations = []string{
-		"FYLO internal transaction-phase SIGKILL coverage remains FYLO-native release evidence; this suite terminates at every SESAME acknowledgement boundary",
-		"cold filesystem-copy restore is exercised locally; built-in S3 backup/restore requires separately provisioned object storage",
+		"this suite terminates at every SESAME acknowledgement boundary; FYLO internal transaction-phase SIGKILL coverage comes from the pinned release provenance",
+		"cold filesystem-copy restore is exercised locally; a deployment-specific external snapshot and remote restore require separate provisioning",
 		"native support still requires this suite on each release OS/architecture and filesystem",
 	}
 

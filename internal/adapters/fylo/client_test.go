@@ -557,27 +557,69 @@ func FuzzDecodeRuntimeIdentityNeverPanics(f *testing.F) {
 	})
 }
 
-// TestDecodeRealV26_30_06Handshake pins that the adapter accepts the pinned
-// release's handshake verbatim, including the capability fields it does not
-// read. A decoder that rejected unknown fields would break on every FYLO
-// release that adds one.
-func TestDecodeRealV26_30_06Handshake(t *testing.T) {
+// TestDecodeRealHandshakes pins that the adapter accepts a real release's
+// handshake verbatim, including the capability fields it does not read.
+//
+// The currently pinned Rust engine, its immediate predecessor, the first Rust
+// release, and the Bun-compiled predecessor are all here. The older releases
+// are not nostalgia: they prove that the decoder tolerates capability additions
+// and removals it does not consume. v26.33.01 adds `serverlessQueue` and expands
+// `documentBuckets`; a decoder that rejected unknown fields would make that
+// independently versioned capability an availability break for SESAME.
+func TestDecodeRealHandshakes(t *testing.T) {
 	t.Parallel()
 
-	const handshake = `{"runtimeVersion":"26.30.06","protocolVersion":1,"commit":"39f57b5cf3120c9b9b3b4ead9e749b47b76ac4f0","buildTarget":"macos-arm64","buildKind":"release","dependencies":{"chex":{"requiredVersion":"26.28.02","available":true},"ttid":{"requiredVersion":"26.28.02","available":true}},"machine":{"framing":"ndjson","encoding":"utf-8","delimiter":"LF","delimiterCountsTowardLimit":false,"maxRequestBytes":1048576,"maxResponseBytes":8388608,"duplicateKeys":"rejected","truncatedFrame":"error-and-terminate","malformedFrame":"error-and-resume-at-next-LF"},"capabilities":{"handshake":true,"exclusiveRoot":true,"queryPagination":{"version":1,"operations":["findDocs","findDeletedDocs"],"defaultItems":256,"maxItems":4096,"maxSnapshotBytes":1073741824,"cursorTtlMs":900000,"ordering":"ttid-binary-ascending","scope":"persistent-process","restartPolicy":"restart-from-first-page","mutationPolicy":"snapshot-at-first-page"},"wholeRootBackup":{"version":1,"available":true,"configured":false,"machineOperations":["backupStatus","backupReconcile"],"offlineOperations":["backup verify","backup restore"],"metadataFormat":"fylo.posix.v2"}}}`
+	for name, testCase := range map[string]struct {
+		handshake string
+		version   string
+		commit    string
+		pinned    bool
+	}{
+		"v26.33.02, the pinned Rust engine": {
+			handshake: `{"protocolVersion":1,"runtimeVersion":"26.33.02","commit":"e236162508f6789f980fa7ca136a6671938030cb","buildKind":"release","buildTarget":"macos-x64","dependencies":{"chex":{"requiredVersion":"26.32.02","available":true},"ttid":{"requiredVersion":"26.32.03","available":true}},"machine":{"framing":"ndjson","encoding":"utf-8","delimiter":"LF","delimiterCountsTowardLimit":false,"maxRequestBytes":1048576,"maxResponseBytes":8388608,"duplicateKeys":"rejected","truncatedFrame":"error-and-terminate","malformedFrame":"error-and-resume-at-next-LF"},"capabilities":{"handshake":true,"exclusiveRoot":true,"queryPagination":{"version":1,"operations":["findDocs","findDeletedDocs"],"defaultItems":256,"maxItems":4096,"maxSnapshotBytes":1073741824,"cursorTtlMs":900000,"ordering":"ttid-binary-ascending","scope":"persistent-process","restartPolicy":"restart-from-first-page","mutationPolicy":"snapshot-at-first-page"},"documentBuckets":{"version":1,"collectionKind":"file","operations":["createCollection","dropCollection","inspectCollection","rebuildCollection","verifyCollection","getDoc","getFileData","getLatest","getMeta","setMeta","findDocs","findDeletedDocs","restoreDoc","putData","patchDoc","patchDocs","delDoc","delDocs"],"putInputs":["path","url"],"getOutputs":["base64","path"],"integrity":"sha256-full-content"},"serverlessQueue":{"version":1,"operations":["queuePublish","queueClaim","queueAck","queueNack","queueExtend","queueStats","queueDeadLetters"],"storage":"filesystem","broker":"embedded","delivery":"at-least-once","ordering":"publication-order-claims","consumerGroups":true,"visibilityLeases":true,"delayedDelivery":true,"idempotentPublish":true,"deadLetters":"per-group","maxMessageBytes":1048576,"maxClaimMessages":1000,"maxPendingPerGroup":10000},"machineAccess":{"version":1,"operations":["executeSQL","getDoc","getLatest","getMeta","setMeta","findDocs","findDeletedDocs","restoreDoc","joinDocs","putData","batchPutData","patchDoc","patchDocs","delDoc","delDocs","importBulkData"],"writeDescriptorFields":["uid","gid","mode"],"actorFields":["uid","groups"],"directDenial":"EACCES","queryDenial":"omit"}}}`,
+			version:   "26.33.02",
+			commit:    "e236162508f6789f980fa7ca136a6671938030cb",
+			pinned:    true,
+		},
+		"v26.33.01, the queue release": {
+			handshake: `{"protocolVersion":1,"runtimeVersion":"26.33.01","commit":"ce95fbceca4981b20ce0c37fbd89acf9fd79215b","buildKind":"release","buildTarget":"macos-x64","dependencies":{"chex":{"requiredVersion":"26.32.02","available":true},"ttid":{"requiredVersion":"26.32.03","available":true}},"machine":{"framing":"ndjson","encoding":"utf-8","delimiter":"LF","delimiterCountsTowardLimit":false,"maxRequestBytes":1048576,"maxResponseBytes":8388608,"duplicateKeys":"rejected","truncatedFrame":"error-and-terminate","malformedFrame":"error-and-resume-at-next-LF"},"capabilities":{"handshake":true,"exclusiveRoot":true,"queryPagination":{"version":1,"operations":["findDocs","findDeletedDocs"],"defaultItems":256,"maxItems":4096,"maxSnapshotBytes":1073741824,"cursorTtlMs":900000,"ordering":"ttid-binary-ascending","scope":"persistent-process","restartPolicy":"restart-from-first-page","mutationPolicy":"snapshot-at-first-page"},"documentBuckets":{"version":1,"collectionKind":"file","operations":["createCollection","dropCollection","inspectCollection","rebuildCollection","verifyCollection","getDoc","getFileData","getLatest","getMeta","setMeta","findDocs","findDeletedDocs","restoreDoc","putData","patchDoc","patchDocs","delDoc","delDocs"],"putInputs":["path","url"],"getOutputs":["base64","path"],"integrity":"sha256-full-content"},"serverlessQueue":{"version":1,"operations":["queuePublish","queueClaim","queueAck","queueNack","queueExtend","queueStats","queueDeadLetters"],"storage":"filesystem","broker":"embedded","delivery":"at-least-once","ordering":"publication-order-claims","consumerGroups":true,"visibilityLeases":true,"delayedDelivery":true,"idempotentPublish":true,"deadLetters":"per-group","maxMessageBytes":1048576,"maxClaimMessages":1000,"maxPendingPerGroup":10000},"machineAccess":{"version":1,"operations":["executeSQL","getDoc","getLatest","getMeta","setMeta","findDocs","findDeletedDocs","restoreDoc","joinDocs","putData","batchPutData","patchDoc","patchDocs","delDoc","delDocs","importBulkData"],"writeDescriptorFields":["uid","gid","mode"],"actorFields":["uid","groups"],"directDenial":"EACCES","queryDenial":"omit"}}}`,
+			version:   "26.33.01",
+			commit:    "ce95fbceca4981b20ce0c37fbd89acf9fd79215b",
+		},
+		"v26.31.06, the first Rust engine": {
+			handshake: `{"protocolVersion":1,"runtimeVersion":"26.31.06","commit":"7724c3915d12ae4fa7cd5cea4f9830adf5bbb6b3","buildKind":"release","buildTarget":"macos-arm64","dependencies":{"chex":{"requiredVersion":"26.28.02","available":true},"ttid":{"requiredVersion":"26.28.02","available":true}},"machine":{"framing":"ndjson","encoding":"utf-8","delimiter":"LF","delimiterCountsTowardLimit":false,"maxRequestBytes":1048576,"maxResponseBytes":8388608,"duplicateKeys":"rejected","truncatedFrame":"error-and-terminate","malformedFrame":"error-and-resume-at-next-LF"},"capabilities":{"handshake":true,"exclusiveRoot":true,"queryPagination":{"version":1,"operations":["findDocs","findDeletedDocs"],"defaultItems":256,"maxItems":4096,"maxSnapshotBytes":1073741824,"cursorTtlMs":900000,"ordering":"ttid-binary-ascending","scope":"persistent-process","restartPolicy":"restart-from-first-page","mutationPolicy":"snapshot-at-first-page"},"documentBuckets":{"version":1,"collectionKind":"file","operations":["createCollection","dropCollection","inspectCollection","rebuildCollection","verifyCollection","getDoc","getLatest","getMeta","setMeta","findDocs","findDeletedDocs","restoreDoc","putData","patchDoc","patchDocs","delDoc","delDocs"],"putInputs":["path","url"],"integrity":"sha256-full-content"},"machineAccess":{"version":1,"operations":["executeSQL","getDoc","getLatest","getMeta","setMeta","findDocs","findDeletedDocs","restoreDoc","joinDocs","putData","batchPutData","patchDoc","patchDocs","delDoc","delDocs","importBulkData"],"writeDescriptorFields":["uid","gid","mode"],"actorFields":["uid","groups"],"directDenial":"EACCES","queryDenial":"omit"}}}`,
+			version:   "26.31.06",
+			commit:    "7724c3915d12ae4fa7cd5cea4f9830adf5bbb6b3",
+		},
+		"v26.30.06, the Bun-compiled predecessor": {
+			handshake: `{"runtimeVersion":"26.30.06","protocolVersion":1,"commit":"39f57b5cf3120c9b9b3b4ead9e749b47b76ac4f0","buildTarget":"macos-arm64","buildKind":"release","dependencies":{"chex":{"requiredVersion":"26.28.02","available":true},"ttid":{"requiredVersion":"26.28.02","available":true}},"machine":{"framing":"ndjson","encoding":"utf-8","delimiter":"LF","delimiterCountsTowardLimit":false,"maxRequestBytes":1048576,"maxResponseBytes":8388608,"duplicateKeys":"rejected","truncatedFrame":"error-and-terminate","malformedFrame":"error-and-resume-at-next-LF"},"capabilities":{"handshake":true,"exclusiveRoot":true,"queryPagination":{"version":1,"operations":["findDocs","findDeletedDocs"],"defaultItems":256,"maxItems":4096,"maxSnapshotBytes":1073741824,"cursorTtlMs":900000,"ordering":"ttid-binary-ascending","scope":"persistent-process","restartPolicy":"restart-from-first-page","mutationPolicy":"snapshot-at-first-page"},"wholeRootBackup":{"version":1,"available":true,"configured":false,"machineOperations":["backupStatus","backupReconcile"],"offlineOperations":["backup verify","backup restore"],"metadataFormat":"fylo.posix.v2"}}}`,
+			version:   "26.30.06",
+			commit:    "39f57b5cf3120c9b9b3b4ead9e749b47b76ac4f0",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 
-	identity, err := decodeRuntimeIdentity([]byte(handshake))
-	if err != nil {
-		t.Fatalf("decodeRuntimeIdentity() error = %v", err)
-	}
-	if identity.RuntimeVersion != PhaseOneRuntimeVersion {
-		t.Fatalf("runtime version = %q, want the pinned %q", identity.RuntimeVersion, PhaseOneRuntimeVersion)
-	}
-	if identity.BuildKind != "release" || identity.Commit != "39f57b5cf3120c9b9b3b4ead9e749b47b76ac4f0" {
-		t.Fatalf("identity = %#v", identity)
-	}
-	if !identity.Capabilities.Handshake || !identity.Capabilities.ExclusiveRoot {
-		t.Fatalf("capabilities = %#v", identity.Capabilities)
+			identity, err := decodeRuntimeIdentity([]byte(testCase.handshake))
+			if err != nil {
+				t.Fatalf("decodeRuntimeIdentity() error = %v", err)
+			}
+			if identity.RuntimeVersion != testCase.version {
+				t.Fatalf("runtime version = %q, want %q",
+					identity.RuntimeVersion, testCase.version)
+			}
+			if testCase.pinned && identity.RuntimeVersion != PhaseOneRuntimeVersion {
+				t.Fatalf("the pinned handshake is %q but the adapter pins %q",
+					identity.RuntimeVersion, PhaseOneRuntimeVersion)
+			}
+			if identity.BuildKind != "release" || identity.Commit != testCase.commit {
+				t.Fatalf("identity = %#v", identity)
+			}
+			// The three capabilities SESAME actually requires.
+			if !identity.Capabilities.Handshake || !identity.Capabilities.ExclusiveRoot {
+				t.Fatalf("capabilities = %#v", identity.Capabilities)
+			}
+		})
 	}
 }
 
