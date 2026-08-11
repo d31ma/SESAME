@@ -41,7 +41,7 @@ routing, and middleware.
 ## Installing
 
 ```bash
-go get github.com/d31ma/sesame/clients/go/sesame@v26.30.07
+go get github.com/d31ma/sesame/clients/go/sesame@v26.33.02
 ```
 
 Go is the one SESAME client not distributed as a file to copy. It lives inside
