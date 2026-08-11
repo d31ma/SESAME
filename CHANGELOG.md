@@ -5,7 +5,7 @@ All notable changes to SESAME will be documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and releases use UTC-derived CalVer in `YY.WW.DD` form.
 
-## [Unreleased]
+## [26.33.02] - 2026-08-11
 
 ### Added
 

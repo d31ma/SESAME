@@ -49,7 +49,7 @@ Go is the one client not distributed as a file to copy. It lives inside the
 engine's own module, so the tag resolves it like any other Go package:
 
 ```bash
-go get github.com/d31ma/sesame/clients/go/sesame@v26.30.07
+go get github.com/d31ma/sesame/clients/go/sesame@v26.33.02
 ```
 
 Vendoring it would be strictly worse than that. The consequence worth knowing:
