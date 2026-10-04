@@ -248,9 +248,10 @@ of its engine requests, so the hash-chained security ledger records
 - **What stays `operator:machine`.** Public routes (`authn/*`,
   `session/verify`, OIDC protocol endpoints, discovery, JWKS, SCIM with its
   bearer token, and the public system routes `ping`, `version` and
-  `readiness`) resolve no caller and send no actor. `system/metrics` and
-  `system/build` resolve the caller to decide the role; they only read. So do
-  the command-line tools and any SDK use without `sesame.WithActor`.
+  `readiness`) resolve no caller and send no actor. So do the command-line
+  tools and any SDK use without `sesame.WithActor`. `system/metrics` and
+  `system/build` resolve the caller to decide the role, so their engine calls
+  carry the actor, but they only read and record nothing.
   `standards.dispatch` never carries an actor: the Go client drops it there.
 - **Fail closed.** The Go client sends `actor` only to an engine whose
   `system.version` lists it in `request_fields`. When a caller is bound and the
@@ -381,7 +382,11 @@ Two pieces of production code exist for tests. Both are kept deliberately:
 - The Go SDK changes its import path to
   `github.com/d31ma/sesame/server/packages/sesame`; release notes must say so.
 - Every request pays an engine start. The preview is not for high request
-  rates.
+  rates, and one anonymous client can starve every other caller. A
+  TLS-terminating, rate-limiting reverse proxy in front of `ty` is therefore
+  required, never optional (docs/YON.md lists the paths to limit).
+- Signed-in and administrator routes answer a busy engine with `500`, not
+  `503`, until Tachyon lets an identity provider choose its status (gap 12).
 - The project root's `.env` belongs to `ty` (it accepts only `YON_` names), so
   the `sesame init` example file is `sesame.env.example`.
 - Tachyon's build-time design rules (one decision per helper, no unused public
