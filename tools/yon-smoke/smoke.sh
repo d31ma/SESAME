@@ -124,13 +124,24 @@ prepare_project() {
   pass "setup: project copy in the temporary directory, sesame.waitmilliseconds=$wait_milliseconds"
 }
 
-start_server() {
+link_fylo_tools() {
   local workspace=$1 fylo_binary=$2
+  local tools="$workspace/fylo-tools" chex_binary
+  chex_binary="$(dirname "$fylo_binary")/chex"
+  [ -x "$chex_binary" ] || chex_binary=$(command -v chex) ||
+    fail "setup: chex is neither next to $fylo_binary nor on PATH"
+  mkdir "$tools"
+  ln -s "$fylo_binary" "$tools/fylo"
+  ln -s "$(absolute_path "$chex_binary")" "$tools/chex"
+}
+
+start_server() {
+  local workspace=$1
   local -r ready_seconds=300
   local deadline=$((SECONDS + ready_seconds))
   local url="" ty_binary
   ty_binary=$(command -v ty)
-  PATH="$(dirname "$fylo_binary"):$PATH" "$ty_binary" serve --port 0 --no-watch \
+  PATH="$workspace/fylo-tools:$PATH" "$ty_binary" serve --port 0 --no-watch \
     "$workspace/project" >"$workspace/server.log" 2>&1 &
   echo $! >"$workspace/server.pid"
   while [ -z "$url" ]; do
@@ -367,7 +378,8 @@ main() {
   create_member "$workspace" "$binary" acme
   set_passwords "$workspace" "$binary"
   prepare_project "$workspace" "$binary" "$root"
-  start_server "$workspace" "$fylo_binary"
+  link_fylo_tools "$workspace" "$fylo_binary"
+  start_server "$workspace"
   for name in acme-admin globex-admin acme-member; do
     sign_in "$workspace" "$name"
   done
