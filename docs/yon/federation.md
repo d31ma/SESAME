@@ -18,19 +18,19 @@ caller needs, as noted below.
 
 | Route | Operation | Who may call | Tenant isolation |
 | --- | --- | --- | --- |
-| `POST /api/v1/federation/provider-register` | `federation.provider_register` | an administrator | the body's `tenant_id` must be the caller's tenant |
-| `POST /api/v1/federation/provider-configure` | `federation.provider_configure` | an administrator | as `provider-register`; SESAME then refuses a provider of another tenant (`provider_not_found`) |
+| `POST /api/v1/federation/provider-register` | `federation.provider_register` | an administrator, signed in within 10 minutes | the body's `tenant_id` must be the caller's tenant |
+| `POST /api/v1/federation/provider-configure` | `federation.provider_configure` | an administrator, signed in within 10 minutes | as `provider-register`; SESAME then refuses a provider of another tenant (`provider_not_found`) |
 | `POST /api/v1/federation/provider-get` | `federation.provider_get` | an administrator | as `provider-configure` |
 | `POST /api/v1/federation/provider-disable` | `federation.provider_disable` | an administrator | as `provider-configure` |
-| `POST /api/v1/federation/login-start` | `federation.login_start` | anyone | SESAME refuses a provider outside the body's tenant |
+| `POST /api/v1/federation/login-start` | `federation.login_start` | anyone, with a `redirect_uri` from `sesame.federationredirecturis` | SESAME refuses a provider outside the body's tenant |
 | `POST /api/v1/federation/login-complete` | `federation.login_complete` | anyone | SESAME refuses a login outside the body's tenant (`federated_login_not_found`) |
-| `POST /api/v1/saml/provider-register` | `saml.provider_register` | an administrator | the body's `tenant_id` must be the caller's tenant |
+| `POST /api/v1/saml/provider-register` | `saml.provider_register` | an administrator, signed in within 10 minutes | the body's `tenant_id` must be the caller's tenant |
 | `POST /api/v1/saml/provider-get` | `saml.provider_get` | an administrator | as `provider-register`; SESAME then refuses a provider of another tenant (`saml_provider_not_found`) |
 | `POST /api/v1/saml/provider-disable` | `saml.provider_disable` | an administrator | as `provider-get` |
-| `POST /api/v1/saml/login-start` | `saml.login_start` | anyone | SESAME refuses a provider outside the body's tenant |
+| `POST /api/v1/saml/login-start` | `saml.login_start` | anyone, with a `consumer_url` from `sesame.samlconsumerurls` | SESAME refuses a provider outside the body's tenant |
 | `POST /api/v1/saml/login-complete` | `saml.login_complete` | anyone | SESAME refuses a login outside the body's tenant (`saml_login_not_found`) |
-| `POST /api/v1/scim/client-register` | `scim.client_register` | an administrator | the body's `tenant_id` must be the caller's tenant |
-| `POST /api/v1/scim/client-rotate-token` | `scim.client_rotate_token` | an administrator | as `client-register`; SESAME then refuses a client of another tenant (`provisioning_client_not_found`) |
+| `POST /api/v1/scim/client-register` | `scim.client_register` | an administrator, signed in within 10 minutes | the body's `tenant_id` must be the caller's tenant |
+| `POST /api/v1/scim/client-rotate-token` | `scim.client_rotate_token` | an administrator, signed in within 10 minutes | as `client-register`; SESAME then refuses a client of another tenant (`provisioning_client_not_found`) |
 | `POST /api/v1/scim/client-disable` | `scim.client_disable` | an administrator | as `client-rotate-token` |
 | `POST /api/v1/scim/user-create` | `scim.user_create` | a SCIM client, by its bearer token | the token decides the tenant; the body names none |
 | `POST /api/v1/scim/user-get` | `scim.user_get` | a SCIM client | as `user-create` |
@@ -62,6 +62,19 @@ administrator who names its own tenant and another tenant's provider or client
 id gets the same `404` as for an id that does not exist, and the other
 tenant's record is untouched.
 
+**Recent sign-in for trust and credential changes.** Registering or
+configuring an identity provider (OIDC or SAML) changes whose assertions sign
+people in, and registering a SCIM client or rotating its token mints a bearer
+credential that can create and change principals. A stolen administrator
+session could turn either into lasting access, so these five routes also need
+a session issued within the last 10 minutes, the same rule the self-service
+authenticator routes use: an older session gets
+`403 {"code":"reauthentication_required"}` before the operation runs, and
+nothing is registered, configured or minted. The administrator signs in again and
+retries. Reading (`provider-get`) and disabling (`provider-disable`,
+`client-disable`) only reduce or report trust, so an older session may still
+call them.
+
 **Federated sign-in steps.** `login-start` and `login-complete` serve people
 who are not signed in yet, so they are public. Everything that makes them safe
 stays in SESAME: the state, nonce and PKCE verifier are generated and stored by
@@ -75,6 +88,7 @@ single use. A replayed, expired, forged or mismatched step is refused:
 | OIDC `login-complete` after the login expired (15 minutes) | `400 {"code":"federated_login_expired"}` |
 | OIDC `login-complete` with a token for another nonce, a foreign key, another audience or an expired token | `400 {"code":"assertion_rejected"}` |
 | OIDC `login-complete` naming another tenant | `404 {"code":"federated_login_not_found"}` |
+| OIDC or SAML `login-start` with a URL the operator did not list, or with no list configured | `400 {"code":"redirect_not_allowed"}` |
 | OIDC `login-start` before the provider is configured | `409 {"code":"provider_not_configured"}` |
 | SAML `login-complete` with a bad signature, another audience, an expired assertion, or an assertion already used for another login | `400 {"code":"saml_assertion_rejected"}` |
 | SAML `login-complete` for a login already completed, already refused, expired or of another tenant | `404 {"code":"saml_login_not_found"}` |
@@ -83,6 +97,17 @@ single use. A replayed, expired, forged or mismatched step is refused:
 Every way an assertion can fail answers the same code. The specific reason goes
 to SESAME's audit ledger, not to the caller. The answer never contains the
 token, the assertion, or the engine's message.
+
+**Where `login-start` may send the browser.** The OIDC `redirect_uri` and the
+SAML `consumer_url` name where the provider delivers the authorization code or
+the signed assertion, and SAML AuthnRequests are not signed, so a caller who
+chose the URL could have a provider deliver another person's sign-in to them.
+The public routes therefore never take the URL from the caller on trust: it
+must equal, character for character, one of the URLs the operator listed (see
+[Allowed redirect targets](#allowed-redirect-targets)). Any other URL, a URL
+that only differs by a trailing slash, a query, letter case or an empty value,
+is refused with `400 {"code":"redirect_not_allowed"}` before SESAME runs, and
+no login is created.
 
 **What `login-start` answers.** Only what a browser redirect needs.
 `federation/login-start` answers `login_id`, `authorization_url` and
@@ -162,11 +187,55 @@ inspects the token. It also maps answers back: the SCIM `schemas`, `meta` and
 codes in the table above. SESAME does not ship this adapter, and the Yon host
 makes no SCIM conformance claim.
 
+## Allowed redirect targets
+
+The operator lists every URL a login may return to, in `server/application.json`
+or a profile file:
+
+```json
+{
+  "sesame": {
+    "samlconsumerurls": ["https://app.example/saml/acs"],
+    "federationredirecturis": ["https://app.example/federation/callback"]
+  }
+}
+```
+
+| Setting | Meaning |
+| --- | --- |
+| `sesame.samlconsumerurls` | Every `consumer_url` that `POST /api/v1/saml/login-start` accepts. Default: empty. |
+| `sesame.federationredirecturis` | Every `redirect_uri` that `POST /api/v1/federation/login-start` accepts. Default: empty. |
+
+- Matching is exact: the body's URL must equal a listed entry character for
+  character. There are no wildcards, prefixes or normalisation.
+- Each entry must be an absolute `https` URL with a host and no fragment
+  (`#`). When any entry is not, the settings are unusable and every request
+  that needs the engine answers `500` (`engine_not_configured`), as for a bad
+  `sesame.binary`; nothing falls back to accepting the body's URL.
+- An empty or missing list refuses every `login-start` of that kind with
+  `400 {"code":"redirect_not_allowed"}`. A deployment that does not use SAML
+  or OIDC federation leaves the list empty.
+- The two lists are separate: a SAML consumer URL does not allow an OIDC
+  redirect, and the reverse.
+- These are lists, so set them in a JSON file. `ty` passes `.env` values as
+  text, which is not a list, and the settings are then unusable.
+- The lists are deployment-wide: every tenant and provider may use every
+  listed URL. List only URLs of applications that drive the login as described
+  below.
+
+Future work: the stronger control is a per-provider allowlist that SESAME
+itself stores and enforces (registered with the provider, checked by
+`federation.login_start` and `saml.login_start` in the engine), so that every
+host, not only this one, is bound by it and one tenant's provider cannot
+return to another tenant's application. That needs an engine change, a
+machine-protocol field and a stored-data migration, and is not done yet.
+
 ## SAML assertion consumer service
 
 The identity provider posts `SAMLResponse` and `RelayState` as an HTML form to
 the `consumer_url` given at `login-start`. That URL belongs to the relying
-application, not to these routes. The application reads the two fields,
+application, not to these routes, and it must be one the operator listed in
+`sesame.samlconsumerurls`. The application reads the two fields,
 bounds their size, and calls `POST /api/v1/saml/login-complete` with
 `{"tenant_id": ..., "login_id": <RelayState>, "assertion": <SAMLResponse>}`,
 passing the `SAMLResponse` through byte for byte. The answer carries a SESAME
@@ -178,8 +247,9 @@ need a cookie and redirect design that does not exist yet. The obligations in
 application.
 
 The OpenID Connect callback works the same way: the provider redirects the
-browser to the application's `redirect_uri`, and the application drives the
-rest of the login.
+browser to the application's `redirect_uri`, which must be listed in
+`sesame.federationredirecturis`, and the application drives the rest of the
+login.
 
 ## Not routed
 
@@ -205,8 +275,10 @@ request. That makes the Yon host an egress client, so it needs its own ADR.
 ## Tests
 
 `server/tests/` holds `FederationControllerTest` and `FederationLoginTest`,
-`SamlControllerTest` and `SamlLoginTest`, and `ScimControllerTest`,
-`ScimBearerTest`, `ScimUserTest` and `ScimGroupTest`. Each `ty test` unit is one
+`SamlControllerTest` and `SamlLoginTest`, `ScimControllerTest`,
+`ScimBearerTest`, `ScimUserTest` and `ScimGroupTest`, and
+`FederationRedirectAllowlistTest`, `SamlConsumerAllowlistTest` and
+`AdministratorRecentSignInTest`. Each `ty test` unit is one
 invocation with a 30 second deadline, so the cases are split to keep each unit
 well inside it. They run against a real engine:
 
@@ -218,6 +290,15 @@ well inside it. They run against a real engine:
   XML, so a whole login completes. Also replay, an assertion reused for a new
   login, another audience, an expired assertion, a forged signature that spends
   the login, and another tenant.
+- Allowed redirect targets: an attacker's URL, near misses (trailing slash,
+  query, letter case, empty), no list configured and a list of the other kind
+  are refused with `redirect_not_allowed` and the engine is never started;
+  unsafe entries (`http`, relative, no host, a fragment, empty) fail closed
+  with `engine_not_configured`; a listed URL completes a whole login.
+- Recent sign-in: an administrator session older than 10 minutes cannot
+  register or configure an OIDC provider, register a SAML provider, or
+  register or rotate a SCIM client (`reauthentication_required`, nothing
+  changed, the old SCIM token still works); a 9 minute old session may rotate.
 - SCIM: the token only in `Authorization: Bearer`, a missing token, another
   scheme, a rotated or disabled client, another tenant's client and users, the
   group grant, and that a token is never echoed.
