@@ -1,6 +1,9 @@
 # Go Client
 
-The initial Go client starts one local SESAME executable in persistent NDJSON
+This folder is the native Go module of SESAME's Yon host project
+([ADR 0007](../../docs/adr/0007-sesame-ships-a-yon-host-project.md)). The Yon
+controllers use it as their engine transport, and Go host applications import
+it directly. The Go client starts one local SESAME executable in persistent NDJSON
 mode:
 
 ```go
@@ -18,7 +21,7 @@ if err := client.Ping(ctx); err != nil {
 Import path:
 
 ```text
-github.com/d31ma/sesame/clients/go/sesame
+github.com/d31ma/sesame/server/packages/sesame
 ```
 
 The client exposes typed methods for the complete machine-operation manifest,
@@ -41,17 +44,17 @@ routing, and middleware.
 ## Installing
 
 ```bash
-go get github.com/d31ma/sesame/clients/go/sesame@v26.33.02
+go get github.com/d31ma/sesame/server/packages@v<version>
 ```
 
-Go is the one SESAME client not distributed as a file to copy. It lives inside
-the engine's own module, so the tag resolves it like any other Go package and
-vendoring would be a downgrade. The consequence worth knowing: importing it
-puts `golang.org/x/crypto` and `golang.org/x/sys` in your module graph.
-Every command above is exercised by `tools/verify-sdk-install.sh`, which
-extracts the release tarball, copies the shim into a throwaway project, and
-runs code against it. [docs/SDK_DISTRIBUTION.md](../../docs/SDK_DISTRIBUTION.md)
-covers verification and what this model costs.
+Go is the one SESAME client not distributed as a file to copy. It is its own
+module, `github.com/d31ma/sesame/server/packages`, tagged
+`server/packages/v<version>` next to each release tag. The module uses the Go
+standard library only, so importing it adds nothing else to your module graph.
+Earlier releases published it as `github.com/d31ma/sesame/clients/go/sesame`;
+change that import path when you upgrade.
+[docs/SDK_DISTRIBUTION.md](../../docs/SDK_DISTRIBUTION.md) covers verification
+and what this model costs.
 
 The client spawns a SESAME executable; the file does not carry one. Releases
 publish native binaries alongside the client bundle.

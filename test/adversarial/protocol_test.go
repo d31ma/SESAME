@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/d31ma/sesame/clients/go/sesame"
+	"github.com/d31ma/sesame/server/packages/sesame"
 )
 
 // TestReplay covers every value SESAME hands out that must work exactly once.

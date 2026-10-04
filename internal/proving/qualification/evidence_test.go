@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	sesame "github.com/d31ma/sesame/clients/go/sesame"
+	sesame "github.com/d31ma/sesame/server/packages/sesame"
 )
 
 var (

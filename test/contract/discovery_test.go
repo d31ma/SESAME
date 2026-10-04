@@ -27,7 +27,7 @@ func TestDiscoveryEndpointFieldsReachTheEngine(t *testing.T) {
 	t.Parallel()
 
 	root := repositoryRoot(t)
-	sdk := jsonFieldsOf(t, filepath.Join(root, "clients", "go", "sesame", "client.go"),
+	sdk := jsonFieldsOf(t, goSDKClientFile(root),
 		"type DiscoveryEndpoints struct {")
 	engine := jsonFieldsOf(t, filepath.Join(root, "internal", "adapters", "machine", "processor.go"),
 		"func (p *Processor) handleDiscovery(request Request) Response {")

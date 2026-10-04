@@ -10,8 +10,6 @@ import (
 	"runtime"
 	"testing"
 	"time"
-
-	"github.com/d31ma/sesame/internal/adapters/machine"
 )
 
 // TestSDKContractScenario drives the shared cross-language SDK corpus. The
@@ -105,7 +103,7 @@ func TestSDKContractScenario(t *testing.T) {
 		Namespace: "email",
 		Value:     "alice@example.com",
 	})
-	assertCode(err, machine.ErrorIdentifierConflict, "duplicate PrincipalCreate()")
+	assertCode(err, codeIdentifierConflict, "duplicate PrincipalCreate()")
 
 	role, err := client.RoleCreate(ctx, tenantID, "reader", []Permission{
 		{Action: "doc:read", Resource: "project:*"},
@@ -133,7 +131,7 @@ func TestSDKContractScenario(t *testing.T) {
 	}
 	stale := allowed.PolicyVersion - 1
 	_, err = client.Decide(ctx, request, &stale)
-	assertCode(err, machine.ErrorStalePolicyVersion, "stale Decide()")
+	assertCode(err, codeStalePolicyVersion, "stale Decide()")
 	batch, err := client.DecideBatch(ctx, []DecisionRequest{
 		request,
 		{TenantID: tenantID, PrincipalID: alice.ID, Action: "doc:delete", Resource: "project:alpha"},
@@ -186,7 +184,7 @@ func TestSDKContractScenario(t *testing.T) {
 	if err != nil || memberDecision.ReasonCode != "allow_group_grant" {
 		t.Fatalf("membership Decide() = %#v, %v", memberDecision, err)
 	}
-	assertCode(client.GroupMemberAdd(ctx, group.ID, bob.ID), machine.ErrorGroupMemberExists, "duplicate GroupMemberAdd()")
+	assertCode(client.GroupMemberAdd(ctx, group.ID, bob.ID), codeGroupMemberExists, "duplicate GroupMemberAdd()")
 	if err := client.GroupMemberRemove(ctx, group.ID, bob.ID); err != nil {
 		t.Fatalf("GroupMemberRemove() error = %v", err)
 	}
@@ -229,12 +227,12 @@ func TestSDKContractScenario(t *testing.T) {
 	}
 
 	_, err = client.TenantGetByName(ctx, "missing")
-	assertCode(err, machine.ErrorTenantNotFound, "TenantGetByName(missing)")
+	assertCode(err, codeTenantNotFound, "TenantGetByName(missing)")
 	_, err = client.PrincipalGetByID(ctx, "prn_00000000000000000000000000000000")
-	assertCode(err, machine.ErrorPrincipalNotFound, "PrincipalGetByID(missing)")
+	assertCode(err, codePrincipalNotFound, "PrincipalGetByID(missing)")
 	var unused map[string]any
 	err = client.Request(ctx, "identity.unknown", struct{}{}, &unused)
-	assertCode(err, machine.ErrorOperationNotFound, "unknown operation")
+	assertCode(err, codeOperationNotFound, "unknown operation")
 
 }
 
@@ -489,7 +487,7 @@ func TestSDKAuthenticationFlow(t *testing.T) {
 	}
 	_, err = client.SessionVerify(ctx, issued.SessionID, "nope")
 	protocolError, ok := err.(*ProtocolError)
-	if !ok || protocolError.Code != machine.ErrorSessionNotFound {
+	if !ok || protocolError.Code != codeSessionNotFound {
 		t.Fatalf("wrong-secret SessionVerify() error = %T %v", err, err)
 	}
 	if err := client.SessionRevoke(ctx, issued.SessionID, "test"); err != nil {
@@ -497,7 +495,7 @@ func TestSDKAuthenticationFlow(t *testing.T) {
 	}
 	_, err = client.SessionVerify(ctx, issued.SessionID, issued.Secret)
 	protocolError, ok = err.(*ProtocolError)
-	if !ok || protocolError.Code != machine.ErrorSessionInactive {
+	if !ok || protocolError.Code != codeSessionInactive {
 		t.Fatalf("revoked SessionVerify() error = %T %v", err, err)
 	}
 

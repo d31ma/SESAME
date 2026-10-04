@@ -24,7 +24,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/d31ma/sesame/clients/go/sesame"
+	"github.com/d31ma/sesame/server/packages/sesame"
 )
 
 const (

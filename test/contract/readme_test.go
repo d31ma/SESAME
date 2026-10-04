@@ -82,16 +82,9 @@ func TestREADMEDescribesEveryShippedSDK(t *testing.T) {
 	t.Parallel()
 
 	readme, root := loadREADME(t)
-	entries, err := os.ReadDir(filepath.Join(root, "clients"))
-	if err != nil {
-		t.Fatalf("read clients: %v", err)
-	}
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			continue
-		}
-		if !strings.Contains(readme, "clients/"+entry.Name()) {
-			t.Errorf("clients/%s ships, but the README never links it", entry.Name())
+	for _, sdk := range shippedSDKs(t, root) {
+		if !strings.Contains(readme, sdkRelativeDirectory(sdk)) {
+			t.Errorf("%s ships, but the README never links it", sdkRelativeDirectory(sdk))
 		}
 	}
 }

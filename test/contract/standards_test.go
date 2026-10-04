@@ -17,7 +17,7 @@ func TestStandardsRequestFieldsStayAlignedAcrossEngineAndGoSDK(t *testing.T) {
 		filepath.Join(root, "internal", "adapters", "machine", "standards_ops.go"),
 		"type StandardsRequest struct {")
 	sdk := jsonFieldsOf(t,
-		filepath.Join(root, "clients", "go", "sesame", "client.go"),
+		goSDKClientFile(root),
 		"type StandardsRequest struct {")
 	if !reflect.DeepEqual(engine, sdk) {
 		t.Fatalf("standards request fields disagree.\n  engine: %v\n  Go SDK: %v", engine, sdk)

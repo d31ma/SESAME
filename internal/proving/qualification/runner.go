@@ -15,9 +15,9 @@ import (
 	"runtime"
 	"time"
 
-	sesame "github.com/d31ma/sesame/clients/go/sesame"
 	"github.com/d31ma/sesame/internal/platform/runtimeid"
 	fyloproving "github.com/d31ma/sesame/internal/proving/fylo"
+	sesame "github.com/d31ma/sesame/server/packages/sesame"
 )
 
 const reportSchemaVersion = 1

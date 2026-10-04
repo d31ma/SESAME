@@ -31,7 +31,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/d31ma/sesame/clients/go/sesame"
+	"github.com/d31ma/sesame/server/packages/sesame"
 )
 
 func main() {

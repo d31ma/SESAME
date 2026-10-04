@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/d31ma/sesame/clients/go/sesame"
+	"github.com/d31ma/sesame/server/packages/sesame"
 )
 
 func TestHostTranslationPreservesDuplicateValues(t *testing.T) {

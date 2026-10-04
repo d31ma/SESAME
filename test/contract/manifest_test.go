@@ -217,7 +217,7 @@ func TestSDKCoverageMatchesTheDeclaredGaps(t *testing.T) {
 	}
 
 	for sdk, declared := range loaded.SDKGaps {
-		directory := filepath.Join(root, "clients", sdk)
+		directory := sdkDirectory(root, sdk)
 		if _, err := os.Stat(directory); err != nil {
 			t.Errorf("the manifest names SDK %q, which does not exist", sdk)
 			continue
@@ -291,16 +291,9 @@ func TestSDKCoverageMatchesTheDeclaredGaps(t *testing.T) {
 
 	// Every shim must be accounted for, so a new SDK cannot arrive with no
 	// declared surface at all.
-	entries, err := os.ReadDir(filepath.Join(root, "clients"))
-	if err != nil {
-		t.Fatalf("list clients: %v", err)
-	}
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			continue
-		}
-		if _, ok := loaded.SDKGaps[entry.Name()]; !ok {
-			t.Errorf("SDK %q has no entry in the manifest's sdk_gaps", entry.Name())
+	for _, sdk := range shippedSDKs(t, root) {
+		if _, ok := loaded.SDKGaps[sdk]; !ok {
+			t.Errorf("SDK %q has no entry in the manifest's sdk_gaps", sdk)
 		}
 	}
 }
@@ -322,28 +315,19 @@ func TestEverySDKCanExpressASessionDecision(t *testing.T) {
 	// Each shim either takes a request object on decide (so a session is just
 	// another key) or carries a named session variant.
 	shims := map[string][]string{
-		filepath.Join("clients", "python", "sesame.py"):       {"def decide(self, request"},
-		filepath.Join("clients", "node", "sesame.mjs"):        {"decide = (request"},
-		filepath.Join("clients", "go", "sesame", "client.go"): {"SessionID     string"},
-		filepath.Join("clients", "ruby", "sesame.rb"):         {"def decide_for_session("},
-		filepath.Join("clients", "php", "sesame.php"):         {"function decideForSession("},
-		filepath.Join("clients", "java", "Sesame.java"):       {"Object decideForSession("},
-		filepath.Join("clients", "kotlin", "Sesame.kt"):       {"fun decideForSession("},
-		filepath.Join("clients", "csharp", "Sesame.cs"):       {"JsonElement DecideForSession("},
-		filepath.Join("clients", "dart", "sesame.dart"):       {"decideForSession("},
-		filepath.Join("clients", "rust", "sesame.rs"):         {"fn decide_for_session("},
+		filepath.Join("clients", "python", "sesame.py"):            {"def decide(self, request"},
+		filepath.Join("clients", "node", "sesame.mjs"):             {"decide = (request"},
+		filepath.Join("server", "packages", "sesame", "client.go"): {"SessionID     string"},
+		filepath.Join("clients", "ruby", "sesame.rb"):              {"def decide_for_session("},
+		filepath.Join("clients", "php", "sesame.php"):              {"function decideForSession("},
+		filepath.Join("clients", "java", "Sesame.java"):            {"Object decideForSession("},
+		filepath.Join("clients", "kotlin", "Sesame.kt"):            {"fun decideForSession("},
+		filepath.Join("clients", "csharp", "Sesame.cs"):            {"JsonElement DecideForSession("},
+		filepath.Join("clients", "dart", "sesame.dart"):            {"decideForSession("},
+		filepath.Join("clients", "rust", "sesame.rs"):              {"fn decide_for_session("},
 	}
 
-	entries, err := os.ReadDir(filepath.Join(root, "clients"))
-	if err != nil {
-		t.Fatalf("read clients: %v", err)
-	}
-	shipped := 0
-	for _, entry := range entries {
-		if entry.IsDir() {
-			shipped++
-		}
-	}
+	shipped := len(shippedSDKs(t, root))
 	if len(shims) != shipped {
 		t.Fatalf("this test covers %d shims; clients/ ships %d", len(shims), shipped)
 	}

@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/d31ma/sesame/clients/go/sesame"
+	"github.com/d31ma/sesame/server/packages/sesame"
 )
 
 // pushedRequest is the request this suite pushes: a valid one, so every

@@ -83,23 +83,16 @@ func TestWebsiteSDKListMatchesTheShippedClients(t *testing.T) {
 			t.Errorf("the website names SDK %q, which has no clients/ directory mapping", language)
 			continue
 		}
-		if _, err := os.Stat(filepath.Join(root, "clients", directory)); err != nil {
-			t.Errorf("the website names SDK %q, but clients/%s does not exist", language, directory)
+		if _, err := os.Stat(sdkDirectory(root, directory)); err != nil {
+			t.Errorf("the website names SDK %q, but %s does not exist", language, sdkRelativeDirectory(directory))
 			continue
 		}
 		advertised[directory] = true
 	}
 
-	entries, err := os.ReadDir(filepath.Join(root, "clients"))
-	if err != nil {
-		t.Fatalf("read clients: %v", err)
-	}
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			continue
-		}
-		if !advertised[entry.Name()] {
-			t.Errorf("clients/%s ships, but the website never mentions it", entry.Name())
+	for _, sdk := range shippedSDKs(t, root) {
+		if !advertised[sdk] {
+			t.Errorf("%s ships, but the website never mentions it", sdkRelativeDirectory(sdk))
 		}
 	}
 }
@@ -202,7 +195,7 @@ func TestWebsiteGuideSnippetsCallRealSDKMethods(t *testing.T) {
 			{"Dart", read("clients", "dart", "sesame.dart"), "> %s("},
 		},
 		"pascal": {
-			{"Go", read("clients", "go", "sesame", "client.go"), "func (c *Client) %s("},
+			{"Go", read("server", "packages", "sesame", "client.go"), "func (c *Client) %s("},
 			{"C#", read("clients", "csharp", "Sesame.cs"), " %s("},
 		},
 	}

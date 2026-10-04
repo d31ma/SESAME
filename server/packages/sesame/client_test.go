@@ -9,8 +9,6 @@ import (
 	"runtime"
 	"testing"
 	"time"
-
-	"github.com/d31ma/sesame/internal/adapters/machine"
 )
 
 var testBinary string
@@ -99,7 +97,7 @@ func TestClientReturnsTypedProtocolErrors(t *testing.T) {
 	if !ok {
 		t.Fatalf("Request() error = %T %v, want *ProtocolError", err, err)
 	}
-	if protocolError.Code != machine.ErrorOperationNotFound || protocolError.Retryable {
+	if protocolError.Code != codeOperationNotFound || protocolError.Retryable {
 		t.Fatalf("protocol error = %#v", protocolError)
 	}
 }
@@ -120,7 +118,7 @@ func TestTenantOperationsFailClosedWithoutStorage(t *testing.T) {
 
 	_, err = client.TenantBootstrap(context.Background(), "acme")
 	protocolError, ok := err.(*ProtocolError)
-	if !ok || protocolError.Code != machine.ErrorStorageNotConfigured {
+	if !ok || protocolError.Code != codeStorageNotConfigured {
 		t.Fatalf("TenantBootstrap() error = %T %v, want storage_not_configured", err, err)
 	}
 }
@@ -190,7 +188,7 @@ func TestTenantBootstrapThroughStorageBackedChild(t *testing.T) {
 
 	_, err = client.TenantGetByName(requestContext, "missing")
 	protocolError, ok := err.(*ProtocolError)
-	if !ok || protocolError.Code != machine.ErrorTenantNotFound {
+	if !ok || protocolError.Code != codeTenantNotFound {
 		t.Fatalf("TenantGetByName(missing) error = %T %v", err, err)
 	}
 
@@ -210,7 +208,7 @@ func TestTenantBootstrapThroughStorageBackedChild(t *testing.T) {
 		Value:     "alice@example.com",
 	})
 	protocolError, ok = err.(*ProtocolError)
-	if !ok || protocolError.Code != machine.ErrorIdentifierConflict {
+	if !ok || protocolError.Code != codeIdentifierConflict {
 		t.Fatalf("duplicate PrincipalCreate() error = %T %v", err, err)
 	}
 
@@ -250,7 +248,7 @@ func TestTenantBootstrapThroughStorageBackedChild(t *testing.T) {
 	stale := pinned - 1
 	_, err = client.Decide(requestContext, request, &stale)
 	protocolError, ok = err.(*ProtocolError)
-	if !ok || protocolError.Code != machine.ErrorStalePolicyVersion {
+	if !ok || protocolError.Code != codeStalePolicyVersion {
 		t.Fatalf("stale Decide() error = %T %v", err, err)
 	}
 	batch, err := client.DecideBatch(requestContext, []DecisionRequest{
