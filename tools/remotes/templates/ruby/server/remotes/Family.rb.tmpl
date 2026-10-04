@@ -1,0 +1,31 @@
+#[HTTPClient({"path":"{{.Family.Path}}","adapter":"sesame","setup":"SesameSetup"})]
+class {{.Family.ClassName}}
+{{- range $index, $method := .Family.Methods}}
+{{- if $index}}
+{{end}}
+{{- if $method.Header}}
+  # @param {{$method.HeaderParameter.Snake}} [String]
+{{- end}}
+{{- if $method.HasBody}}
+  # @param body [Hash]
+{{- end}}
+  # @return [Hash]
+  #[{{$method.Verb.Pascal}}Request("{{$method.Path}}")]
+{{- if or $method.Header $method.HasBody}}
+  def {{$method.Words.Snake}}(
+{{- if $method.Header}}
+    #[RequestHeader("{{$method.Header}}")]
+    {{$method.HeaderParameter.Snake}}{{if $method.HasBody}},{{end}}
+{{- end}}
+{{- if $method.HasBody}}
+    #[RequestBody]
+    body
+{{- end}}
+  )
+  end
+{{- else}}
+  def {{$method.Words.Snake}}
+  end
+{{- end}}
+{{- end}}
+end

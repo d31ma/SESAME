@@ -1,0 +1,12 @@
+@HTTPClient({"path":"{{.Family.Path}}","adapter":"sesame","setup":"SesameSetup"})
+abstract interface class {{.Family.ClassName}} {
+{{- range $index, $method := .Family.Methods}}
+{{- if $index}}
+{{end}}
+  @{{$method.Verb.Pascal}}Request("{{$method.Path}}")
+  Future<Object?> {{$method.Words.Camel}}(
+{{- if $method.Header}}@RequestHeader("{{$method.Header}}") String {{$method.HeaderParameter.Camel}}{{if $method.HasBody}}, {{end}}{{end}}
+{{- if $method.HasBody}}@RequestBody Object? body{{end -}}
+);
+{{- end}}
+}

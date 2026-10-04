@@ -1,0 +1,13 @@
+<?php
+#[HTTPClient({"path":"{{.Family.Path}}","adapter":"sesame","setup":"SesameSetup"})]
+interface {{.Family.ClassName}} {
+{{- range $index, $method := .Family.Methods}}
+{{- if $index}}
+{{end}}
+    #[{{$method.Verb.Pascal}}Request("{{$method.Path}}")]
+    public function {{$method.Words.Camel}}(
+{{- if $method.Header}}#[RequestHeader("{{$method.Header}}")] string ${{$method.HeaderParameter.Camel}}{{if $method.HasBody}}, {{end}}{{end}}
+{{- if $method.HasBody}}#[RequestBody] mixed $body{{end -}}
+): array;
+{{- end}}
+}
