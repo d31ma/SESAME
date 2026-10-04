@@ -58,6 +58,7 @@ func TestStartWithNoOptionsUsesTheEnvironment(t *testing.T) {
 	}
 
 	t.Setenv("SESAME_BINARY", testBinary)
+	t.Setenv("SESAME_DEPLOYMENT", "")
 	t.Setenv("FYLO_BINARY", fakeFYLO)
 	t.Setenv("FYLO_ROOT", root)
 
@@ -86,6 +87,7 @@ func TestStartWithNoOptionsUsesTheEnvironment(t *testing.T) {
 // silently run a different one because a variable was exported.
 func TestExplicitOptionsBeatTheEnvironment(t *testing.T) {
 	t.Setenv("SESAME_BINARY", filepath.Join(t.TempDir(), "does-not-exist"))
+	t.Setenv("SESAME_DEPLOYMENT", "")
 
 	workspace := t.TempDir()
 	fakeFYLO := buildFakeFYLO(t, workspace)
@@ -112,6 +114,8 @@ func TestStartReportsAMissingDeploymentClearly(t *testing.T) {
 	missing := filepath.Join(t.TempDir(), "not-created")
 	t.Setenv("SESAME_BINARY", testBinary)
 	t.Setenv("SESAME_DEPLOYMENT", missing)
+	t.Setenv("FYLO_BINARY", "")
+	t.Setenv("FYLO_ROOT", "")
 
 	client, err := Start(context.Background(), Options{})
 	if err == nil {

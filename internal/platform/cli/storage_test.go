@@ -49,6 +49,9 @@ func TestStorageOptionsResolveFromTheEnvironment(t *testing.T) {
 		// configured() gates the usage error every command prints before it
 		// opens storage. If it did not resolve, an environment-configured
 		// deployment would be rejected as unconfigured.
+		t.Setenv(EnvDeployment, "")
+		t.Setenv(EnvFYLOBinary, "")
+		t.Setenv(EnvFYLORoot, "")
 		if (storageOptions{}).configured() {
 			t.Fatal("empty options reported themselves configured")
 		}

@@ -15,7 +15,12 @@ var testBinary string
 
 const testOperationTimeout = 10 * time.Second
 
+var engineEnvironmentVariables = []string{"SESAME_BINARY", "SESAME_DEPLOYMENT", "FYLO_BINARY", "FYLO_ROOT"}
+
 func TestMain(m *testing.M) {
+	for _, variable := range engineEnvironmentVariables {
+		_ = os.Unsetenv(variable)
+	}
 	temporaryDirectory, err := os.MkdirTemp("", "sesame-go-client-*")
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "create test directory: %v\n", err)
