@@ -99,6 +99,9 @@ func (s *Service) RoleCreate(
 	if actor == "" {
 		return authzdomain.Role{}, errors.New("actor is required")
 	}
+	if err := requireActorTenant(tenantID, actor); err != nil {
+		return authzdomain.Role{}, err
+	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -168,6 +171,9 @@ func (s *Service) GrantCreate(
 	}
 	if actor == "" {
 		return authzdomain.Grant{}, errors.New("actor is required")
+	}
+	if err := requireActorTenant(tenantID, actor); err != nil {
+		return authzdomain.Grant{}, err
 	}
 
 	s.mu.Lock()

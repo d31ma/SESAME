@@ -39,6 +39,9 @@ func (s *Service) GroupCreate(
 	if actor == "" {
 		return authzdomain.Group{}, errors.New("actor is required")
 	}
+	if err := requireActorTenant(tenantID, actor); err != nil {
+		return authzdomain.Group{}, err
+	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -122,6 +125,9 @@ func (s *Service) groupMembership(
 	if !exists {
 		return ErrGroupNotFound
 	}
+	if err := requireActorTenant(group.TenantID, actor); err != nil {
+		return err
+	}
 	principal, exists := s.principals[principalID]
 	if !exists || principal.TenantID != group.TenantID {
 		return ErrPrincipalNotFound
@@ -172,6 +178,9 @@ func (s *Service) GrantCreateForGroup(
 	}
 	if actor == "" {
 		return authzdomain.Grant{}, errors.New("actor is required")
+	}
+	if err := requireActorTenant(tenantID, actor); err != nil {
+		return authzdomain.Grant{}, err
 	}
 
 	s.mu.Lock()

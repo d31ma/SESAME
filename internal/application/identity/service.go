@@ -906,6 +906,9 @@ func (s *Service) Bootstrap(ctx context.Context, name, actor string) (BootstrapR
 	defer s.mu.Unlock()
 
 	if existing, exists := s.byName[normalized]; exists {
+		if err := requireActorTenant(existing.ID, actor); err != nil {
+			return BootstrapResult{}, err
+		}
 		return BootstrapResult{Tenant: existing, Created: false}, nil
 	}
 
@@ -1006,6 +1009,9 @@ func (s *Service) PrincipalCreate(
 	if actor == "" {
 		return principaldomain.Principal{}, errors.New("actor is required")
 	}
+	if err := requireActorTenant(tenantID, actor); err != nil {
+		return principaldomain.Principal{}, err
+	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -1069,6 +1075,9 @@ func (s *Service) PrincipalSuspend(
 	current, exists := s.principals[principalID]
 	if !exists {
 		return principaldomain.Principal{}, ErrPrincipalNotFound
+	}
+	if err := requireActorTenant(current.TenantID, actor); err != nil {
+		return principaldomain.Principal{}, err
 	}
 	if current.Status == principaldomain.StatusSuspended {
 		return current, nil

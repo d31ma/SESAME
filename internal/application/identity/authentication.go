@@ -445,6 +445,9 @@ func (s *Service) SessionRevoke(ctx context.Context, sessionID, reason, actor st
 	if !exists {
 		return ErrSessionNotFound
 	}
+	if err := requireActorTenant(stored.TenantID, actor); err != nil {
+		return err
+	}
 	if stored.Status == sessiondomain.StatusRevoked {
 		return nil
 	}

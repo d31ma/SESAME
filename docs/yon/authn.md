@@ -80,8 +80,8 @@ not check the tenant itself. Instead, every route that acts for a signed-in
 caller sends that caller as the request's actor (see
 [ADR 0007](../adr/0007-sesame-ships-a-yon-host-project.md)), and SESAME refuses
 to write an event into another tenant: `403 {"code":"actor_tenant_mismatch"}`,
-with nothing revoked. An unknown session answers
-`404 {"code":"session_not_found"}`.
+with nothing revoked, whether that session is live or already revoked. An
+unknown session answers `404 {"code":"session_not_found"}`.
 
 ### Self-service authenticator routes
 
@@ -143,14 +143,6 @@ by the engine for every request.
 | `authenticator.totp_enroll`, `totp_activate`, `recovery_codes_issue`, `passkey_register_begin`, `passkey_register_finish` for another principal | An administrator must never receive another principal's factor secrets. Use the command line. |
 
 ## Known gaps
-
-- **An already revoked session of another tenant answers `200`.** Revoking a
-  revoked session writes nothing, so SESAME's tenant check on the write never
-  runs, and `session/revoke-by-id` answers `200 {"revoked":true}` instead of
-  `403`. Nothing changes. An administrator who knows another tenant's session
-  ID can still tell a revoked session (`200`) from a live one (`403`). Session
-  IDs are random public handles, not secrets. The fix is in the engine: refuse
-  this with `actor_tenant_mismatch` too.
 
 - **Recent sign-in is not proof of the current credential.** A session secret
   stolen within 10 minutes of sign-in can still change the password or add a

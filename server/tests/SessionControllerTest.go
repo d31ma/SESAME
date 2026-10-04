@@ -143,6 +143,19 @@ func (test *SessionControllerTest) TestRevokeByIDRefusesASessionOfAnotherTenant(
 	Assert.Equals("active", still.Status)
 }
 
+func (test *SessionControllerTest) TestRevokeByIDAnswersARevokedSessionOfAnotherTenantLikeALiveOne() {
+	setup := SesameTestSetup{}.Provision()
+	defer setup.Remove()
+	administrator := setup.SignIn("acme", true)
+	other := setup.SignInMember("globex", "member")
+	setup.Revoke(other)
+
+	revocation, err := test.controller().PostRevokeByID(test.request(setup.Credential(administrator)), SessionRevokeRequest{SessionID: other.SessionID})
+
+	Assert.Equals(`{"code":"actor_tenant_mismatch"}`, test.answer(err))
+	Assert.IsTrue(!revocation.Revoked)
+}
+
 func (test *SessionControllerTest) TestRevokeByIDAnswersNotFoundForAnUnknownSession() {
 	setup := SesameTestSetup{}.Provision()
 	defer setup.Remove()

@@ -157,6 +157,13 @@ stops at the first failure. A refusal is returned before the operation runs.
    covers operations that name no tenant (`principal.suspend`,
    `grant.revoke`, `session.revoke`, ...). A write into another tenant is
    refused with `actor_tenant_mismatch` before anything is appended.
+   A write also checks the actor's tenant against its target as soon as
+   it knows the target, before any answer that depends on the target's
+   state. An attributed request for another tenant's record therefore
+   answers `actor_tenant_mismatch` even when the operation would be an
+   idempotent no-op (already revoked, suspended, disabled, withdrawn or
+   deprovisioned) or a state refusal (already exists, already a member,
+   not enrolled), so the answer never reveals that record's state.
 
 All three codes are not retryable.
 

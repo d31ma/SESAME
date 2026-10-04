@@ -141,6 +141,9 @@ func (s *Service) PasskeyRegisterFinish(
 	if !exists || principal.Status != principaldomain.StatusActive {
 		return authenticatordomain.Passkey{}, ErrPrincipalNotFound
 	}
+	if err := requireActorTenant(principal.TenantID, actor); err != nil {
+		return authenticatordomain.Passkey{}, err
+	}
 	pending, held := s.passkeyChallenges[principalID]
 	if !held || !s.now().Before(pending.ExpiresAt) {
 		delete(s.passkeyChallenges, principalID)

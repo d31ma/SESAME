@@ -223,6 +223,9 @@ func (s *Service) RefreshFamilyRevoke(ctx context.Context, familyID, reason, act
 	if !exists {
 		return ErrRefreshFamilyNotFound
 	}
+	if err := requireActorTenant(family.TenantID, actor); err != nil {
+		return err
+	}
 	if family.Revoked {
 		return nil
 	}

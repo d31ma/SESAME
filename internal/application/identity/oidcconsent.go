@@ -136,6 +136,9 @@ func (s *Service) ConsentWithdraw(
 	if !exists {
 		return ErrConsentNotFound
 	}
+	if err := requireActorTenant(existing.TenantID, actor); err != nil {
+		return err
+	}
 	if existing.Withdrawn {
 		return nil
 	}

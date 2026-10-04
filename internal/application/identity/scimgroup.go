@@ -63,6 +63,9 @@ func (s *Service) GroupProvision(
 	if err := s.requireLedgerAndActor(actor); err != nil {
 		return ProvisionedGroup{}, err
 	}
+	if err := requireActorTenant(client.TenantID, actor); err != nil {
+		return ProvisionedGroup{}, err
+	}
 	if err := s.requireGroupManagement(client); err != nil {
 		return ProvisionedGroup{}, err
 	}
@@ -228,6 +231,9 @@ func (s *Service) GroupPatch(
 	if err := s.requireLedgerAndActor(actor); err != nil {
 		return ProvisionedGroup{}, err
 	}
+	if err := requireActorTenant(client.TenantID, actor); err != nil {
+		return ProvisionedGroup{}, err
+	}
 	if err := s.requireGroupManagement(client); err != nil {
 		return ProvisionedGroup{}, err
 	}
@@ -385,6 +391,9 @@ func (s *Service) GroupDeprovision(
 	groupID, actor string,
 ) error {
 	if err := s.requireLedgerAndActor(actor); err != nil {
+		return err
+	}
+	if err := requireActorTenant(client.TenantID, actor); err != nil {
 		return err
 	}
 

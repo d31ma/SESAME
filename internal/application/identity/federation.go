@@ -174,6 +174,9 @@ func (s *Service) ProviderRegister(
 	if err := s.requireLedgerAndActor(actor); err != nil {
 		return federationdomain.Provider{}, FetchInstruction{}, err
 	}
+	if err := requireActorTenant(tenantID, actor); err != nil {
+		return federationdomain.Provider{}, FetchInstruction{}, err
+	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -262,6 +265,9 @@ func (s *Service) ProviderConfigure(
 	actor string,
 ) (federationdomain.Metadata, error) {
 	if err := s.requireLedgerAndActor(actor); err != nil {
+		return federationdomain.Metadata{}, err
+	}
+	if err := requireActorTenant(tenantID, actor); err != nil {
 		return federationdomain.Metadata{}, err
 	}
 	if err := federationdomain.ValidateProviderID(providerID); err != nil {
@@ -996,6 +1002,9 @@ func (s *Service) ProviderDisable(
 	tenantID, providerID, reason, actor string,
 ) error {
 	if err := s.requireLedgerAndActor(actor); err != nil {
+		return err
+	}
+	if err := requireActorTenant(tenantID, actor); err != nil {
 		return err
 	}
 	if err := federationdomain.ValidateProviderID(providerID); err != nil {

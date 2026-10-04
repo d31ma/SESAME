@@ -65,6 +65,9 @@ func (s *Service) SAMLProviderRegister(
 	if err := s.requireLedgerAndActor(actor); err != nil {
 		return samldomain.Provider{}, err
 	}
+	if err := requireActorTenant(tenantID, actor); err != nil {
+		return samldomain.Provider{}, err
+	}
 	request, err := validateSAMLRegistration(name, entityID, ssoURL, certificates,
 		namespace, linking)
 	if err != nil {
@@ -184,6 +187,9 @@ func (s *Service) SAMLProviderDisable(
 	tenantID, providerID, reason, actor string,
 ) error {
 	if err := s.requireLedgerAndActor(actor); err != nil {
+		return err
+	}
+	if err := requireActorTenant(tenantID, actor); err != nil {
 		return err
 	}
 	if err := samldomain.ValidateProviderID(providerID); err != nil {

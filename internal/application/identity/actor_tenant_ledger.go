@@ -35,6 +35,14 @@ func (l actorTenantLedger) Append(
 	return l.ledger.Append(ctx, eventType, tenantID, actor, payload)
 }
 
+// requireActorTenant refuses an attributed principal actor whose tenant is not
+// tenantID. The ledger applies it to every event. A write also applies it as
+// soon as it knows the tenant of its target, before any answer that depends
+// on the target's state: an idempotent no-op (already revoked, suspended,
+// disabled, withdrawn, deprovisioned) or a state refusal (already exists,
+// already a member, not enrolled). An attributed caller therefore gets the
+// same actor_tenant_mismatch for every record of another tenant, whatever
+// state it is in. Operator actors pass unchanged.
 func requireActorTenant(tenantID, actor string) error {
 	if !audit.IsPrincipalActor(actor) {
 		return nil

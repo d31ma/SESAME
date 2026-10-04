@@ -60,6 +60,9 @@ func (s *Service) ProvisioningClientRegister(
 	if err := s.requireLedgerAndActor(actor); err != nil {
 		return scimdomain.Client{}, "", err
 	}
+	if err := requireActorTenant(tenantID, actor); err != nil {
+		return scimdomain.Client{}, "", err
+	}
 	if err := scimdomain.ValidateName(name); err != nil {
 		return scimdomain.Client{}, "", err
 	}
@@ -137,6 +140,9 @@ func (s *Service) ProvisioningClientDisable(
 	if err := s.requireLedgerAndActor(actor); err != nil {
 		return err
 	}
+	if err := requireActorTenant(tenantID, actor); err != nil {
+		return err
+	}
 	if err := scimdomain.ValidateClientID(clientID); err != nil {
 		return err
 	}
@@ -188,6 +194,9 @@ func (s *Service) UserProvision(
 	actor string,
 ) (ProvisionedUser, error) {
 	if err := s.requireLedgerAndActor(actor); err != nil {
+		return ProvisionedUser{}, err
+	}
+	if err := requireActorTenant(client.TenantID, actor); err != nil {
 		return ProvisionedUser{}, err
 	}
 	user, err := scimdomain.ParseUser(document)
@@ -454,6 +463,9 @@ func (s *Service) UserDeprovision(
 	if err := s.requireLedgerAndActor(actor); err != nil {
 		return err
 	}
+	if err := requireActorTenant(client.TenantID, actor); err != nil {
+		return err
+	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -509,6 +521,9 @@ func (s *Service) UserPatch(
 	actor string,
 ) (ProvisionedUser, error) {
 	if err := s.requireLedgerAndActor(actor); err != nil {
+		return ProvisionedUser{}, err
+	}
+	if err := requireActorTenant(client.TenantID, actor); err != nil {
 		return ProvisionedUser{}, err
 	}
 	request, err := scimdomain.ParsePatch(document)

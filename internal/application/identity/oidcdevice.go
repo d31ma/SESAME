@@ -234,6 +234,9 @@ func (s *Service) DeviceAuthorizationApprove(
 	if err := s.requireLedgerAndActor(actor); err != nil {
 		return PendingDeviceAuthorization{}, err
 	}
+	if err := requireActorTenant(tenantID, actor); err != nil {
+		return PendingDeviceAuthorization{}, err
+	}
 	if err := oidcdomain.ValidateUserCode(userCode); err != nil {
 		return PendingDeviceAuthorization{}, err
 	}
@@ -304,6 +307,9 @@ func (s *Service) DeviceAuthorizationDeny(
 	tenantID, userCode, actor string,
 ) error {
 	if err := s.requireLedgerAndActor(actor); err != nil {
+		return err
+	}
+	if err := requireActorTenant(tenantID, actor); err != nil {
 		return err
 	}
 	if err := oidcdomain.ValidateUserCode(userCode); err != nil {

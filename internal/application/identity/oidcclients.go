@@ -84,6 +84,9 @@ func (s *Service) ClientRegister(
 	if actor == "" {
 		return ClientRegistration{}, errors.New("actor is required")
 	}
+	if err := requireActorTenant(tenantID, actor); err != nil {
+		return ClientRegistration{}, err
+	}
 
 	var secret, verifier string
 	if clientType == oidcdomain.TypeConfidential {
@@ -181,6 +184,9 @@ func (s *Service) ClientRotateSecret(ctx context.Context, clientID, actor string
 	if !exists {
 		return "", ErrClientNotFound
 	}
+	if err := requireActorTenant(stored.Client.TenantID, actor); err != nil {
+		return "", err
+	}
 	if stored.Client.Disabled {
 		return "", ErrClientDisabled
 	}
@@ -224,6 +230,9 @@ func (s *Service) ClientDisable(ctx context.Context, clientID, reason, actor str
 	stored, exists := s.clients[clientID]
 	if !exists {
 		return ErrClientNotFound
+	}
+	if err := requireActorTenant(stored.Client.TenantID, actor); err != nil {
+		return err
 	}
 	if stored.Client.Disabled {
 		return nil

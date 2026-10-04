@@ -73,6 +73,9 @@ func (s *Service) TOTPEnroll(
 	if !exists {
 		return authenticatordomain.TOTPEnrollment{}, ErrPrincipalNotFound
 	}
+	if err := requireActorTenant(principal.TenantID, actor); err != nil {
+		return authenticatordomain.TOTPEnrollment{}, err
+	}
 	// Re-enrolling over an active factor would silently disable the one the
 	// principal is actually carrying, so it is refused.
 	if existing, enrolled := s.totp[principalID]; enrolled && existing.Active {
@@ -124,6 +127,9 @@ func (s *Service) TOTPActivate(
 	principal, exists := s.principals[principalID]
 	if !exists {
 		return ErrPrincipalNotFound
+	}
+	if err := requireActorTenant(principal.TenantID, actor); err != nil {
+		return err
 	}
 	stored, enrolled := s.totp[principalID]
 	if !enrolled {
