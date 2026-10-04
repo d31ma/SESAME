@@ -75,8 +75,8 @@ authenticator routes.
 `server/application.json`, an optional `server/application-<profile>.json`
 selected with `YON_PROFILE`, and `YON_` names from `.env` at the project root
 (`.env.example` lists them). Handlers see no other configuration. Their
-environment holds only `PATH`, `LANG`, `LC_ALL` and `TMPDIR` from the process
-that started `ty`, the snapshot in `YON_APPLICATION_JSON`, Tachyon's own
+environment holds only `PATH`, `LANG`, `LC_ALL` and `TMPDIR` (when set) from
+the process that started `ty`, the snapshot in `YON_APPLICATION_JSON`, Tachyon's own
 `YON_HANDLER_PROTOCOL`, and, under `ty serve`, the outgoing proxy variables
 `ty` sets (`YON_OUTGOING_PROXY`, `HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY` and
 their lowercase forms, `NODE_USE_ENV_PROXY`). There is no `HOME`. The working
