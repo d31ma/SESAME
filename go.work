@@ -4,5 +4,5 @@ toolchain go1.26.5
 
 use (
 	.
-	./server/packages
+	./app/server/packages
 )

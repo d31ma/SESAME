@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/d31ma/sesame/server/packages/sesame"
+	"github.com/d31ma/sesame/app/server/packages/sesame"
 )
 
 // This file is the host side of SESAME's external interaction contract.

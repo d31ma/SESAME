@@ -31,7 +31,7 @@ func buildFakeFYLO(t *testing.T, workspace string) string {
 	if !ok {
 		t.Fatal("locate the test file")
 	}
-	root := filepath.Clean(filepath.Join(filepath.Dir(filename), "..", "..", ".."))
+	root := filepath.Clean(filepath.Join(filepath.Dir(filename), "..", "..", "..", ".."))
 	build := exec.Command("go", "build", "-trimpath", "-o", binary,
 		"./internal/adapters/fylo/testdata/fakefylo")
 	build.Dir = root

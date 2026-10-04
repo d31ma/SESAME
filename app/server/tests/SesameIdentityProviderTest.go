@@ -3,7 +3,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 
-	"github.com/d31ma/sesame/server/packages/host"
+	"github.com/d31ma/sesame/app/server/packages/host"
 )
 
 // @Test(SesameTestSetup, {"partition":"tests"})

@@ -10,7 +10,7 @@ import (
 	"runtime"
 	"time"
 
-	sesame "github.com/d31ma/sesame/server/packages/sesame"
+	sesame "github.com/d31ma/sesame/app/server/packages/sesame"
 )
 
 // Profile controls whether a run is observational smoke evidence or eligible

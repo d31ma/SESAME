@@ -6,7 +6,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/d31ma/sesame/server/packages/sesame"
+	"github.com/d31ma/sesame/app/server/packages/sesame"
 )
 
 const maxStandardsBodyBytes = 128 * 1024

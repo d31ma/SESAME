@@ -37,7 +37,7 @@ func TestMain(m *testing.M) {
 		_, _ = fmt.Fprintln(os.Stderr, "locate Go client test file")
 		os.Exit(1)
 	}
-	repositoryRoot := filepath.Clean(filepath.Join(filepath.Dir(filename), "..", "..", ".."))
+	repositoryRoot := filepath.Clean(filepath.Join(filepath.Dir(filename), "..", "..", "..", ".."))
 	build := exec.Command("go", "build", "-trimpath", "-o", testBinary, "./cmd/sesame")
 	build.Dir = repositoryRoot
 	build.Env = append(os.Environ(), "CGO_ENABLED=0", "GOTOOLCHAIN=auto")
@@ -139,7 +139,7 @@ func TestTenantBootstrapThroughStorageBackedChild(t *testing.T) {
 	if !ok {
 		t.Fatal("locate Go client test file")
 	}
-	repositoryRoot := filepath.Clean(filepath.Join(filepath.Dir(filename), "..", "..", ".."))
+	repositoryRoot := filepath.Clean(filepath.Join(filepath.Dir(filename), "..", "..", "..", ".."))
 	build := exec.Command("go", "build", "-trimpath", "-o", fakeFYLO, "./internal/adapters/fylo/testdata/fakefylo")
 	build.Dir = repositoryRoot
 	build.Env = append(os.Environ(), "CGO_ENABLED=0", "GOTOOLCHAIN=auto")

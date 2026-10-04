@@ -2,7 +2,7 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/d31ma/sesame/server/packages/host"
+	"github.com/d31ma/sesame/app/server/packages/host"
 )
 
 // @IdentityProvider

@@ -1,7 +1,7 @@
 import (
 	"slices"
 
-	"github.com/d31ma/sesame/server/packages/host"
+	"github.com/d31ma/sesame/app/server/packages/host"
 )
 
 // @Service

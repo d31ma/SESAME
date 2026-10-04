@@ -29,7 +29,7 @@ func startAgainstFakeFYLO(t *testing.T) *Client {
 	if !ok {
 		t.Fatal("locate contract test file")
 	}
-	repositoryRoot := filepath.Clean(filepath.Join(filepath.Dir(filename), "..", "..", ".."))
+	repositoryRoot := filepath.Clean(filepath.Join(filepath.Dir(filename), "..", "..", "..", ".."))
 	build := exec.Command("go", "build", "-trimpath", "-o", fakeFYLO, "./internal/adapters/fylo/testdata/fakefylo")
 	build.Dir = repositoryRoot
 	build.Env = append(os.Environ(), "CGO_ENABLED=0", "GOTOOLCHAIN=auto")
@@ -585,7 +585,7 @@ func startAgainstDeployment(t *testing.T, issuer string) *Client {
 	if !ok {
 		t.Fatal("locate contract test file")
 	}
-	repositoryRoot := filepath.Clean(filepath.Join(filepath.Dir(filename), "..", "..", ".."))
+	repositoryRoot := filepath.Clean(filepath.Join(filepath.Dir(filename), "..", "..", "..", ".."))
 	build := exec.Command("go", "build", "-trimpath", "-o", fakeFYLO, "./internal/adapters/fylo/testdata/fakefylo")
 	build.Dir = repositoryRoot
 	build.Env = append(os.Environ(), "CGO_ENABLED=0", "GOTOOLCHAIN=auto")

@@ -2,7 +2,7 @@ import (
 	"net/http"
 	"slices"
 
-	"github.com/d31ma/sesame/server/packages/host"
+	"github.com/d31ma/sesame/app/server/packages/host"
 )
 
 // @RequestRoute("/api/v1/authenticator")

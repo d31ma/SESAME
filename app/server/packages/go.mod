@@ -1,4 +1,4 @@
-module github.com/d31ma/sesame/server/packages
+module github.com/d31ma/sesame/app/server/packages
 
 go 1.26.0
 
