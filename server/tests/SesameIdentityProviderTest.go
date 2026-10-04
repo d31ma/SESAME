@@ -79,9 +79,5 @@ func (test *SesameIdentityProviderTest) request(credential string) *http.Request
 }
 
 func (test *SesameIdentityProviderTest) provider() *SesameIdentityProvider {
-	engine := &EngineService{engineSettingsService: &EngineSettingsService{}}
-	return &SesameIdentityProvider{
-		callerService:        &CallerService{engineService: engine},
-		administratorService: &AdministratorService{engineService: engine},
-	}
+	return &SesameIdentityProvider{}
 }

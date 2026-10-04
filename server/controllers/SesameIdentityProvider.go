@@ -6,24 +6,25 @@ import (
 )
 
 // @IdentityProvider
-// @NeedsAll
-type SesameIdentityProvider struct {
-	callerService        *CallerService
-	administratorService *AdministratorService
-}
+type SesameIdentityProvider struct{}
 
 func (provider *SesameIdentityProvider) Identify(request *http.Request) (*Identity, error) {
-	caller, failure := provider.callerService.Resolve(request)
-	roles, failure := provider.roles(caller, failure)
+	engineService := &EngineService{engineSettingsService: &EngineSettingsService{}}
+	caller, failure := (&CallerService{engineService: engineService}).Resolve(request)
+	roles, failure := provider.roles(&AdministratorService{engineService: engineService}, caller, failure)
 	identity, failure := provider.identity(caller, roles, failure)
 	return identity, provider.withoutRejection(failure)
 }
 
-func (provider *SesameIdentityProvider) roles(caller Caller, failure error) ([]string, error) {
+func (provider *SesameIdentityProvider) roles(
+	administratorService *AdministratorService,
+	caller Caller,
+	failure error,
+) ([]string, error) {
 	if failure != nil {
 		return nil, failure
 	}
-	return provider.administratorService.Roles(caller)
+	return administratorService.Roles(caller)
 }
 
 func (provider *SesameIdentityProvider) identity(caller Caller, roles []string, failure error) (*Identity, error) {
