@@ -1,0 +1,36 @@
+from typing import Annotated, Protocol
+
+@http_client({"path":"/api/v1/authenticator","adapter":"sesame","setup":"SesameSetup"})
+class SesameAuthenticatorClient(Protocol):
+    @post_request("/passkey-list")
+    async def passkey_list(self, session: Annotated[str, request_header("Sesame-Session")], body: Annotated[object, request_body]) -> object: ...
+
+    @post_request("/passkey-list-for-principal")
+    async def passkey_list_for_principal(self, session: Annotated[str, request_header("Sesame-Session")], body: Annotated[object, request_body]) -> object: ...
+
+    @post_request("/passkey-register-begin")
+    async def passkey_register_begin(self, session: Annotated[str, request_header("Sesame-Session")], body: Annotated[object, request_body]) -> object: ...
+
+    @post_request("/passkey-register-finish")
+    async def passkey_register_finish(self, session: Annotated[str, request_header("Sesame-Session")], body: Annotated[object, request_body]) -> object: ...
+
+    @post_request("/passkey-remove")
+    async def passkey_remove(self, session: Annotated[str, request_header("Sesame-Session")], body: Annotated[object, request_body]) -> object: ...
+
+    @post_request("/passkey-remove-for-principal")
+    async def passkey_remove_for_principal(self, session: Annotated[str, request_header("Sesame-Session")], body: Annotated[object, request_body]) -> object: ...
+
+    @post_request("/recovery-codes-issue")
+    async def recovery_codes_issue(self, session: Annotated[str, request_header("Sesame-Session")], body: Annotated[object, request_body]) -> object: ...
+
+    @post_request("/set-password")
+    async def set_password(self, session: Annotated[str, request_header("Sesame-Session")], body: Annotated[object, request_body]) -> object: ...
+
+    @post_request("/set-password-for-principal")
+    async def set_password_for_principal(self, session: Annotated[str, request_header("Sesame-Session")], body: Annotated[object, request_body]) -> object: ...
+
+    @post_request("/totp-activate")
+    async def totp_activate(self, session: Annotated[str, request_header("Sesame-Session")], body: Annotated[object, request_body]) -> object: ...
+
+    @post_request("/totp-enroll")
+    async def totp_enroll(self, session: Annotated[str, request_header("Sesame-Session")], body: Annotated[object, request_body]) -> object: ...

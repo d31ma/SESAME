@@ -1,0 +1,13 @@
+from typing import Annotated, Protocol
+
+@http_client({"path":"{{.Family.Path}}","adapter":"sesame","setup":"SesameSetup"})
+class {{.Family.ClassName}}(Protocol):
+{{- range $index, $method := .Family.Methods}}
+{{- if $index}}
+{{end}}
+    @{{$method.Verb.Snake}}_request("{{$method.Path}}")
+    async def {{$method.Words.Snake}}(self
+{{- if $method.Header}}, {{$method.HeaderParameter.Snake}}: Annotated[str, request_header("{{$method.Header}}")]{{end}}
+{{- if $method.HasBody}}, body: Annotated[object, request_body]{{end -}}
+    ) -> object: ...
+{{- end}}

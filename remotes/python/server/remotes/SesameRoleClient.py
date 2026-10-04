@@ -1,0 +1,6 @@
+from typing import Annotated, Protocol
+
+@http_client({"path":"/api/v1/role","adapter":"sesame","setup":"SesameSetup"})
+class SesameRoleClient(Protocol):
+    @post_request("/create")
+    async def create(self, session: Annotated[str, request_header("Sesame-Session")], body: Annotated[object, request_body]) -> object: ...
