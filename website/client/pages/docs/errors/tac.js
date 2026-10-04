@@ -27,6 +27,9 @@ const GROUPS = [
       { code: 'operation_not_found', meaning: 'This build does not route that operation. Usually a version mismatch; call RequireOperations at startup to find out sooner.' },
       { code: 'frame_too_large', meaning: 'The request exceeded the 1 MiB frame limit.' },
       { code: 'internal_error', meaning: 'An unexpected failure. Retryable only if the error says so.' },
+      { code: 'invalid_actor', meaning: 'The optional actor field is not exactly a tenant_id, principal_id, and session_id, or was sent to standards.dispatch. Send it only when system.version lists it in request_fields.' },
+      { code: 'actor_session_invalid', meaning: 'The actor names a session that is unknown, expired, revoked, held by another principal or tenant, or whose principal is suspended. Nothing was recorded.' },
+      { code: 'actor_tenant_mismatch', meaning: 'The attributed request would record an event in a tenant other than the actor\'s own. Refused before anything was written.' },
     ],
   },
   {
