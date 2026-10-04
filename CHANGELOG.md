@@ -224,6 +224,12 @@ Fixes from the security review of the Yon host, before any release:
 
 ### Fixed
 
+- `oidc.interaction_get` with `interaction_secret` and `oidc.interaction_complete`
+  answer `interaction_not_found` for a malformed interaction ID instead of
+  `invalid_request`, so `POST /api/v1/oidc/interaction-get` and
+  `/interaction-complete` answer a malformed or missing interaction cookie with
+  `404` like an unknown interaction (was `400`). An unexpected failure on the
+  held lookup answers `internal_error`.
 - `api/schema/machine-v1.schema.json` listed only six framing error codes; it
   now lists every code and a test keeps it in step with the engine.
   `fixtures.ndjson` is replayed byte for byte in tests.

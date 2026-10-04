@@ -66,8 +66,8 @@ one SESAME subprocess and one authoritative FYLO root.
 | `oidc_client.rotate_secret` | `{"client_id":...}` | `{"client_secret":...}`, returned once |
 | `oidc_client.disable` | `{"client_id":...,"reason"?}` | `{"disabled":true}` |
 | `oidc.authorize` | `{"client_id":...,"redirect_uri":...,"response_type":"code","scopes":[...],"state"?,"nonce"?,"code_challenge":...,"code_challenge_method":"S256"}` | the interaction handle and its only copy of the secret |
-| `oidc.interaction_complete` | `{"interaction_id":...,"interaction_secret":...,"session_id":...,"session_secret":...}` | `{"redirect_uri":...,"code":...,"state"?}` |
-| `oidc.interaction_get` | `{"interaction_id":...}`, optionally `"interaction_secret":...` | one interaction, without its digests; with `interaction_secret`, only when it matches (a wrong secret answers `interaction_not_found`, like an unknown interaction) |
+| `oidc.interaction_complete` | `{"interaction_id":...,"interaction_secret":...,"session_id":...,"session_secret":...}` | `{"redirect_uri":...,"code":...,"state"?}` (a malformed `interaction_id` answers `interaction_not_found`, like an unknown interaction) |
+| `oidc.interaction_get` | `{"interaction_id":...}`, optionally `"interaction_secret":...` | one interaction, without its digests; with `interaction_secret`, only when it matches (a wrong secret or a malformed `interaction_id` answers `interaction_not_found`, like an unknown interaction) |
 | `oidc.token` | `{"grant_type":"authorization_code","code":...,"redirect_uri":...,"client_id":...,"client_secret"?,"code_verifier":...}` or `{"grant_type":"refresh_token","refresh_token":...,"client_id":...,"client_secret"?,"scope"?}` | the issued token set |
 | `oidc.dpop_verify` | `{"access_token":...,"dpop_proof":...,"http_method":...,"http_uri":...}` | whether the key-bound token and its proof agree, and the grant behind them |
 | `oidc.pushed_authorize` | `{"client_id":...,"client_secret"?,"redirect_uri":...,"response_type":"code","scopes":[...],"state"?,"nonce"?,"code_challenge":...,"code_challenge_method":"S256"}` | a single-use `request_uri` and its lifetime |

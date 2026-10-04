@@ -152,8 +152,8 @@ name another principal, session or tenant.
 | `POST /api/v1/oidc-client/disable` | `oidc_client.disable` | an administrator | as `get`; nothing is disabled otherwise |
 | `POST /api/v1/oidc/refresh-family-get` | `oidc.refresh_family_get` | an administrator | the family is loaded, then refused unless it is in the caller's tenant |
 | `POST /api/v1/oidc/refresh-family-revoke` | `oidc.refresh_family_revoke` | an administrator | as `refresh-family-get`; nothing is revoked otherwise |
-| `POST /api/v1/oidc/interaction-get` | `oidc.interaction_get` | any signed-in principal | interaction id and secret from the `__Secure-sesame_interaction` cookie; a wrong or missing secret answers `404 {"code":"interaction_not_found"}` like an unknown interaction; refused unless it is in the caller's tenant |
-| `POST /api/v1/oidc/interaction-complete` | `oidc.interaction_complete` | any signed-in principal | interaction id and secret from the cookie; the caller's own session completes it |
+| `POST /api/v1/oidc/interaction-get` | `oidc.interaction_get` | any signed-in principal | interaction id and secret from the `__Secure-sesame_interaction` cookie; a wrong, missing or malformed cookie answers `404 {"code":"interaction_not_found"}` like an unknown interaction; refused unless it is in the caller's tenant |
+| `POST /api/v1/oidc/interaction-complete` | `oidc.interaction_complete` | any signed-in principal | interaction id and secret from the cookie; the caller's own session completes it; a malformed cookie answers `404 {"code":"interaction_not_found"}` |
 | `POST /api/v1/oidc/consent-grant` | `oidc.consent_grant` | any signed-in principal | the caller's own session states the consent; body: `client_id`, `scopes` |
 | `POST /api/v1/oidc/consent-get` | `oidc.consent_get` | any signed-in principal | the caller's own principal; body: `client_id` |
 | `POST /api/v1/oidc/consent-withdraw` | `oidc.consent_withdraw` | any signed-in principal | the caller's own principal; body: `client_id` |
