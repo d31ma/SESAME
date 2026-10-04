@@ -6,7 +6,6 @@ import "net/http"
 type PrincipalController struct {
 	tenantCallService      *TenantCallService
 	principalTenantService *PrincipalTenantService
-	engineService          *EngineService
 }
 
 // @PostRoute("/create")
@@ -56,15 +55,11 @@ func (controller *PrincipalController) PostSuspend(
 	// @FromBody
 	body PrincipalReference,
 ) (Principal, error) {
-	_, failure := controller.principalTenantService.Require(request, body.PrincipalID)
-	return controller.suspend(body, failure)
-}
-
-func (controller *PrincipalController) suspend(body PrincipalReference, failure error) (Principal, error) {
-	if failure != nil {
-		return Principal{}, failure
-	}
 	var result Principal
-	failure = controller.engineService.Call("principal.suspend", body, &result)
-	return result, failure
+	err := controller.principalTenantService.Call(request, body.PrincipalID, EngineCall{
+		Operation:  "principal.suspend",
+		Parameters: body,
+		Result:     &result,
+	})
+	return result, err
 }

@@ -14,6 +14,18 @@ func (service *PrincipalTenantService) Require(request *http.Request, principalI
 	return service.owned(principal, failure)
 }
 
+func (service *PrincipalTenantService) Call(request *http.Request, principalID string, call EngineCall) error {
+	_, failure := service.Require(request, principalID)
+	return service.send(call, failure)
+}
+
+func (service *PrincipalTenantService) send(call EngineCall, failure error) error {
+	if failure != nil {
+		return failure
+	}
+	return service.engineService.Call(call.Operation, call.Parameters, call.Result)
+}
+
 func (service *PrincipalTenantService) load(principalID string, failure error) (Principal, error) {
 	if failure != nil {
 		return Principal{}, failure

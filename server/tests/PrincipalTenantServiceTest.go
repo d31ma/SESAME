@@ -64,6 +64,45 @@ func (test *PrincipalTenantServiceTest) TestRequireRejectsAnAnonymousCaller() {
 	Assert.Equals("", principal.PrincipalID)
 }
 
+func (test *PrincipalTenantServiceTest) TestCallRunsTheOperationForAPrincipalOfTheCallersTenant() {
+	setup := SesameTestSetup{}.Provision()
+	defer setup.Remove()
+	administrator := setup.SignIn("acme", true)
+	member := setup.SignInMember("acme", "member")
+	suspended := Principal{}
+
+	err := test.service().Call(test.request(setup.Credential(administrator)), member.PrincipalID, EngineCall{
+		Operation:  "principal.suspend",
+		Parameters: PrincipalReference{PrincipalID: member.PrincipalID},
+		Result:     &suspended,
+	})
+
+	Assert.IsTrue(err == nil)
+	Assert.Equals("suspended", suspended.Status)
+}
+
+func (test *PrincipalTenantServiceTest) TestCallRefusesAPrincipalOfAnotherTenantBeforeTheOperationRuns() {
+	setup := SesameTestSetup{}.Provision()
+	defer setup.Remove()
+	administrator := setup.SignIn("acme", true)
+	other := setup.SignIn("globex", true)
+	service := test.service()
+	suspended := Principal{}
+
+	err := service.Call(test.request(setup.Credential(administrator)), other.PrincipalID, EngineCall{
+		Operation:  "principal.suspend",
+		Parameters: PrincipalReference{PrincipalID: other.PrincipalID},
+		Result:     &suspended,
+	})
+	untouched, check := service.Require(test.request(setup.Credential(other)), other.PrincipalID)
+
+	var mismatch *host.TenantMismatchError
+	Assert.IsTrue(errors.As(err, &mismatch))
+	Assert.Equals("", suspended.Status)
+	Assert.IsTrue(check == nil)
+	Assert.Equals("active", untouched.Status)
+}
+
 func (test *PrincipalTenantServiceTest) request(credential string) *http.Request {
 	request := httptest.NewRequest(http.MethodPost, "/", nil)
 	request.Header.Set("Sesame-Session", credential)

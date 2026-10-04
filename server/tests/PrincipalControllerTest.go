@@ -192,6 +192,5 @@ func (test *PrincipalControllerTest) controller() *PrincipalController {
 	return &PrincipalController{
 		tenantCallService:      &TenantCallService{callerService: callers, engineService: engine},
 		principalTenantService: &PrincipalTenantService{callerService: callers, engineService: engine},
-		engineService:          engine,
 	}
 }
