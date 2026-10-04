@@ -522,19 +522,14 @@ func (test *OidcControllerTest) credential(session sesame.IssuedSession) string 
 
 func (test *OidcControllerTest) controller(engine *EngineService) *OidcController {
 	return &OidcController{
-		engineService:            engine,
-		tenantCallService:        SesameTestSetup{}.TenantCalls(engine),
-		interactionCookieService: &InteractionCookieService{},
+		engineService:     engine,
+		tenantCallService: SesameTestSetup{}.TenantCalls(engine),
 	}
 }
 
 func (test *OidcControllerTest) standards(engine *EngineService) *StandardsController {
-	refusals := &StandardsRefusalService{}
 	return &StandardsController{
-		standardsDispatchService: &StandardsDispatchService{engineService: engine, standardsRefusalService: refusals},
-		standardsAnswerService: &StandardsAnswerService{
-			standardsRefusalService:  refusals,
-			interactionCookieService: &InteractionCookieService{},
-		},
+		standardsDispatchService: &StandardsDispatchService{engineService: engine},
+		standardsAnswerService:   &StandardsAnswerService{},
 	}
 }

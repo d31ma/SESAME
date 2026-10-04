@@ -65,7 +65,7 @@ func (test *StandardsAnswerServiceTest) TestAuthorizeRefusesAnUnknownActionKind(
 }
 
 func (test *StandardsAnswerServiceTest) TestAuthorizeServesAnOrdinaryRefusalWithoutACookie() {
-	refusal := (&StandardsRefusalService{}).Refusal(http.StatusBadRequest, "invalid_request")
+	refusal := StandardsContractUtils{}.Refusal(http.StatusBadRequest, "invalid_request")
 
 	response, err := test.service().Authorize(refusal, nil)
 
@@ -112,8 +112,5 @@ func (test *StandardsAnswerServiceTest) text(response *http.Response) string {
 }
 
 func (test *StandardsAnswerServiceTest) service() *StandardsAnswerService {
-	return &StandardsAnswerService{
-		standardsRefusalService:  &StandardsRefusalService{},
-		interactionCookieService: &InteractionCookieService{},
-	}
+	return &StandardsAnswerService{}
 }

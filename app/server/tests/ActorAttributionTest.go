@@ -108,9 +108,8 @@ func (test *ActorAttributionTest) TestCallerCallRecordsTheCallingPrincipal() {
 	member := setup.SignInMember("acme", "member")
 	engine := setup.Engine()
 	oidc := &OidcController{
-		engineService:            engine,
-		tenantCallService:        setup.TenantCalls(engine),
-		interactionCookieService: &InteractionCookieService{},
+		engineService:     engine,
+		tenantCallService: setup.TenantCalls(engine),
 	}
 	registered := sesame.ClientRegistration{}
 	registerErr := engine.Call("oidc_client.register", map[string]any{

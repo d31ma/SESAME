@@ -4,13 +4,16 @@ import (
 	"github.com/d31ma/sesame/app/server/packages/sesame"
 )
 
-// @Service
-type StandardsRefusalService struct{}
+type StandardsContractUtils struct{}
 
-func (service *StandardsRefusalService) Refusal(status int, code string) sesame.StandardsResponse {
+func (StandardsContractUtils) Version() string {
+	return "1"
+}
+
+func (StandardsContractUtils) Refusal(status int, code string) sesame.StandardsResponse {
 	body, _ := json.Marshal(StandardsProblem{Error: code})
 	return sesame.StandardsResponse{
-		ContractVersion: service.contractVersion(),
+		ContractVersion: StandardsContractUtils{}.Version(),
 		Status:          status,
 		Headers: map[string]string{
 			"cache-control":          "no-store",
@@ -20,8 +23,4 @@ func (service *StandardsRefusalService) Refusal(status int, code string) sesame.
 		},
 		Body: body,
 	}
-}
-
-func (service *StandardsRefusalService) contractVersion() string {
-	return "1"
 }

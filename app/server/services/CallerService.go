@@ -1,11 +1,9 @@
 import (
-	"errors"
 	"net/http"
 	"slices"
 	"strings"
 
 	"github.com/d31ma/sesame/app/server/packages/host"
-	"github.com/d31ma/sesame/app/server/packages/sesame"
 )
 
 // @Service
@@ -65,7 +63,7 @@ func (service *CallerService) actAs(caller Caller, failure error) error {
 }
 
 func (service *CallerService) rejection(failure error) error {
-	if slices.Contains(service.rejectedCodes(), service.protocolCode(failure)) {
+	if slices.Contains(service.rejectedCodes(), ProtocolErrorUtils{}.Code(failure)) {
 		return &host.SessionRejectedError{}
 	}
 	return failure
@@ -76,12 +74,6 @@ func (service *CallerService) mismatch(checks []bool) error {
 		return &host.TenantMismatchError{}
 	}
 	return nil
-}
-
-func (service *CallerService) protocolCode(failure error) string {
-	protocolError := &sesame.ProtocolError{}
-	errors.As(failure, &protocolError)
-	return protocolError.Code
 }
 
 func (service *CallerService) rejectedCodes() []string {

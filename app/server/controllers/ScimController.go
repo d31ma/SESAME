@@ -1,7 +1,4 @@
-import (
-	"net/http"
-	"strings"
-)
+import "net/http"
 
 // @RequestRoute("/api/v1/scim")
 // @NeedsAll
@@ -181,16 +178,8 @@ func (controller *ScimController) PostGroupDeprovision(
 }
 
 func (controller *ScimController) provision(request *http.Request, operation string, call ScimEngineCall, result any) error {
-	call.Token = controller.bearerToken(request)
+	call.Token = HeaderUtils{}.BearerToken(request.Header)
 	return controller.engineService.Call(operation, call, result)
-}
-
-func (controller *ScimController) bearerToken(request *http.Request) string {
-	scheme, token, _ := strings.Cut(request.Header.Get(controller.authorizationHeader()), " ")
-	if !strings.EqualFold(scheme, controller.bearerScheme()) {
-		return ""
-	}
-	return strings.TrimSpace(token)
 }
 
 func (controller *ScimController) listCall(body ScimListRequest) ScimEngineCall {
@@ -199,12 +188,4 @@ func (controller *ScimController) listCall(body ScimListRequest) ScimEngineCall 
 
 func (controller *ScimController) patchCall(body ScimResourcePatchRequest) ScimEngineCall {
 	return ScimEngineCall{ResourceID: body.ResourceID, Body: body.Body}
-}
-
-func (controller *ScimController) authorizationHeader() string {
-	return "Authorization"
-}
-
-func (controller *ScimController) bearerScheme() string {
-	return "Bearer"
 }

@@ -3,9 +3,8 @@ import "net/http"
 // @RequestRoute("/api/v1/oidc")
 // @NeedsAll
 type OidcController struct {
-	engineService            *EngineService
-	tenantCallService        *TenantCallService
-	interactionCookieService *InteractionCookieService
+	engineService     *EngineService
+	tenantCallService *TenantCallService
 }
 
 // @PostRoute("/interaction-get")
@@ -16,7 +15,7 @@ func (controller *OidcController) PostInteractionGet(
 	interaction string,
 ) (OidcInteraction, error) {
 	var result OidcInteraction
-	handle := controller.interactionCookieService.Handle(interaction)
+	handle := InteractionCookieUtils{}.Handle(interaction)
 	err := controller.tenantCallService.LoadAsCaller(request, EngineCall{
 		Operation:  "oidc.interaction_get",
 		Parameters: handle,
@@ -33,7 +32,7 @@ func (controller *OidcController) PostInteractionComplete(
 	interaction string,
 ) (OidcAuthorizationCode, error) {
 	var result OidcAuthorizationCode
-	handle := controller.interactionCookieService.Handle(interaction)
+	handle := InteractionCookieUtils{}.Handle(interaction)
 	err := controller.tenantCallService.CallAsCaller(request, controller.completionFor(handle, &result))
 	return result, err
 }

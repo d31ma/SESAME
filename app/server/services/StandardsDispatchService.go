@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"net/url"
 	"slices"
-	"strings"
 
 	"github.com/d31ma/sesame/app/server/packages/sesame"
 )
@@ -13,8 +12,7 @@ import (
 // @Service
 // @NeedsAll
 type StandardsDispatchService struct {
-	engineService           *EngineService
-	standardsRefusalService *StandardsRefusalService
+	engineService *EngineService
 }
 
 func (service *StandardsDispatchService) Dispatch(request *http.Request, endpoint string) (sesame.StandardsResponse, error) {
@@ -24,11 +22,11 @@ func (service *StandardsDispatchService) Dispatch(request *http.Request, endpoin
 
 func (service *StandardsDispatchService) translate(request *http.Request, endpoint string) (sesame.StandardsRequest, bool) {
 	form, formUsable := service.form(request)
-	authorization, authorizationUsable := service.singleHeader(request.Header, service.authorizationHeader())
-	proof, proofUsable := service.singleHeader(request.Header, service.proofHeader())
+	authorization, authorizationUsable := HeaderUtils{}.Single(request.Header, HeaderUtils{}.Authorization())
+	proof, proofUsable := HeaderUtils{}.Single(request.Header, service.proofHeader())
 	scheme := service.scheme(request.Header.Get(service.forwardedProtocolHeader()))
 	return sesame.StandardsRequest{
-		ContractVersion: service.contractVersion(),
+		ContractVersion: StandardsContractUtils{}.Version(),
 		Endpoint:        endpoint,
 		Method:          request.Method,
 		Query:           service.copied(request.URL.Query()),
@@ -38,10 +36,6 @@ func (service *StandardsDispatchService) translate(request *http.Request, endpoi
 		HTTPURI:         service.publicURI(request, proof, scheme),
 		Endpoints:       service.endpoints(endpoint),
 	}, !slices.Contains([]bool{formUsable, authorizationUsable, proofUsable}, false)
-}
-
-func (service *StandardsDispatchService) authorizationHeader() string {
-	return "Authorization"
 }
 
 func (service *StandardsDispatchService) dispatchWhen(translated sesame.StandardsRequest, usable bool) (sesame.StandardsResponse, error) {
@@ -69,14 +63,11 @@ func (service *StandardsDispatchService) refusedWhenInvalid(
 	response sesame.StandardsResponse,
 	failure error,
 ) (sesame.StandardsResponse, error) {
-	if service.protocolCode(failure) == service.invalidRequest() {
+	code := ProtocolErrorUtils{}.Code(failure)
+	if code == service.invalidRequest() {
 		return service.refusal(), nil
 	}
 	return response, failure
-}
-
-func (service *StandardsDispatchService) contractVersion() string {
-	return "1"
 }
 
 func (service *StandardsDispatchService) form(request *http.Request) (map[string][]string, bool) {
@@ -102,11 +93,6 @@ func (service *StandardsDispatchService) bounded(body []byte) error {
 
 func (service *StandardsDispatchService) largestBody() int64 {
 	return 128 * 1024
-}
-
-func (service *StandardsDispatchService) singleHeader(header http.Header, name string) (string, bool) {
-	values := header.Values(name)
-	return strings.Join(values, ""), len(values) <= 1
 }
 
 func (service *StandardsDispatchService) copied(values url.Values) map[string][]string {
@@ -157,14 +143,8 @@ func (service *StandardsDispatchService) discoveryEndpoint() string {
 	return "oidc.discovery"
 }
 
-func (service *StandardsDispatchService) protocolCode(failure error) string {
-	protocolError := &sesame.ProtocolError{}
-	errors.As(failure, &protocolError)
-	return protocolError.Code
-}
-
 func (service *StandardsDispatchService) refusal() sesame.StandardsResponse {
-	return service.standardsRefusalService.Refusal(http.StatusBadRequest, service.invalidRequest())
+	return StandardsContractUtils{}.Refusal(http.StatusBadRequest, service.invalidRequest())
 }
 
 func (service *StandardsDispatchService) invalidRequest() string {

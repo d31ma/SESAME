@@ -9,11 +9,7 @@ import (
 )
 
 // @Service
-// @NeedsAll
-type StandardsAnswerService struct {
-	standardsRefusalService  *StandardsRefusalService
-	interactionCookieService *InteractionCookieService
-}
+type StandardsAnswerService struct{}
 
 func (service *StandardsAnswerService) Answer(response sesame.StandardsResponse, failure error) (*http.Response, error) {
 	return service.answered(service.rendered(service.ordinary(response)), failure)
@@ -54,8 +50,8 @@ func (service *StandardsAnswerService) interaction(response sesame.StandardsResp
 	if !service.interactive(response) {
 		return service.rendered(service.unavailable())
 	}
-	answer := service.rendered(service.interactionCookieService.WithoutSecret(response))
-	answer.Header.Add(service.cookieHeader(), service.interactionCookieService.Cookie(*response.Action).String())
+	answer := service.rendered(InteractionCookieUtils{}.WithoutSecret(response))
+	answer.Header.Add(service.cookieHeader(), InteractionCookieUtils{}.Cookie(*response.Action).String())
 	return answer
 }
 
@@ -69,17 +65,13 @@ func (service *StandardsAnswerService) interactive(response sesame.StandardsResp
 
 func (service *StandardsAnswerService) valid(response sesame.StandardsResponse) bool {
 	checks := []bool{
-		response.ContractVersion == service.contractVersion(),
+		response.ContractVersion == StandardsContractUtils{}.Version(),
 		response.Status >= http.StatusOK,
 		response.Status <= service.highestStatus(),
 		service.actionAllowed(response),
 		service.headersAllowed(response.Headers),
 	}
 	return !slices.Contains(checks, false)
-}
-
-func (service *StandardsAnswerService) contractVersion() string {
-	return "1"
 }
 
 func (service *StandardsAnswerService) highestStatus() int {
@@ -161,7 +153,7 @@ func (service *StandardsAnswerService) emptyBodyType() string {
 }
 
 func (service *StandardsAnswerService) unavailable() sesame.StandardsResponse {
-	return service.standardsRefusalService.Refusal(http.StatusServiceUnavailable, service.serverError())
+	return StandardsContractUtils{}.Refusal(http.StatusServiceUnavailable, service.serverError())
 }
 
 func (service *StandardsAnswerService) serverError() string {
