@@ -55,7 +55,7 @@ func (service *InteractionCookieService) headers(engineHeaders map[string]string
 }
 
 func (service *InteractionCookieService) cookieName() string {
-	return "sesame_interaction"
+	return "__Secure-sesame_interaction"
 }
 
 func (service *InteractionCookieService) cookiePath() string {

@@ -12,7 +12,7 @@ type OidcController struct {
 // @SignedIn
 func (controller *OidcController) PostInteractionGet(
 	request *http.Request,
-	// @FromCookie("sesame_interaction")
+	// @FromCookie("__Secure-sesame_interaction")
 	interaction string,
 ) (result OidcInteraction, err error) {
 	handle := controller.interactionCookieService.Handle(interaction)
@@ -28,7 +28,7 @@ func (controller *OidcController) PostInteractionGet(
 // @SignedIn
 func (controller *OidcController) PostInteractionComplete(
 	request *http.Request,
-	// @FromCookie("sesame_interaction")
+	// @FromCookie("__Secure-sesame_interaction")
 	interaction string,
 ) (result OidcAuthorizationCode, err error) {
 	handle := controller.interactionCookieService.Handle(interaction)

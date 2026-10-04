@@ -84,6 +84,7 @@ func (test *StandardsControllerTest) TestAuthorizationKeepsTheInteractionSecretI
 	Assert.Equals("no-store", response.Header.Get("Cache-Control"))
 	Assert.IsTrue(cookie.HttpOnly)
 	Assert.IsTrue(cookie.Secure)
+	Assert.Equals("", cookie.Domain)
 	Assert.Equals(http.SameSiteLaxMode, cookie.SameSite)
 	Assert.Equals("/api/v1/oidc", cookie.Path)
 	Assert.IsTrue(secret != "")
@@ -411,7 +412,7 @@ func (test *StandardsControllerTest) segment(value any) string {
 
 func (test *StandardsControllerTest) interactionCookie(response *http.Response) *http.Cookie {
 	for _, cookie := range response.Cookies() {
-		if cookie.Name == "sesame_interaction" {
+		if cookie.Name == "__Secure-sesame_interaction" {
 			return cookie
 		}
 	}
