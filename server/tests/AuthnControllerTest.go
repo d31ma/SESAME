@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/d31ma/sesame/server/packages/sesame"
 )
@@ -33,6 +34,31 @@ func (test *AuthnControllerTest) TestPasswordLoginIssuesAUsableSession() {
 	Assert.Equals(login.TenantID, session.TenantID)
 	Assert.IsTrue(session.SessionSecret != "")
 	Assert.IsTrue(!strings.Contains(test.json(verified), password))
+}
+
+func (test *AuthnControllerTest) TestCompleteBodyCannotChooseTheSessionLifetime() {
+	body := `{"transaction_id":"txn_00000000000000000000000000000000","lifetime_seconds":2592000}`
+
+	err := test.decodeStrictly(body, &AuthnCompleteRequest{})
+
+	Assert.IsTrue(err != nil)
+}
+
+func (test *AuthnControllerTest) TestCompleteIssuesASessionOfTheEngineDefaultLifetime() {
+	setup := SesameTestSetup{}.Provision()
+	defer setup.Remove()
+	login, password := test.login(setup, "acme")
+	controller := test.controller()
+	begun, _ := controller.PostBegin(login)
+	_, _ = controller.PostVerifyPassword(test.password(begun, password))
+
+	session, err := controller.PostComplete(AuthnCompleteRequest{TransactionID: begun.TransactionID})
+	expiresAt, parseErr := time.Parse(time.RFC3339Nano, session.ExpiresAt)
+
+	Assert.IsTrue(err == nil)
+	Assert.IsTrue(parseErr == nil)
+	Assert.IsTrue(time.Until(expiresAt) <= 12*time.Hour)
+	Assert.IsTrue(time.Until(expiresAt) > 11*time.Hour)
 }
 
 func (test *AuthnControllerTest) TestBeginAnswersTheSameForAnUnknownIdentifier() {
@@ -243,6 +269,12 @@ func (test *AuthnControllerTest) answer(err error) string {
 	}
 	body, _ := io.ReadAll((&SesameErrorHandler{}).Answer(err).Body)
 	return string(body)
+}
+
+func (test *AuthnControllerTest) decodeStrictly(body string, target any) error {
+	decoder := json.NewDecoder(strings.NewReader(body))
+	decoder.DisallowUnknownFields()
+	return decoder.Decode(target)
 }
 
 func (test *AuthnControllerTest) json(value any) string {
