@@ -2,7 +2,7 @@
 
 These files let a Tachyon Yon project written in Ruby
 call SESAME's HTTP API. They follow Tachyon's remotes format: one bodiless
-`@HTTPClient` contract per route family in `server/remotes/`, one
+`#[HTTPClient]` contract per route family in `server/remotes/`, one
 `SesameSetup` that registers the `sesame` HTTP adapter, and one
 `SesameTransportHelper` that sends the requests to SESAME.
 

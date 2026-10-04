@@ -34,7 +34,7 @@ Add these members to `server/application.json`:
   "outgoing": { "hosts": ["sesame.example.com"] },
   "sesame": { "origin": "https://sesame.example.com" },
   "names": { "words": ["authn", "deprovision", "dpop", "jwks", "oidc", "saml", "scim", "totp"] },
-  "duplication": { "check": false}
+  "duplication": { "check": false }
 }
 ```
 

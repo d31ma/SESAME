@@ -2,7 +2,7 @@
 
 These files let a Tachyon Yon project written in PHP
 call SESAME's HTTP API. They follow Tachyon's remotes format: one bodiless
-`@HTTPClient` contract per route family in `server/remotes/`, one
+`#[HTTPClient]` contract per route family in `server/remotes/`, one
 `SesameSetup` that registers the `sesame` HTTP adapter, and one
 `SesameTransportHelper` that sends the requests to SESAME.
 
@@ -34,7 +34,7 @@ Add these members to `server/application.json`:
   "outgoing": { "hosts": ["sesame.example.com"] },
   "sesame": { "origin": "https://sesame.example.com" },
   "names": { "words": ["authn", "oidc", "saml", "scim"] },
-  "duplication": { "check": false}
+  "duplication": { "check": false }
 }
 ```
 
