@@ -46,6 +46,25 @@ by a standard protocol route), `command_line_only` (`tenant.bootstrap`,
 controllers' route annotations, so a route cannot appear or disappear without
 the manifest saying so.
 
+## SDK clients: Tachyon remotes
+
+A Tachyon Yon application calls the Yon host through SESAME's generated
+remotes instead of a hand-written HTTP client. `remotes/<language>/server/`
+holds, for each language, one `@HTTPClient` contract per route family
+(`SesameSystemClient`, `SesameAuthnClient`, ...), one `SesameSetup` and one
+`SesameTransportHelper`, which owns SESAME's HTTPS origin (`sesame.origin`).
+Each language's README covers copying them in, `outgoing.hosts`, the
+authentication headers and the `{"status", "body"}` answer:
+[Go](../remotes/go/README.md) and [TypeScript](../remotes/typescript/README.md).
+The other former SDK languages follow as template sets.
+
+`go run ./tools/remotes/generate` writes them from
+`api/machine/v1/operations.json` and the templates in
+`tools/remotes/templates/<language>/`; a new language is one new template
+folder. `test/contract/remotes_test.go` fails when the committed files differ
+from the generator's output, when a routed route has no remote method or more
+than one, or when a remote names a route that the manifest does not list.
+
 ## The Go package
 
 ```bash

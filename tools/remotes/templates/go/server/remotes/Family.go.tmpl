@@ -1,0 +1,22 @@
+// @HTTPClient({"path":"{{.Family.Path}}","adapter":"sesame","setup":"SesameSetup"})
+type {{.Family.ClassName}} interface {
+{{- range $index, $method := .Family.Methods}}
+{{- if $index}}
+{{end}}
+	// @{{$method.Verb.Pascal}}Request("{{$method.Path}}")
+{{- if or $method.Header $method.HasBody}}
+	{{$method.Words.Pascal}}(
+{{- if $method.Header}}
+		// @RequestHeader("{{$method.Header}}")
+		{{$method.HeaderParameter.Camel}} BehaviorValue,
+{{- end}}
+{{- if $method.HasBody}}
+		// @RequestBody
+		body BehaviorValue,
+{{- end}}
+	) (BehaviorValue, error)
+{{- else}}
+	{{$method.Words.Pascal}}() (BehaviorValue, error)
+{{- end}}
+{{- end}}
+}

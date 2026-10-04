@@ -1,0 +1,12 @@
+@HTTPClient({"path":"{{.Family.Path}}","adapter":"sesame","setup":"SesameSetup"})
+export default class {{.Family.ClassName}} {
+{{- range $index, $method := .Family.Methods}}
+{{- if $index}}
+{{end}}
+  @{{$method.Verb.Pascal}}Request("{{$method.Path}}")
+  async {{$method.Words.Camel}}(
+{{- if $method.Header}}@RequestHeader("{{$method.Header}}") {{$method.HeaderParameter.Camel}}: string{{if $method.HasBody}}, {{end}}{{end}}
+{{- if $method.HasBody}}@RequestBody body: BehaviorJsonValue{{end -}}
+  ): Promise<BehaviorJsonValue | void> {}
+{{- end}}
+}
