@@ -10,7 +10,7 @@ large number of folders or abstractions.
 ## Repository Rules
 
 - Build vertical slices. Add a package only with production behavior and tests.
-- Keep domain code independent of host frameworks, NDJSON, FYLO, SDKs,
+- Keep domain code independent of host frameworks, NDJSON, FYLO, the Go package,
   configuration, and operating-system details.
 - Place executable entry points under `cmd/sesame`.
 - Keep non-public Go implementation under `internal`.
@@ -77,9 +77,10 @@ large number of folders or abstractions.
 - Every mutating operation documents idempotency and safe retry semantics.
 - Errors expose a stable code, safe message, retryability, and bounded details.
 - Human-readable text is not a parsing contract.
-- Generated SDK code includes a generated header and reproducible command.
-- SDKs never expose internal FYLO records or SESAME event schemas as their
-  primary application API.
+- Generated code includes a generated header and reproducible command.
+- The Go package (`server/packages`) and the Yon host's routes never expose
+  internal FYLO records or SESAME event schemas as their primary application
+  API; they answer the machine protocol's result shapes.
 
 ## Security and Reliability Rules
 

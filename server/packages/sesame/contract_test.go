@@ -236,8 +236,8 @@ func TestSDKContractScenario(t *testing.T) {
 }
 
 // TestSDKGoldenDecisionCorpus drives the shared decision fixture through the
-// Go SDK. The Node and Python suites load the same file, and the engine test
-// asserts the same outcomes directly, so the semantics have one definition.
+// Go SDK. The engine test asserts the same outcomes directly, so the
+// semantics have one definition.
 func TestSDKGoldenDecisionCorpus(t *testing.T) {
 	t.Parallel()
 
@@ -409,8 +409,8 @@ func TestSDKGoldenDecisionCorpus(t *testing.T) {
 	}
 }
 
-// TestSDKAuthenticationFlow drives the login flow through the Go SDK. The
-// Node and Python suites run the identical sequence.
+// TestSDKAuthenticationFlow drives the login flow through the Go SDK against
+// a real compiled engine.
 func TestSDKAuthenticationFlow(t *testing.T) {
 	t.Parallel()
 

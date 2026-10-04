@@ -9,13 +9,17 @@ Build SESAME as a headless Go modular monolith backed by FYLO. The product is:
 - an operator CLI in the same executable;
 - versioned management, authorization, standards-dispatch, and local machine
   interfaces;
-- thin SDK shims for multiple languages.
+- a Yon host project (`server/`, served by Tachyon's `ty`) that exposes the
+  engine over HTTP, and a standard-library Go package (`server/packages`) for
+  Go hosts ([ADR 0007](adr/0007-sesame-ships-a-yon-host-project.md)). The thin
+  SDK shims for ten languages that preceded them were retired on 2026-10-04.
 
 SESAME does not ship a web or desktop UI in the initial scope. A future UI is an
 external consumer of the same public contracts and receives no privileged
-internal access. SESAME also does not open a network listener: the developer's
-application owns its HTTP server and maps public standards routes through SDK
-framework adapters.
+internal access. SESAME also does not open a network listener: the host
+application (the shipped Yon host, or a developer's own Go server through the
+Go package) owns the HTTP listener and maps public standards routes through the
+host-adapter contract.
 
 “Runs on any operating system” means one source tree and deterministic release
 pipeline producing a native artifact for each supported OS/architecture pair.
@@ -32,7 +36,7 @@ The project should not chase authentik feature parity first. It should earn a
 smaller, stronger initial surface through:
 
 1. a portable, low-operational-overhead subprocess engine;
-2. stable contracts and first-class language SDKs;
+2. stable contracts, an HTTP API served by the Yon host, and a Go package;
 3. deterministic typed authentication configuration;
 4. strict, explainable authorization;
 5. secure connector egress;
@@ -63,7 +67,8 @@ The architecture remains conditional on a stop/go FYLO viability gate.
 - decide whether a principal may perform an action on a resource;
 - explain why a decision was allowed or denied;
 - back up, restore, upgrade, and prove equivalent security state;
-- perform those operations from the Go, Node, and Python SDKs.
+- perform those operations over the Yon host's HTTP API, from the CLI, and
+  through the Go package.
 
 ### Non-Goals for v1
 
@@ -78,8 +83,8 @@ The architecture remains conditional on a stop/go FYLO viability gate.
 
 ### Consequence of the Headless Scope
 
-Management and policy operations work fully through the CLI and SDKs. The
-developer's application owns its web server. Browser-based OAuth/OIDC
+Management and policy operations work fully through the CLI, the Yon host's
+HTTP API and the Go package. The host application owns the web server. Browser-based OAuth/OIDC
 authorization requires human interaction, so SESAME must expose a bounded
 standards-dispatch and authentication-transaction contract that host-framework
 adapters can map onto standard public routes.
@@ -156,7 +161,8 @@ revisited from measured results, not marketing goals.
 ### Public Contracts
 
 Use one executable transport contract: the **local NDJSON machine interface**
-through `sesame exec --loop`. SDKs own a local SESAME process. Each request and
+through `sesame exec --loop`. A host owns a local SESAME process: the Yon
+host starts one per request, and a Go host keeps one through the Go package. Each request and
 response carries a protocol version, request ID, operation, result or stable
 error, and optional diagnostic metadata.
 
@@ -165,13 +171,20 @@ routing, trusted-proxy handling, middleware, and public request limits. OIDC and
 later standards endpoints retain their standard public wire formats through
 host-framework adapters. [RFC 0002](rfcs/0002-host-adapter-contract-v1.md)
 defines the implemented bounded request/response envelope that dispatches
-those routes to SESAME without moving protocol semantics into SDKs.
+those routes to SESAME without moving protocol semantics into host code.
 
 Stable error codes, idempotency behavior, pagination, deadlines, retry safety,
 and compatibility ranges are part of the public contract. Internal Go package
 types are not.
 
 ### SDK Sequence
+
+**Superseded 2026-10-04 ([ADR 0007](adr/0007-sesame-ships-a-yon-host-project.md)).**
+The language SDKs below were delivered and then retired. Every language now
+reaches SESAME over the Yon host's HTTP API, and Go hosts use the Go package in
+`server/packages`. The shim rules at the end of this section now apply to that
+Go package and to the Yon controllers. The rest of this subsection is kept as
+the record of the earlier plan.
 
 Deliver SDKs in this order:
 
@@ -246,11 +259,11 @@ are made.
 ```mermaid
 flowchart LR
     O["Operators"] --> CLI["sesame CLI"]
-    A["Applications and resource servers"] --> SDK["Language SDKs"]
-    B["Browsers and protocol clients"] --> H["Developer's HTTP server"]
-    H --> FA["SESAME framework adapter"]
-    FA --> SDK
-    SDK --> M["Local NDJSON machine edge"]
+    A["Applications and resource servers"] --> H["Yon host (ty) or a Go host"]
+    B["Browsers and protocol clients"] --> P["Rate-limiting TLS reverse proxy"]
+    P --> H
+    H --> GO["Go package (server/packages)"]
+    GO --> M["Local NDJSON machine edge"]
     CLI --> APP["Application commands and queries"]
     M --> APP
     APP --> AUTHN["Typed authentication state machines"]
@@ -475,8 +488,10 @@ See `docs/ENGINEERING_STANDARDS.md` for naming and code rules and
 - all developer checks;
 - `go test -race` on supported race-detector targets;
 - FYLO integration tests using the pinned executable;
-- black-box CLI, NDJSON, SDK, and host-framework-adapter contract corpus;
-- Go, Node, and Python SDK interoperability;
+- black-box CLI, NDJSON, Go package, Yon route, and host-adapter contract
+  corpus;
+- Go package tests, and the Yon host's `ty bundle` and `ty test --coverage`
+  (in the local release gate until a released `ty` can run them in CI);
 - API backward-compatibility and stable-error checks;
 - dependency vulnerability and license policy checks;
 - reproducible-build comparison on at least one target.
@@ -501,7 +516,8 @@ See `docs/ENGINEERING_STANDARDS.md` for naming and code rules and
 - 24-hour pre-v1 soak, increasing to 72 hours for v1.0;
 - memory, goroutine, file-descriptor, and child-process leak checks;
 - package install/uninstall/upgrade on clean native hosts;
-- SDK compatibility against the oldest and newest supported SESAME releases;
+- Go package and Yon host compatibility against the oldest and newest
+  supported SESAME releases;
 - SBOM, provenance, checksums, signatures, and artifact-manifest verification.
 
 Security tests are never skipped or weakened to make a build pass. Flaky tests
@@ -862,6 +878,9 @@ Until that run exists, SESAME does not claim OpenID certification, and the
 README and protocol documentation say so.
 
 ### Phase 5: SDK Expansion and Ecosystem Hardening
+
+(Completed in 2026-07, then superseded on 2026-10-04 by the Yon host; see the
+note at the end of this phase.)
 
 Deliver Rust, Java, and C# SDKs, followed by PHP, Ruby, and Dart based on demand.
 Publish per-language packages only when their ecosystem-native tests,
@@ -1421,10 +1440,11 @@ trick does not transfer: federation egress is request/response initiated by the
 engine's own flow, so it decomposes into fetch instructions a host performs. A
 gateway is the opposite shape — a server driven by traffic arriving from
 outside, often with no host application in the picture at all, since a VPN
-appliance binding to an LDAP port is not going to embed a Go SDK.
+appliance binding to an LDAP port is not going to embed the Go package.
 
 So each gateway is its own deployable, its own release artifact, and an
-ordinary SDK consumer with no privileged path into the engine. Anything a
+ordinary consumer of the public operation surface with no privileged path into
+the engine. Anything a
 gateway cannot express through the public operation surface is a gap in that
 surface, to be fixed there.
 
@@ -1478,7 +1498,8 @@ Release stages:
 - `v0.5`: security preview after contract, conformance, recovery, native matrix,
   and load evidence;
 - `v1.0`: supported single-node release after independent security review,
-  upgrade/rollback fixtures, restore drills, SDK compatibility policy, and
+  upgrade/rollback fixtures, restore drills, a Go package and HTTP API
+  compatibility policy, and
   supported-version policy;
 - HA: separately versioned only after FYLO prerequisites pass.
 
