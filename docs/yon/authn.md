@@ -27,6 +27,7 @@ names the field path or the model, never the submitted value.
 | `POST /api/v1/authn/complete` | `authn.complete` | anyone holding the transaction ID | that transaction |
 | `POST /api/v1/session/verify` | `session.verify` | anyone holding the session ID and secret | that session |
 | `POST /api/v1/session/revoke` | `session.revoke` | a signed-in caller | the caller's current session only |
+| `POST /api/v1/session/revoke-by-id` | `session.revoke` of any session | an administrator | the caller is sent as the request's actor; SESAME refuses a live session of another tenant with `403 {"code":"actor_tenant_mismatch"}` and revokes nothing |
 | `POST /api/v1/authenticator/set-password` | `authenticator.set_password` | a signed-in caller | the caller only |
 | `POST /api/v1/authenticator/totp-enroll` | `authenticator.totp_enroll` | a signed-in caller | the caller only |
 | `POST /api/v1/authenticator/totp-activate` | `authenticator.totp_activate` | a signed-in caller | the caller only |
@@ -70,8 +71,17 @@ A wrong secret and an unknown session answer the same
 answer never contains the secret or its digest.
 
 `session/revoke` ends the caller's current session (sign out). Its body is
-`{"reason":"..."}` or `{}`; it cannot name another session. Revoking any other
-session is not routed yet (see below).
+`{"reason":"..."}` or `{}`; it cannot name another session.
+
+`session/revoke-by-id` lets an administrator end any session of their tenant,
+for example a stolen one. Its body is `{"session_id":"...","reason":"..."}`.
+SESAME cannot report a session's tenant without its secret, so the host does
+not check the tenant itself. Instead, every route that acts for a signed-in
+caller sends that caller as the request's actor (see
+[ADR 0007](../adr/0007-sesame-ships-a-yon-host-project.md)), and SESAME refuses
+to write an event into another tenant: `403 {"code":"actor_tenant_mismatch"}`,
+with nothing revoked. An unknown session answers
+`404 {"code":"session_not_found"}`.
 
 ### Self-service authenticator routes
 
@@ -130,10 +140,17 @@ by the engine for every request.
 
 | Operation | Why |
 | --- | --- |
-| `session.revoke` of another session, by an administrator | The engine cannot report a session's tenant without its secret, so the host cannot hold an administrator to its own tenant. It will be routed after the engine enforces the actor's tenant on the write (ACTOR-WIRE). Until then, suspend the principal or use `sesame session revoke`. |
 | `authenticator.totp_enroll`, `totp_activate`, `recovery_codes_issue`, `passkey_register_begin`, `passkey_register_finish` for another principal | An administrator must never receive another principal's factor secrets. Use the command line. |
 
 ## Known gaps
+
+- **An already revoked session of another tenant answers `200`.** Revoking a
+  revoked session writes nothing, so SESAME's tenant check on the write never
+  runs, and `session/revoke-by-id` answers `200 {"revoked":true}` instead of
+  `403`. Nothing changes. An administrator who knows another tenant's session
+  ID can still tell a revoked session (`200`) from a live one (`403`). Session
+  IDs are random public handles, not secrets. The fix is in the engine: refuse
+  this with `actor_tenant_mismatch` too.
 
 - **Recent sign-in is not proof of the current credential.** A session secret
   stolen within 10 minutes of sign-in can still change the password or add a

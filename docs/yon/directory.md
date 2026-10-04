@@ -20,6 +20,7 @@ is refused with `400` before SESAME runs.
 | `POST /api/v1/principal/suspend` | `principal.suspend` | an administrator | the principal is loaded, then refused unless it is in the caller's tenant; nothing is suspended otherwise |
 | `POST /api/v1/role/create` | `role.create` | an administrator | the body's `tenant_id` must be the caller's tenant |
 | `POST /api/v1/grant/create` | `grant.create` | an administrator | the body's `tenant_id` must be the caller's tenant; SESAME then refuses a role, principal or group of another tenant (`role_not_found`, `principal_not_found`, `group_not_found`) |
+| `POST /api/v1/grant/revoke` | `grant.revoke` | an administrator | the caller is sent as the request's actor; SESAME refuses a grant of another tenant with `403 {"code":"actor_tenant_mismatch"}` and revokes nothing |
 | `POST /api/v1/group/create` | `group.create` | an administrator | the body's `tenant_id` must be the caller's tenant |
 | `POST /api/v1/group/member-add` | `group.member_add` | an administrator | the principal must be in the caller's tenant; SESAME then refuses a group whose tenant differs from the principal's (`principal_not_found`) |
 | `POST /api/v1/group/member-remove` | `group.member_remove` | an administrator | as `member-add` |
@@ -50,6 +51,14 @@ operation runs.
 belongs to the caller's tenant. For group membership this also protects the
 group: SESAME refuses to join or remove a principal and a group of different
 tenants, so a group of another tenant answers `principal_not_found`.
+
+`grant.revoke` takes only `grant_id`, and SESAME offers no way to read a
+grant's tenant first. Its isolation is SESAME's own: every route that acts for
+a signed-in caller sends that caller as the request's actor (see
+[ADR 0007](../adr/0007-sesame-ships-a-yon-host-project.md)), and SESAME
+refuses a write that would record an event in another tenant with
+`403 {"code":"actor_tenant_mismatch"}` before anything is written. Revoking an
+unknown or already revoked grant answers `404 {"code":"grant_not_found"}`.
 
 Asking for a principal of another tenant by id answers `403`, while an id that
 does not exist answers `404`, so an administrator can learn that some other
@@ -89,7 +98,6 @@ curl -X POST http://127.0.0.1:8080/api/v1/authorize/decide \
 | --- | --- |
 | `tenant.bootstrap` | Creates a tenant. That is a deployment-wide capability, not the administration of one tenant, and no tenant administrator may hold it. Use `sesame tenant bootstrap` on the command line. |
 | `admin.bootstrap` | Creates the first administrator of a tenant. Before it runs nobody can sign in, so there is no caller to check; over HTTP it would let anyone make themselves an administrator. Use `sesame admin bootstrap` on the command line. |
-| `grant.revoke` | Takes only `grant_id`, and SESAME offers no way to read a grant's tenant before revoking it, so the host cannot stop an administrator of one tenant from revoking another tenant's grant. It will be routed once the host sends the calling principal as the request's actor: SESAME then refuses a write outside the actor's tenant with `actor_tenant_mismatch` (`403`). Until then use `sesame grant revoke`. |
 
 ## Tests
 
