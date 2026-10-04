@@ -4,7 +4,20 @@
     "port": 8080
   },
   "names": {
-    "words": ["sesame", "fylo", "oidc", "saml", "scim", "jwks", "totp", "dpop", "passkey", "goroutines", "uptime"]
+    "words": [
+      "authn",
+      "dpop",
+      "fylo",
+      "goroutines",
+      "jwks",
+      "oidc",
+      "passkey",
+      "saml",
+      "scim",
+      "sesame",
+      "totp",
+      "uptime"
+    ]
   },
   "sesame": {
     "waitmilliseconds": 5000
