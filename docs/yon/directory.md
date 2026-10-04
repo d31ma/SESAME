@@ -30,9 +30,12 @@ is refused with `400` before SESAME runs.
 `POST /api/v1/tenant/get` is described in [docs/YON.md](../YON.md).
 
 A refusal for another tenant answers `403 {"code":"tenant_mismatch"}`. An
-anonymous caller, or a session that is unknown, expired or revoked, gets `401`.
-A signed-in principal that is not an administrator gets `403` on the
-administrator routes. Every administrator route also decides the
+anonymous caller, or a session that is unknown, expired or revoked, gets `401`,
+and a signed-in principal that is not an administrator gets `403` on the
+administrator routes. Those two answers come from `ty`'s route guard as plain
+text, not JSON; when the engine is busy during the guard's identity check, the
+guard answers a plain-text `500` without `Retry-After` (see
+[Errors](../YON.md#errors)). Every administrator route also decides the
 `Administrator` role again inside its own call, so a caller that reaches the
 controller without the route guard (for example through `ty handler invoke`)
 is still refused with `403 {"code":"administrator_required"}`. Routes marked

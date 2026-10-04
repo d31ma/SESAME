@@ -77,7 +77,9 @@ translation follows the host-adapter contract
   the secret.
 - When the engine cannot run (another request holds the deployment for the
   whole wait), the route answers `503 {"code":"engine_busy"}` with
-  `Retry-After: 1`, like every other route.
+  `Retry-After: 1`, like every other public route. (Signed-in and
+  administrator routes below answer a busy engine differently: see the note
+  after their table.)
 
 A revocation succeeds with an empty body. `ty` refuses an empty answer that has
 no `Content-Type`, so the host types an empty body `text/plain;
@@ -164,8 +166,14 @@ name another principal, session or tenant.
 
 An anonymous caller, or a session that is unknown, expired or revoked, gets
 `401` on the signed-in and administrator routes. A signed-in principal that is
-not an administrator gets `403` on the administrator routes. A record of
-another tenant answers `403 {"code":"tenant_mismatch"}`.
+not an administrator gets `403` on the administrator routes. Both come from
+`ty`'s route guard as plain text, not JSON. When the engine is busy during the
+guard's identity check, a signed-in or administrator route answers a
+plain-text `500 Tachyon could not check who is signed in.` without
+`Retry-After`, not `503`; nothing ran, so retry after a short delay (see
+[Errors](../YON.md#errors)). A record of another tenant answers
+`403 {"code":"tenant_mismatch"}`; a caller that reached an administrator route
+without the guard answers `403 {"code":"administrator_required"}`.
 
 ### Client secrets
 
@@ -227,6 +235,9 @@ authentication itself.
 ## Throughput and rate limits
 
 Every request starts an engine (see [docs/YON.md](../YON.md)). The token,
-introspection and device routes are called by machines and may be polled;
-operators must rate-limit `/oidc/*` and `/api/v1/oidc/*` in the reverse proxy.
-A polling device that ignores `interval` gets `slow_down` from the engine.
+introspection and device routes are called by machines and may be polled. A
+rate-limiting reverse proxy in front of `ty` is required: limit `/oidc/*`,
+`/api/v1/oidc/pushed-authorize`, `/api/v1/oidc/device-authorize` and
+`/api/v1/oidc/dpop-verify` per client
+([Reverse proxy](../YON.md#reverse-proxy-required)). A polling device that
+ignores `interval` gets `slow_down` from the engine.

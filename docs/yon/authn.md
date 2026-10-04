@@ -3,8 +3,12 @@
 This page lists the Yon routes for signing in, managing authenticators,
 sessions and the signing key set. It extends the route table in
 [the Yon operator guide](../YON.md). Every route is `POST`, takes a JSON body
-and answers JSON. Errors answer `{"code":"<code>"}` with the statuses in the
-guide.
+and answers JSON. SESAME's errors answer `{"code":"<code>"}` with the
+statuses in the guide; the route guard's `401`, `403` and identity-check `500`
+are plain text, and `ty`'s own `400` is `{"error","field","part"}` (see
+[Errors](../YON.md#errors)). Public login steps answer a busy engine with
+`503 {"code":"engine_busy"}` and `Retry-After: 1`; signed-in routes answer it
+with the guard's plain-text `500`.
 
 Secrets (passwords, TOTP codes and secrets, recovery codes, session secrets)
 travel only in request bodies, response bodies and the `Sesame-Session`
@@ -157,8 +161,10 @@ older administrator session cannot take over another principal's sign-in.
   authenticator changes that require a freshly verified login transaction).
   Keep session lifetimes short and revoke sessions on suspicion.
 - **No throttling of public login steps.** Each transaction allows five
-  attempts and every engine start is serialized, but nothing limits how many
-  transactions a client may begin. Put a rate limit in front of `ty`
-  (reverse proxy) for `/api/v1/authn/*`.
+  attempts and every engine start is serialized, but neither SESAME nor `ty`
+  limits how many transactions a client may begin. A rate-limiting reverse
+  proxy in front of `ty` is required, with per-client limits on
+  `/api/v1/authn/*` and `/api/v1/session/verify`
+  ([Reverse proxy](../YON.md#reverse-proxy-required)).
 - **Login transaction expiry** (ten minutes) is enforced by the engine and
   covered by its tests; the Yon tests cannot move the engine's clock.
