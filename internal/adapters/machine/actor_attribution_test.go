@@ -196,3 +196,281 @@ func TestVersionAdvertisesActorAttribution(t *testing.T) {
 		t.Fatalf("request_fields = %v, want [actor]", report.RequestFields)
 	}
 }
+
+func assertRefusedWithoutWriting(t *testing.T, edge *actorEdge, before int, response Response, want string) {
+	t.Helper()
+
+	assertErrorCode(t, response, want)
+	if edge.eventCount() != before {
+		t.Fatalf("refused request %s appended %d events", response.RequestID, edge.eventCount()-before)
+	}
+}
+
+func TestMalformedActorFailsClosed(t *testing.T) {
+	t.Parallel()
+
+	edge := newActorEdge(t)
+	valid := map[string]any{
+		"tenant_id":    edge.alpha.TenantID,
+		"principal_id": edge.alpha.PrincipalID,
+		"session_id":   edge.alpha.SessionID,
+	}
+	with := func(key string, value any) map[string]any {
+		changed := map[string]any{}
+		for name, existing := range valid {
+			changed[name] = existing
+		}
+		changed[key] = value
+		return changed
+	}
+	without := func(key string) map[string]any {
+		changed := with(key, nil)
+		delete(changed, key)
+		return changed
+	}
+
+	cases := map[string]any{
+		"null":                   json.RawMessage(`null`),
+		"string":                 edge.alpha.recorded(),
+		"array":                  []string{edge.alpha.TenantID},
+		"number":                 7,
+		"empty object":           map[string]any{},
+		"missing session":        without("session_id"),
+		"malformed tenant":       with("tenant_id", "tnt_not-hex"),
+		"principal as tenant":    with("tenant_id", edge.alpha.PrincipalID),
+		"nested tenant":          with("tenant_id", map[string]string{"id": edge.alpha.TenantID}),
+		"unknown field":          with("roles", []string{"Administrator"}),
+		"oversized identifier":   with("session_id", "ses_"+strings.Repeat("0", MaxActorBytes)),
+		"recorded text as actor": with("principal_id", edge.alpha.recorded()),
+	}
+	for name, actor := range cases {
+		before := edge.eventCount()
+		response := runRequests(t, edge.processor,
+			actorFrame(t, "malformed", "principal.create",
+				principalCreateParameters(edge.alpha.TenantID, "mallory@example.com"), actor),
+		)[0]
+		if response.OK || response.Error == nil || response.Error.Code != ErrorInvalidActor {
+			t.Fatalf("%s: response = %#v, want %s", name, response.Error, ErrorInvalidActor)
+		}
+		assertRefusedWithoutWriting(t, edge, before, response, ErrorInvalidActor)
+	}
+}
+
+func TestOversizedActorIsRefusedBeforeItIsRead(t *testing.T) {
+	t.Parallel()
+
+	edge := newActorEdge(t)
+	before := edge.eventCount()
+	padding := strings.Repeat(" ", MaxActorBytes)
+	frame := `{"protocol_version":"1","request_id":"padded-actor","operation":"principal.create",` +
+		`"parameters":` + string(mustMarshal(t, principalCreateParameters(edge.alpha.TenantID, "carol@example.com"))) + `,` +
+		`"actor":{"tenant_id":"` + edge.alpha.TenantID + `","principal_id":"` + edge.alpha.PrincipalID +
+		`","session_id":"` + edge.alpha.SessionID + `"` + padding + `}}`
+	response := runRequests(t, edge.processor, frame)[0]
+	assertRefusedWithoutWriting(t, edge, before, response, ErrorInvalidActor)
+}
+
+func TestDuplicateFieldInsideTheActorIsAnInvalidRequest(t *testing.T) {
+	t.Parallel()
+
+	edge := newActorEdge(t)
+	before := edge.eventCount()
+	frame := `{"protocol_version":"1","request_id":"duplicate-actor","operation":"principal.suspend",` +
+		`"parameters":{"principal_id":"` + edge.alpha.PrincipalID + `"},` +
+		`"actor":{"tenant_id":"` + edge.alpha.TenantID + `","principal_id":"` + edge.alpha.PrincipalID +
+		`","session_id":"` + edge.alpha.SessionID + `","tenant_id":"` + edge.beta.TenantID + `"}}`
+	response := runRequests(t, edge.processor, frame)[0]
+	assertRefusedWithoutWriting(t, edge, before, response, ErrorInvalidRequest)
+}
+
+func TestActorWithoutALiveSessionIsRefused(t *testing.T) {
+	t.Parallel()
+
+	edge := newActorEdge(t)
+	unknownSession := edge.alpha
+	unknownSession.SessionID = "ses_00000000000000000000000000000000"
+	borrowedSession := edge.alpha
+	borrowedSession.SessionID = edge.beta.SessionID
+	foreignTenant := edge.alpha
+	foreignTenant.TenantID = edge.beta.TenantID
+
+	for name, actor := range map[string]actorFixture{
+		"unknown session":                 unknownSession,
+		"another principal's session":     borrowedSession,
+		"tenant other than the session's": foreignTenant,
+	} {
+		before := edge.eventCount()
+		response := runRequests(t, edge.processor,
+			actorFrame(t, "no-session", "principal.create",
+				principalCreateParameters(edge.alpha.TenantID, "mallory@example.com"), actor),
+		)[0]
+		if response.OK || response.Error.Code != ErrorActorSessionInvalid {
+			t.Fatalf("%s: response = %#v", name, response.Error)
+		}
+		assertRefusedWithoutWriting(t, edge, before, response, ErrorActorSessionInvalid)
+	}
+}
+
+func TestActorRefusedOnceItsSessionStopsStanding(t *testing.T) {
+	t.Parallel()
+
+	revoked := newActorEdge(t)
+	if err := revoked.service.SessionRevoke(context.Background(), revoked.alpha.SessionID, "test", actorTestSetup); err != nil {
+		t.Fatalf("SessionRevoke() error = %v", err)
+	}
+	before := revoked.eventCount()
+	response := runRequests(t, revoked.processor,
+		actorFrame(t, "revoked", "role.create", map[string]any{
+			"tenant_id":   revoked.alpha.TenantID,
+			"name":        "reader",
+			"permissions": []map[string]string{{"action": "doc:read", "resource": "*"}},
+		}, revoked.alpha),
+	)[0]
+	assertRefusedWithoutWriting(t, revoked, before, response, ErrorActorSessionInvalid)
+
+	suspended := newActorEdge(t)
+	if _, err := suspended.service.PrincipalSuspend(context.Background(), suspended.alpha.PrincipalID, actorTestSetup); err != nil {
+		t.Fatalf("PrincipalSuspend() error = %v", err)
+	}
+	before = suspended.eventCount()
+	response = runRequests(t, suspended.processor,
+		actorFrame(t, "suspended", "principal.create",
+			principalCreateParameters(suspended.alpha.TenantID, "mallory@example.com"), suspended.alpha),
+	)[0]
+	assertRefusedWithoutWriting(t, suspended, before, response, ErrorActorSessionInvalid)
+}
+
+func TestActorCannotWriteIntoAnotherTenant(t *testing.T) {
+	t.Parallel()
+
+	edge := newActorEdge(t)
+	before := edge.eventCount()
+	responses := runRequests(t, edge.processor,
+		actorFrame(t, "spoof-create", "principal.create",
+			principalCreateParameters(edge.beta.TenantID, "mallory@example.com"), edge.alpha),
+		actorFrame(t, "spoof-suspend", "principal.suspend",
+			map[string]any{"principal_id": edge.beta.PrincipalID}, edge.alpha),
+		actorFrame(t, "spoof-revoke", "session.revoke",
+			map[string]any{"session_id": edge.beta.SessionID}, edge.alpha),
+	)
+	for _, response := range responses {
+		assertRefusedWithoutWriting(t, edge, before, response, ErrorActorTenantMismatch)
+	}
+
+	if _, err := edge.service.SessionVerify(edge.beta.SessionID, edge.beta.secret); err != nil {
+		t.Fatalf("the other tenant's session no longer verifies: %v", err)
+	}
+	principal, err := edge.service.PrincipalGetByID(edge.beta.PrincipalID)
+	if err != nil || principal.Status != principaldomain.StatusActive {
+		t.Fatalf("the other tenant's principal = %#v, %v", principal, err)
+	}
+}
+
+func TestActorNeverChangesWhatIsAllowed(t *testing.T) {
+	t.Parallel()
+
+	edge := newActorEdge(t)
+	setup := runRequests(t, edge.processor,
+		actorFrame(t, "admin-role", "role.create", map[string]any{
+			"tenant_id":   edge.alpha.TenantID,
+			"name":        "administrator",
+			"permissions": []map[string]string{{"action": "*", "resource": "*"}},
+		}, nil),
+	)[0]
+	var role struct {
+		ID string `json:"role_id"`
+	}
+	decodeResult(t, setup.Result, &role)
+	granted := runRequests(t, edge.processor,
+		actorFrame(t, "admin-grant", "grant.create", map[string]any{
+			"tenant_id": edge.alpha.TenantID, "principal_id": edge.alpha.PrincipalID, "role_id": role.ID,
+		}, nil),
+	)[0]
+	if !granted.OK {
+		t.Fatalf("grant.create = %#v", granted.Error)
+	}
+
+	operations := []struct {
+		operation  string
+		parameters map[string]any
+		want       string
+	}{
+		{"authorize.decide", map[string]any{
+			"tenant_id": edge.beta.TenantID, "principal_id": edge.beta.PrincipalID,
+			"action": "doc:read", "resource": "file:a",
+		}, "deny:" + identity.ReasonDenyNoGrant},
+		{"session.verify", map[string]any{"session_id": edge.beta.SessionID, "session_secret": "guess"},
+			"error:" + ErrorSessionNotFound},
+		{"grant.revoke", map[string]any{"grant_id": "grt_00000000000000000000000000000000"},
+			"error:" + ErrorGrantNotFound},
+	}
+	for _, entry := range operations {
+		plain := runRequests(t, edge.processor, actorFrame(t, "plain", entry.operation, entry.parameters, nil))[0]
+		attributed := runRequests(t, edge.processor, actorFrame(t, "attributed", entry.operation, entry.parameters, edge.alpha))[0]
+		if outcome(t, plain) != entry.want || outcome(t, attributed) != entry.want {
+			t.Fatalf("%s: unattributed %s, attributed %s, want %s",
+				entry.operation, outcome(t, plain), outcome(t, attributed), entry.want)
+		}
+	}
+}
+
+func outcome(t *testing.T, response Response) string {
+	t.Helper()
+
+	if response.Error != nil {
+		return "error:" + response.Error.Code
+	}
+	var decision identity.Decision
+	if err := json.Unmarshal(mustMarshal(t, response.Result), &decision); err == nil && decision.Decision != "" {
+		return decision.Decision + ":" + decision.ReasonCode
+	}
+	return "ok"
+}
+
+func TestReadWithActorRecordsNothing(t *testing.T) {
+	t.Parallel()
+
+	edge := newActorEdge(t)
+	before := edge.eventCount()
+	response := runRequests(t, edge.processor,
+		actorFrame(t, "read", "tenant.get", map[string]any{"tenant_id": edge.alpha.TenantID}, edge.alpha),
+	)[0]
+	if !response.OK {
+		t.Fatalf("attributed tenant.get = %#v", response.Error)
+	}
+	if edge.eventCount() != before {
+		t.Fatal("an attributed read appended an event")
+	}
+}
+
+func TestStandardsDispatchRefusesAnActor(t *testing.T) {
+	t.Parallel()
+
+	edge := newActorEdge(t)
+	before := edge.eventCount()
+	response := runRequests(t, edge.processor,
+		actorFrame(t, "standards", "standards.dispatch", map[string]any{
+			"contract_version": StandardsContractVersion,
+			"endpoint":         "oidc.jwks",
+			"method":           "GET",
+		}, edge.alpha),
+	)[0]
+	assertRefusedWithoutWriting(t, edge, before, response, ErrorInvalidActor)
+}
+
+func TestActorWithoutStorageFailsClosed(t *testing.T) {
+	t.Parallel()
+
+	processor := New(system.New(buildinfo.New("", "", "")), nil)
+	wellFormed := actorFixture{
+		TenantID:    "tnt_00000000000000000000000000000000",
+		PrincipalID: "prn_00000000000000000000000000000000",
+		SessionID:   "ses_00000000000000000000000000000000",
+	}
+	responses := runRequests(t, processor,
+		actorFrame(t, "ping", "system.ping", map[string]any{}, wellFormed),
+		actorFrame(t, "ping-bad", "system.ping", map[string]any{}, map[string]any{"tenant_id": "x"}),
+	)
+	assertErrorCode(t, responses[0], ErrorStorageNotConfigured)
+	assertErrorCode(t, responses[1], ErrorInvalidActor)
+}
