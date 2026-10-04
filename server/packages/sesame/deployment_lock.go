@@ -3,6 +3,7 @@ package sesame
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 )
 
@@ -19,29 +20,20 @@ const deploymentRetryInterval = 50 * time.Millisecond
 var ErrDeploymentLocked = errors.New("another sesame engine owns the deployment")
 
 // StartWhenAvailable starts an engine like Start. While another engine owns
-// the deployment it tries again until ctx ends, and then returns an error
-// that wraps ErrDeploymentLocked. Any other failure returns at once.
+// the deployment it tries again until ctx ends. When ctx ends first, the
+// error always wraps ctx.Err(), whether the deadline fell between attempts or
+// during an attempt; it also wraps ErrDeploymentLocked when the last attempt
+// found the deployment locked. Any other failure returns at once.
 func StartWhenAvailable(ctx context.Context, options Options) (*Client, error) {
-	var locked error
 	for {
 		client, err := Start(ctx, options)
 		if !errors.Is(err, ErrDeploymentLocked) {
-			return client, lockedWhenOutOfTime(ctx, err, locked)
+			return client, err
 		}
-		locked = err
 		select {
 		case <-ctx.Done():
-			return nil, locked
+			return nil, fmt.Errorf("%w: %w", err, ctx.Err())
 		case <-time.After(deploymentRetryInterval):
 		}
 	}
-}
-
-// lockedWhenOutOfTime keeps the lock as the reason when ctx ran out between
-// a locked attempt and the next one, so callers see why they waited.
-func lockedWhenOutOfTime(ctx context.Context, err, locked error) error {
-	if err != nil && locked != nil && ctx.Err() != nil {
-		return locked
-	}
-	return err
 }

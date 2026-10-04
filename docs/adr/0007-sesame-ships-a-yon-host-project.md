@@ -72,7 +72,10 @@ invocation's process exits, because its stdin closes; no child outlives the
 handler. When another engine owns the deployment, `EngineService` tries again
 every 50 ms until `sesame.waitmilliseconds` (default 5000, at most 20000,
 always under the 30 second deadline) has passed, and then fails with
-`host.EngineBusyError`. The answer is `503` with `Retry-After: 1` and
+`host.EngineBusyError`. An engine that has not finished starting when the wait
+ends is stopped and answered the same way: the SDK's `StartWhenAvailable`
+always wraps the context error when its context ends, and `EngineService` maps
+`context.DeadlineExceeded` from its own wait to `EngineBusyError`. The answer is `503` with `Retry-After: 1` and
 `{"code":"engine_busy"}`. Nothing ran, so the client may retry.
 
 This is a developer-preview throughput ceiling. Measured on an Apple silicon

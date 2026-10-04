@@ -56,11 +56,27 @@ func TestStartWhenAvailableGivesUpWhenTheContextEnds(t *testing.T) {
 		_ = client.Close()
 		t.Fatal("StartWhenAvailable succeeded against a root another owner holds")
 	}
-	if !errors.Is(err, ErrDeploymentLocked) {
-		t.Fatalf("StartWhenAvailable() error = %v, want ErrDeploymentLocked", err)
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("StartWhenAvailable() error = %v, want it to wrap context.DeadlineExceeded", err)
 	}
 	if waited < wait || waited > testOperationTimeout {
 		t.Fatalf("StartWhenAvailable() waited %v, want between %v and %v", waited, wait, testOperationTimeout)
+	}
+}
+
+func TestStartWhenAvailableReportsAnEndedContext(t *testing.T) {
+	options := lockedOptions(t, "root-locked")
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	client, err := StartWhenAvailable(ctx, options)
+
+	if err == nil {
+		_ = client.Close()
+		t.Fatal("StartWhenAvailable succeeded with an ended context")
+	}
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("StartWhenAvailable() error = %v, want it to wrap context.Canceled", err)
 	}
 }
 

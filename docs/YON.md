@@ -129,7 +129,7 @@ Errors answer `{"code":"<code>"}`:
 | `403` | `tenant_mismatch`, `actor_tenant_mismatch`, `access_denied` and other refusals. |
 | `404` | A named record does not exist (`principal_not_found`, ...). |
 | `409` | A conflict (`identifier_conflict`, `stale_policy_version`, ...). |
-| `503` | `engine_busy`, with `Retry-After: 1`. Nothing ran; retry. |
+| `503` | `engine_busy`, with `Retry-After: 1`: another request held the deployment, or the engine did not start, for the whole wait. Nothing ran; retry. |
 | `500` | `internal_error`. The cause is in the server log, never in the answer. |
 
 ## Throughput

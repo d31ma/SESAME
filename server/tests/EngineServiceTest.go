@@ -50,6 +50,17 @@ func (test *EngineServiceTest) TestCallAnswersBusyWhenAnotherEngineHoldsTheDeplo
 	Assert.IsTrue(waited < 5*time.Second)
 }
 
+func (test *EngineServiceTest) TestCallAnswersBusyWhenTheEngineCannotStartWithinTheWait() {
+	setup := SesameTestSetup{}.Provision()
+	defer setup.Remove()
+	setup.UseWait(1)
+
+	err := test.engine().Call("system.ping", struct{}{}, &SystemPing{})
+
+	var busy *host.EngineBusyError
+	Assert.IsTrue(errors.As(err, &busy))
+}
+
 func (test *EngineServiceTest) TestCallWaitsForTheDeploymentToBeReleased() {
 	setup := SesameTestSetup{}.Provision()
 	defer setup.Remove()

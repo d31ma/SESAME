@@ -50,7 +50,7 @@ func (service *EngineService) send(operation string, parameters any, result any)
 }
 
 func (service *EngineService) busyWhenOutOfTime(failure error) error {
-	if errors.Is(failure, sesame.ErrDeploymentLocked) {
+	if errors.Is(failure, context.DeadlineExceeded) {
 		return &host.EngineBusyError{}
 	}
 	return failure
