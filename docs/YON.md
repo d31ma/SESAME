@@ -191,6 +191,38 @@ The Go SDK and the host errors have ordinary Go tests:
 (cd server/packages && go test ./...)
 ```
 
+### Smoke test
+
+`tools/yon-smoke/smoke.sh` checks the running server end to end with `curl`.
+It needs `ty`, `curl` and `jq` on `PATH`, an engine built from this tree and
+the FYLO executable (with `chex` beside it):
+
+```bash
+go build -trimpath -o /tmp/sesame-smoke/sesame ./cmd/sesame
+tools/yon-smoke/smoke.sh /tmp/sesame-smoke/sesame /absolute/path/to/fylo
+```
+
+The second argument may be left out when `FYLO_BINARY` is set. The script
+works only inside a new temporary directory and never changes the
+repository. It creates a deployment with `sesame init`, bootstraps the tenants
+`acme` and `globex` with an administrator each and an `acme` member on the
+command line, copies `server/` and `package.json` next to it with the
+deployment in that copy's `server/application.json`, starts `ty serve` on a
+free port and signs everyone in through `authn/*`. It then asserts exact
+status codes for each kind of route: public, signed in and administrator; a
+missing or malformed session; a member on an administrator route; another
+tenant's id in a body (`tenant_mismatch`) or in a reference
+(`actor_tenant_mismatch`); an undeclared body field; the unrouted
+`federation/login-exchange`; and `503` with `Retry-After` while a second
+`sesame exec --loop` holds the deployment. Last, it checks that no password or
+session secret reached the server log.
+
+It prints one line per check and stops with `FAIL` and a non-zero exit at the
+first failure. On every exit it stops the server and the engines and deletes
+the temporary directory. Passwords and session secrets live only in files in
+that directory, readable by you alone, and are never printed or passed as
+command arguments.
+
 ## Continuous integration
 
 GitHub Actions does not run the Yon tests yet. `ty test --coverage` and
