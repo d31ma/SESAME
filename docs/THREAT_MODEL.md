@@ -27,7 +27,8 @@ flows, trust boundaries, and mitigations.
 
 1. Untrusted protocol or API client to the host application's HTTP edge.
 2. Host framework adapter to the local SESAME machine process.
-3. Operator CLI and SDK to privileged administration commands.
+3. Operator CLI, `ty handler invoke` and the Go package to privileged
+   administration commands.
 4. External interaction client to persisted authentication transactions.
 5. Local Go package (in the Yon host or a Go application) to the SESAME NDJSON
    machine process.
@@ -37,6 +38,8 @@ flows, trust boundaries, and mitigations.
 9. SESAME to email, federation, provisioning, webhook, and audit destinations.
 10. Operator and host administrator access to the deployment.
 11. Release archives, installers, package registries, and update channels.
+12. Reverse proxy to `ty`, and `ty`'s route guard and identity check to the Yon
+    controllers (see "The Yon Host" below).
 
 ## Primary Threats and Planned Controls
 
@@ -64,6 +67,8 @@ flows, trust boundaries, and mitigations.
 | Malicious interaction client | one-time scoped transaction handles, exact continuation binding, CSRF protection, origin policy, no direct state mutation, complete audit |
 | Package substitution | checksums, signatures, provenance, pinned FYLO digest, archive manifest, verified install/update path |
 | Denial of service | request/body limits, bounded parsers, admission control, queue budgets, expensive-operation isolation |
+| Misattributed audit actor (a host names the wrong principal) | the optional `actor` is shape-checked, cross-checked against a live session of that principal and tenant, may only be recorded on its own tenant's events, and never grants access; an absent actor records `operator:machine` |
+| Cross-tenant state probing through idempotent writes | attributed writes check the target's tenant before any state-dependent answer (a no-op or a refusal answers `actor_tenant_mismatch` too) |
 | Clock manipulation | explicit skew policy, monotonic durations in-process, monitored UTC source, no reliance on TTID as a security clock |
 
 ## Theft of the Data Root
@@ -166,6 +171,21 @@ Three limits are worth stating plainly.
   A client whose private key is taken is compromised, and the answer there is
   revocation, which remains durable and outranks key possession.
 
+## The Yon Host
+
+`ty` serves SESAME over HTTP from this repository (ADR 0007). It owns the
+listener and runs one engine per request. These rows record its specific
+threats, the controls in place and what remains.
+
+| Threat | Controls | Residual risk |
+| --- | --- | --- |
+| Yon host boundary: a request reaches a controller it should not, or acts in another tenant | `ty`'s route guard (`@Public`, `@SignedIn`, `@Allow(Administrator)`) backed by `SesameIdentityProvider` (`session.verify`, then `authorize.decide` of `sesame:administer` on `sesame:tenant`); every administrative call decides the role again inside `TenantCallService` and checks the record's or body's tenant against the session's before the engine runs; the verified caller is the engine's `actor`, so the engine refuses writes into another tenant; `ty` refuses undeclared body fields; `test/contract` pins every route's guard in `operations.json` | `ty` itself is outside SESAME's tests except through `ty serve` checks; a foreign id answers `403` while an unknown one answers `404`, which tells an administrator that some other tenant holds that id (ids are not secrets) |
+| Wildcard roles confer tenant administration | the administrator check asks for the reserved `sesame:administer` on `sesame:tenant` | any role whose patterns match it (`*` on `*`, `sesame:*`) silently makes its holders HTTP tenant administrators; operators must treat such roles as administrator roles. An engine-side reservation of the `sesame:` namespace is future work |
+| Unauthenticated denial of service of the single engine | every request starts one engine and only one may own the deployment, so requests are serialized with a bounded wait and then `503 engine_busy`; the busy answer is fail-closed (on signed-in routes the identity check fails with `500`, never an anonymous identity) | neither SESAME nor `ty` limits request rates: one anonymous client can keep every other caller waiting and refused. A TLS-terminating reverse proxy with per-IP limits on `authn/*`, `session/verify`, `/oidc/*`, `oidc/pushed-authorize`, `oidc/device-authorize`, `oidc/dpop-verify`, `federation/login-*`, `saml/login-*`, `scim/*` and `system/*` is required (docs/YON.md); `ty` must never be exposed directly |
+| Stolen session used to change credentials or privileges | self-service authenticator changes and administrator credential and privilege changes need a session issued in the last 10 minutes (`403 reauthentication_required`); sessions are revocable and expire | recent sign-in is not proof of the current credential: a session secret stolen within its first 10 minutes can change the password, add a passkey, or (for an administrator) grant roles and reset other principals' passwords. No route asks for the current password, because the engine has no reauthentication primitive for `authenticator.*`; closing this needs one |
+| Command-line bypass of the route guard; operator trust | `ty handler invoke` skips the guard, but signed-in routes still verify the `Sesame-Session` header and administrative calls decide the role again (`403 administrator_required`); tenant and recent sign-in checks apply as over HTTP; the `sesame` CLI reads secrets from environment variables | anyone who can run `ty handler invoke` or the `sesame` CLI against the deployment is an operator: the `sesame` CLI and the bootstrap commands act as `operator:cli` with full deployment access, by design. `ty handler invoke` puts session secrets on the command line (visible to other local users) and echoes a malformed `--header` value, so it is recommended only on single-user hosts |
+| Redirect of a federated or SAML login to an attacker | `federation/login-start` and `saml/login-start` accept only a `redirect_uri` or `consumer_url` listed exactly in the host settings `sesame.federationredirecturis` and `sesame.samlconsumerurls` (absolute `https`, no fragment; empty by default, so both refuse until configured with `400 redirect_not_allowed`) | the allowlist is deployment-wide in the host, not per provider in the engine; the engine still stores whatever URL the host passes. An engine-side per-provider allowlist (needs an ADR and a stored-data change) is future work |
+
 ## Explicit v1 Limitations
 
 - The authoritative data plane is single-node and single-writer.
@@ -173,7 +193,10 @@ Three limits are worth stating plainly.
   FYLO root. Multiple replicas or applications cannot share that root.
 - SESAME does not open a network listener. TLS, routing, rate limits, request
   limits, and middleware placement are host-application responsibilities,
-  verified by framework-adapter contract tests.
+  verified by framework-adapter contract tests. The Yon host (`ty`) adds no
+  rate limits of its own; a reverse proxy provides them.
+- The Yon host starts one engine per request and serializes requests on the
+  deployment: a developer-preview throughput of a few requests per second.
 - S3 is backup, not synchronous replication or failover.
 - A privileged host administrator can modify local files and bypass local WORM
   permissions; external audit anchoring provides detection, not prevention.
