@@ -111,4 +111,5 @@ type VersionReport struct {
 	Arch            string   `json:"arch"`
 	ProtocolVersion string   `json:"protocol_version"`
 	Operations      []string `json:"operations"`
+	RequestFields   []string `json:"request_fields"`
 }

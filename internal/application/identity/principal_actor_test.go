@@ -72,8 +72,8 @@ func TestVerifyActorRefusesAnInconsistentAttribution(t *testing.T) {
 	foreignTenant.TenantID = otherTenant.Tenant.ID
 
 	for name, actor := range map[string]audit.PrincipalActor{
-		"unknown session":                unknownSession,
-		"session of another principal":   otherPrincipal,
+		"unknown session":                 unknownSession,
+		"session of another principal":    otherPrincipal,
 		"tenant other than the session's": foreignTenant,
 	} {
 		if err := fixture.service.VerifyActor(actor); !errors.Is(err, ErrActorSessionInvalid) {
