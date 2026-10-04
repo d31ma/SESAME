@@ -610,13 +610,29 @@ func cutCode(code string) (interactionID, secret string, found bool) {
 // InteractionGet returns one interaction without its bearer digests, for
 // operator diagnosis.
 func (s *Service) InteractionGet(interactionID string) (oidcdomain.Interaction, error) {
+	return s.interactionWithoutDigests(interactionID, func(oidcdomain.Interaction) bool { return true })
+}
+
+// InteractionGetHeld returns one interaction without its bearer digests only
+// to the holder of its handle secret. A wrong secret and an unknown
+// interaction are one answer.
+func (s *Service) InteractionGetHeld(interactionID, interactionSecret string) (oidcdomain.Interaction, error) {
+	return s.interactionWithoutDigests(interactionID, func(interaction oidcdomain.Interaction) bool {
+		return oidcdomain.VerifyDigest(interaction.SecretDigest, interactionSecret)
+	})
+}
+
+func (s *Service) interactionWithoutDigests(
+	interactionID string,
+	admitted func(oidcdomain.Interaction) bool,
+) (oidcdomain.Interaction, error) {
 	if err := oidcdomain.ValidateInteractionID(interactionID); err != nil {
 		return oidcdomain.Interaction{}, err
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	interaction, exists := s.interactions[interactionID]
-	if !exists {
+	if !exists || !admitted(interaction) {
 		return oidcdomain.Interaction{}, ErrInteractionNotFound
 	}
 	interaction.SecretDigest = ""

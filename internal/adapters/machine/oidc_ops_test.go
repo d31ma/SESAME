@@ -154,6 +154,29 @@ func TestAuthorizationCodeFlowThroughMachineEdge(t *testing.T) {
 	if !inspected.OK || strings.Contains(body, "digest") || strings.Contains(body, started.Secret) {
 		t.Fatalf("oidc.interaction_get = %s", body)
 	}
+
+	// With interaction_secret the record answers only the handle's holder; a
+	// wrong secret answers exactly like an unknown interaction.
+	interactionGet := func(id, interactionID, secret string) string {
+		return `{"protocol_version":"1","request_id":"` + id + `","operation":"oidc.interaction_get","parameters":{"interaction_id":"` +
+			interactionID + `","interaction_secret":"` + secret + `"}}`
+	}
+	held := runRequests(t, processor,
+		interactionGet("same", started.InteractionID, started.Secret),
+		interactionGet("same", started.InteractionID, "wrong"),
+		interactionGet("same", started.InteractionID, ""),
+		interactionGet("same", "int_00000000000000000000000000000000", started.Secret),
+	)
+	heldBody := string(mustMarshal(t, held[0].Result))
+	if !held[0].OK || heldBody != body {
+		t.Fatalf("oidc.interaction_get with its secret = %s, want %s", heldBody, body)
+	}
+	unknown := string(mustMarshal(t, held[3]))
+	for index, refused := range held[1:3] {
+		if refused.OK || refused.Error.Code != ErrorInteractionNotFound || string(mustMarshal(t, refused)) != unknown {
+			t.Fatalf("oidc.interaction_get with a wrong secret %d = %#v, want the unknown answer %s", index, refused, unknown)
+		}
+	}
 }
 
 // TestRefreshRotationThroughMachineEdge drives a rotating family over the

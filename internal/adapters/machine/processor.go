@@ -1058,12 +1058,21 @@ func (p *Processor) handleInteractionGet(request Request) Response {
 		return errorResponse(request.RequestID, ErrorStorageNotConfigured, "OIDC operations require a configured FYLO root")
 	}
 	var parameters struct {
-		InteractionID string `json:"interaction_id"`
+		InteractionID     string  `json:"interaction_id"`
+		InteractionSecret *string `json:"interaction_secret"`
 	}
 	if err := decodeParameters(request.Parameters, &parameters); err != nil {
 		return errorResponse(request.RequestID, ErrorInvalidRequest, err.Error())
 	}
-	interaction, err := p.tenant.InteractionGet(parameters.InteractionID)
+	var (
+		interaction oidcdomain.Interaction
+		err         error
+	)
+	if parameters.InteractionSecret == nil {
+		interaction, err = p.tenant.InteractionGet(parameters.InteractionID)
+	} else {
+		interaction, err = p.tenant.InteractionGetHeld(parameters.InteractionID, *parameters.InteractionSecret)
+	}
 	if err != nil {
 		return tenantErrorResponse(request.RequestID, err)
 	}
