@@ -504,6 +504,7 @@ func machineRequest(requestID string, parameters any) Request {
 		ProtocolVersion: ProtocolVersion,
 		RequestID:       requestID,
 		Parameters:      encoded,
+		recordedActor:   machineOperatorActor,
 	}
 }
 

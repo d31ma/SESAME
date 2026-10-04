@@ -77,7 +77,7 @@ func (p *Processor) handleSCIMClientRegister(ctx context.Context, request Reques
 	}
 	client, token, err := p.tenant.ProvisioningClientRegister(ctx, parameters.TenantID,
 		parameters.Name, parameters.IdentifierNamespace, parameters.CanManageGroups,
-		"operator:machine")
+		request.recordedActor)
 	if err != nil {
 		return scimErrorResponse(request.RequestID, err)
 	}
@@ -103,7 +103,7 @@ func (p *Processor) handleSCIMClientDisable(ctx context.Context, request Request
 		return errorResponse(request.RequestID, ErrorInvalidRequest, err.Error())
 	}
 	if err := p.tenant.ProvisioningClientDisable(ctx, parameters.TenantID,
-		parameters.ClientID, parameters.Reason, "operator:machine"); err != nil {
+		parameters.ClientID, parameters.Reason, request.recordedActor); err != nil {
 		return scimErrorResponse(request.RequestID, err)
 	}
 	return successResponse(request.RequestID, map[string]bool{"disabled": true})
@@ -248,7 +248,7 @@ func (p *Processor) handleSCIMClientRotateToken(ctx context.Context, request Req
 		return errorResponse(request.RequestID, ErrorInvalidRequest, err.Error())
 	}
 	token, err := p.tenant.ProvisioningClientRotateToken(ctx, parameters.TenantID,
-		parameters.ClientID, "operator:machine")
+		parameters.ClientID, request.recordedActor)
 	if err != nil {
 		return scimErrorResponse(request.RequestID, err)
 	}

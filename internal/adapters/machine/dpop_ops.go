@@ -67,7 +67,7 @@ func (p *Processor) handleDPoPVerify(ctx context.Context, request Request) Respo
 		return errorResponse(request.RequestID, ErrorInvalidRequest, err.Error())
 	}
 	verification, err := p.tenant.DPoPVerify(ctx, parameters.AccessToken, parameters.Proof,
-		parameters.Method, parameters.URI, "operator:machine")
+		parameters.Method, parameters.URI, request.recordedActor)
 	if err != nil {
 		return dpopErrorResponse(request.RequestID, err)
 	}

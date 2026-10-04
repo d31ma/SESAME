@@ -83,7 +83,7 @@ func (p *Processor) handleProviderRegister(ctx context.Context, request Request)
 		parameters.TenantID, parameters.Name, parameters.Issuer,
 		parameters.ClientID, parameters.ClientSecret, parameters.Scopes,
 		parameters.SubjectClaim, parameters.EmailClaim, parameters.Linking,
-		"operator:machine")
+		request.recordedActor)
 	if err != nil {
 		return federationErrorResponse(request.RequestID, err)
 	}
@@ -111,7 +111,7 @@ func (p *Processor) handleProviderConfigure(ctx context.Context, request Request
 		return errorResponse(request.RequestID, ErrorInvalidRequest, err.Error())
 	}
 	metadata, err := p.tenant.ProviderConfigure(ctx, parameters.TenantID, parameters.ProviderID,
-		[]byte(parameters.Discovery), []byte(parameters.KeySet), "operator:machine")
+		[]byte(parameters.Discovery), []byte(parameters.KeySet), request.recordedActor)
 	if err != nil {
 		return federationErrorResponse(request.RequestID, err)
 	}
@@ -149,7 +149,7 @@ func (p *Processor) handleFederatedLoginStart(ctx context.Context, request Reque
 		return errorResponse(request.RequestID, ErrorInvalidRequest, err.Error())
 	}
 	login, err := p.tenant.LoginStart(ctx, parameters.TenantID, parameters.ProviderID,
-		parameters.RedirectURI, "operator:machine")
+		parameters.RedirectURI, request.recordedActor)
 	if err != nil {
 		return federationErrorResponse(request.RequestID, err)
 	}
@@ -190,7 +190,7 @@ func (p *Processor) handleFederatedLoginComplete(ctx context.Context, request Re
 		return errorResponse(request.RequestID, ErrorInvalidRequest, err.Error())
 	}
 	result, err := p.tenant.LoginComplete(ctx, parameters.TenantID, parameters.LoginID,
-		parameters.IDToken, "operator:machine")
+		parameters.IDToken, request.recordedActor)
 	if err != nil {
 		return federationErrorResponse(request.RequestID, err)
 	}
@@ -259,7 +259,7 @@ func (p *Processor) handleProviderDisable(ctx context.Context, request Request) 
 		return errorResponse(request.RequestID, ErrorInvalidRequest, err.Error())
 	}
 	if err := p.tenant.ProviderDisable(ctx, parameters.TenantID, parameters.ProviderID,
-		parameters.Reason, "operator:machine"); err != nil {
+		parameters.Reason, request.recordedActor); err != nil {
 		return federationErrorResponse(request.RequestID, err)
 	}
 	return successResponse(request.RequestID, map[string]bool{"disabled": true})

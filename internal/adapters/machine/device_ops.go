@@ -67,7 +67,7 @@ func (p *Processor) handlePushedAuthorize(ctx context.Context, request Request) 
 		Nonce:               parameters.Nonce,
 		CodeChallenge:       parameters.CodeChallenge,
 		CodeChallengeMethod: parameters.CodeChallengeMethod,
-	}, parameters.ClientSecret, "operator:machine")
+	}, parameters.ClientSecret, request.recordedActor)
 	if err != nil {
 		return deviceErrorResponse(request.RequestID, err)
 	}
@@ -95,7 +95,7 @@ func (p *Processor) handleDeviceAuthorize(ctx context.Context, request Request) 
 		return errorResponse(request.RequestID, ErrorInvalidRequest, err.Error())
 	}
 	started, err := p.tenant.DeviceAuthorizationStart(ctx, parameters.ClientID,
-		parameters.Scopes, "operator:machine")
+		parameters.Scopes, request.recordedActor)
 	if err != nil {
 		return deviceErrorResponse(request.RequestID, err)
 	}
@@ -137,7 +137,7 @@ func (p *Processor) handleDeviceApprove(ctx context.Context, request Request) Re
 	}
 	approved, err := p.tenant.DeviceAuthorizationApprove(ctx, parameters.TenantID,
 		parameters.UserCode, parameters.SessionID, parameters.SessionSecret,
-		"operator:machine")
+		request.recordedActor)
 	if err != nil {
 		return deviceErrorResponse(request.RequestID, err)
 	}
@@ -156,7 +156,7 @@ func (p *Processor) handleDeviceDeny(ctx context.Context, request Request) Respo
 		return errorResponse(request.RequestID, ErrorInvalidRequest, err.Error())
 	}
 	if err := p.tenant.DeviceAuthorizationDeny(ctx, parameters.TenantID,
-		parameters.UserCode, "operator:machine"); err != nil {
+		parameters.UserCode, request.recordedActor); err != nil {
 		return deviceErrorResponse(request.RequestID, err)
 	}
 	return successResponse(request.RequestID, map[string]any{"denied": true})

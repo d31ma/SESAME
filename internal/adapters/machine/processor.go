@@ -94,6 +94,9 @@ type Request struct {
 	RequestID       string          `json:"request_id"`
 	Operation       string          `json:"operation"`
 	Parameters      json.RawMessage `json:"parameters"`
+	Actor           json.RawMessage `json:"actor,omitempty"`
+
+	recordedActor string
 }
 
 // Response is one machine-protocol result.
@@ -272,7 +275,11 @@ func (p *Processor) dispatch(ctx context.Context, request Request) Response {
 	if !known {
 		return errorResponse(request.RequestID, ErrorOperationNotFound, "operation not found")
 	}
-	return handler(ctx, request)
+	attributed, refusal := p.attributeRequest(request)
+	if refusal != nil {
+		return *refusal
+	}
+	return handler(ctx, attributed)
 }
 
 // handlerFunc is one routed operation.
@@ -374,7 +381,7 @@ func (p *Processor) handleTenantBootstrap(ctx context.Context, request Request) 
 		return errorResponse(request.RequestID, ErrorInvalidRequest, err.Error())
 	}
 
-	result, err := p.tenant.Bootstrap(ctx, parameters.Name, "operator:machine")
+	result, err := p.tenant.Bootstrap(ctx, parameters.Name, request.recordedActor)
 	if err != nil {
 		return tenantErrorResponse(request.RequestID, err)
 	}
@@ -433,7 +440,7 @@ func (p *Processor) handlePrincipalCreate(ctx context.Context, request Request) 
 			Namespace: parameters.IdentifierNamespace,
 			Value:     parameters.IdentifierValue,
 		},
-		"operator:machine",
+		request.recordedActor,
 	)
 	if err != nil {
 		return tenantErrorResponse(request.RequestID, err)
@@ -496,7 +503,7 @@ func (p *Processor) handlePrincipalSuspend(ctx context.Context, request Request)
 		return errorResponse(request.RequestID, ErrorInvalidRequest, err.Error())
 	}
 
-	suspended, err := p.tenant.PrincipalSuspend(ctx, parameters.PrincipalID, "operator:machine")
+	suspended, err := p.tenant.PrincipalSuspend(ctx, parameters.PrincipalID, request.recordedActor)
 	if err != nil {
 		return tenantErrorResponse(request.RequestID, err)
 	}
@@ -515,7 +522,7 @@ func (p *Processor) handleRoleCreate(ctx context.Context, request Request) Respo
 	if err := decodeParameters(request.Parameters, &parameters); err != nil {
 		return errorResponse(request.RequestID, ErrorInvalidRequest, err.Error())
 	}
-	created, err := p.tenant.RoleCreate(ctx, parameters.TenantID, parameters.Name, parameters.Permissions, "operator:machine")
+	created, err := p.tenant.RoleCreate(ctx, parameters.TenantID, parameters.Name, parameters.Permissions, request.recordedActor)
 	if err != nil {
 		return tenantErrorResponse(request.RequestID, err)
 	}
@@ -543,9 +550,9 @@ func (p *Processor) handleGrantCreate(ctx context.Context, request Request) Resp
 		err     error
 	)
 	if parameters.PrincipalID != "" {
-		created, err = p.tenant.GrantCreate(ctx, parameters.TenantID, parameters.PrincipalID, parameters.RoleID, "operator:machine")
+		created, err = p.tenant.GrantCreate(ctx, parameters.TenantID, parameters.PrincipalID, parameters.RoleID, request.recordedActor)
 	} else {
-		created, err = p.tenant.GrantCreateForGroup(ctx, parameters.TenantID, parameters.GroupID, parameters.RoleID, "operator:machine")
+		created, err = p.tenant.GrantCreateForGroup(ctx, parameters.TenantID, parameters.GroupID, parameters.RoleID, request.recordedActor)
 	}
 	if err != nil {
 		return tenantErrorResponse(request.RequestID, err)
@@ -563,7 +570,7 @@ func (p *Processor) handleGrantRevoke(ctx context.Context, request Request) Resp
 	if err := decodeParameters(request.Parameters, &parameters); err != nil {
 		return errorResponse(request.RequestID, ErrorInvalidRequest, err.Error())
 	}
-	if err := p.tenant.GrantRevoke(ctx, parameters.GrantID, "operator:machine"); err != nil {
+	if err := p.tenant.GrantRevoke(ctx, parameters.GrantID, request.recordedActor); err != nil {
 		return tenantErrorResponse(request.RequestID, err)
 	}
 	return successResponse(request.RequestID, map[string]any{"revoked": true})
@@ -616,7 +623,7 @@ func (p *Processor) handleGroupCreate(ctx context.Context, request Request) Resp
 	if err := decodeParameters(request.Parameters, &parameters); err != nil {
 		return errorResponse(request.RequestID, ErrorInvalidRequest, err.Error())
 	}
-	created, err := p.tenant.GroupCreate(ctx, parameters.TenantID, parameters.Name, "operator:machine")
+	created, err := p.tenant.GroupCreate(ctx, parameters.TenantID, parameters.Name, request.recordedActor)
 	if err != nil {
 		return tenantErrorResponse(request.RequestID, err)
 	}
@@ -636,9 +643,9 @@ func (p *Processor) handleGroupMember(ctx context.Context, request Request, add 
 	}
 	var err error
 	if add {
-		err = p.tenant.GroupMemberAdd(ctx, parameters.GroupID, parameters.PrincipalID, "operator:machine")
+		err = p.tenant.GroupMemberAdd(ctx, parameters.GroupID, parameters.PrincipalID, request.recordedActor)
 	} else {
-		err = p.tenant.GroupMemberRemove(ctx, parameters.GroupID, parameters.PrincipalID, "operator:machine")
+		err = p.tenant.GroupMemberRemove(ctx, parameters.GroupID, parameters.PrincipalID, request.recordedActor)
 	}
 	if err != nil {
 		return tenantErrorResponse(request.RequestID, err)
@@ -661,7 +668,7 @@ func (p *Processor) handleAdminBootstrap(ctx context.Context, request Request) R
 	result, err := p.tenant.AdminBootstrap(ctx, parameters.TenantName, domainprincipal.Identifier{
 		Namespace: parameters.IdentifierNamespace,
 		Value:     parameters.IdentifierValue,
-	}, "operator:machine")
+	}, request.recordedActor)
 	if err != nil {
 		return tenantErrorResponse(request.RequestID, err)
 	}
@@ -679,7 +686,7 @@ func (p *Processor) handleSetPassword(ctx context.Context, request Request) Resp
 	if err := decodeParameters(request.Parameters, &parameters); err != nil {
 		return errorResponse(request.RequestID, ErrorInvalidRequest, err.Error())
 	}
-	if err := p.tenant.PasswordSet(ctx, parameters.PrincipalID, parameters.Password, "operator:machine"); err != nil {
+	if err := p.tenant.PasswordSet(ctx, parameters.PrincipalID, parameters.Password, request.recordedActor); err != nil {
 		return tenantErrorResponse(request.RequestID, err)
 	}
 	// The response is deliberately empty: echoing anything derived from the
@@ -702,7 +709,7 @@ func (p *Processor) handleAuthnBegin(ctx context.Context, request Request) Respo
 	result, err := p.tenant.AuthenticationBegin(ctx, parameters.TenantID, domainprincipal.Identifier{
 		Namespace: parameters.IdentifierNamespace,
 		Value:     parameters.IdentifierValue,
-	}, "operator:machine")
+	}, request.recordedActor)
 	if err != nil {
 		return tenantErrorResponse(request.RequestID, err)
 	}
@@ -721,7 +728,7 @@ func (p *Processor) handleAuthnVerifyPassword(ctx context.Context, request Reque
 		return errorResponse(request.RequestID, ErrorInvalidRequest, err.Error())
 	}
 	result, err := p.tenant.AuthenticationVerifyPassword(
-		ctx, parameters.TransactionID, parameters.Password, "operator:machine")
+		ctx, parameters.TransactionID, parameters.Password, request.recordedActor)
 	if err != nil {
 		// A closed transaction still returns its state so a client can show
 		// why, but the operation is an error.
@@ -752,7 +759,7 @@ func (p *Processor) handleAuthnComplete(ctx context.Context, request Request) Re
 		ctx,
 		parameters.TransactionID,
 		time.Duration(parameters.LifetimeSeconds)*time.Second,
-		"operator:machine",
+		request.recordedActor,
 	)
 	if err != nil {
 		return tenantErrorResponse(request.RequestID, err)
@@ -791,7 +798,7 @@ func (p *Processor) handleSessionRevoke(ctx context.Context, request Request) Re
 	if err := decodeParameters(request.Parameters, &parameters); err != nil {
 		return errorResponse(request.RequestID, ErrorInvalidRequest, err.Error())
 	}
-	if err := p.tenant.SessionRevoke(ctx, parameters.SessionID, parameters.Reason, "operator:machine"); err != nil {
+	if err := p.tenant.SessionRevoke(ctx, parameters.SessionID, parameters.Reason, request.recordedActor); err != nil {
 		return tenantErrorResponse(request.RequestID, err)
 	}
 	return successResponse(request.RequestID, map[string]any{"revoked": true})
@@ -808,7 +815,7 @@ func (p *Processor) handleTOTPEnroll(ctx context.Context, request Request) Respo
 	if err := decodeParameters(request.Parameters, &parameters); err != nil {
 		return errorResponse(request.RequestID, ErrorInvalidRequest, err.Error())
 	}
-	enrollment, err := p.tenant.TOTPEnroll(ctx, parameters.PrincipalID, parameters.Issuer, "operator:machine")
+	enrollment, err := p.tenant.TOTPEnroll(ctx, parameters.PrincipalID, parameters.Issuer, request.recordedActor)
 	if err != nil {
 		return tenantErrorResponse(request.RequestID, err)
 	}
@@ -827,7 +834,7 @@ func (p *Processor) handleTOTPActivate(ctx context.Context, request Request) Res
 	if err := decodeParameters(request.Parameters, &parameters); err != nil {
 		return errorResponse(request.RequestID, ErrorInvalidRequest, err.Error())
 	}
-	if err := p.tenant.TOTPActivate(ctx, parameters.PrincipalID, parameters.Code, "operator:machine"); err != nil {
+	if err := p.tenant.TOTPActivate(ctx, parameters.PrincipalID, parameters.Code, request.recordedActor); err != nil {
 		return tenantErrorResponse(request.RequestID, err)
 	}
 	return successResponse(request.RequestID, map[string]any{"activated": true})
@@ -845,7 +852,7 @@ func (p *Processor) handleAuthnVerifyTOTP(ctx context.Context, request Request) 
 		return errorResponse(request.RequestID, ErrorInvalidRequest, err.Error())
 	}
 	result, err := p.tenant.AuthenticationVerifyTOTP(
-		ctx, parameters.TransactionID, parameters.Code, "operator:machine")
+		ctx, parameters.TransactionID, parameters.Code, request.recordedActor)
 	if err != nil {
 		return tenantErrorResponse(request.RequestID, err)
 	}
@@ -862,7 +869,7 @@ func (p *Processor) handleRecoveryIssue(ctx context.Context, request Request) Re
 	if err := decodeParameters(request.Parameters, &parameters); err != nil {
 		return errorResponse(request.RequestID, ErrorInvalidRequest, err.Error())
 	}
-	set, err := p.tenant.RecoveryCodesIssue(ctx, parameters.PrincipalID, "operator:machine")
+	set, err := p.tenant.RecoveryCodesIssue(ctx, parameters.PrincipalID, request.recordedActor)
 	if err != nil {
 		return tenantErrorResponse(request.RequestID, err)
 	}
@@ -882,7 +889,7 @@ func (p *Processor) handleAuthnVerifyRecoveryCode(ctx context.Context, request R
 		return errorResponse(request.RequestID, ErrorInvalidRequest, err.Error())
 	}
 	result, err := p.tenant.AuthenticationVerifyRecoveryCode(
-		ctx, parameters.TransactionID, parameters.Code, "operator:machine")
+		ctx, parameters.TransactionID, parameters.Code, request.recordedActor)
 	if err != nil {
 		return tenantErrorResponse(request.RequestID, err)
 	}
@@ -924,7 +931,7 @@ func (p *Processor) handleClientRegister(ctx context.Context, request Request) R
 	// The secret in this result is the only copy that will ever exist.
 	result, err := p.tenant.ClientRegister(ctx, parameters.TenantID, parameters.Name,
 		parameters.ClientType, parameters.RedirectURIs, parameters.Scopes,
-		parameters.Audience, parameters.PostLogoutRedirectURIs, "operator:machine")
+		parameters.Audience, parameters.PostLogoutRedirectURIs, request.recordedActor)
 	if err != nil {
 		return tenantErrorResponse(request.RequestID, err)
 	}
@@ -958,7 +965,7 @@ func (p *Processor) handleClientRotateSecret(ctx context.Context, request Reques
 	if err := decodeParameters(request.Parameters, &parameters); err != nil {
 		return errorResponse(request.RequestID, ErrorInvalidRequest, err.Error())
 	}
-	secret, err := p.tenant.ClientRotateSecret(ctx, parameters.ClientID, "operator:machine")
+	secret, err := p.tenant.ClientRotateSecret(ctx, parameters.ClientID, request.recordedActor)
 	if err != nil {
 		return tenantErrorResponse(request.RequestID, err)
 	}
@@ -976,7 +983,7 @@ func (p *Processor) handleClientDisable(ctx context.Context, request Request) Re
 	if err := decodeParameters(request.Parameters, &parameters); err != nil {
 		return errorResponse(request.RequestID, ErrorInvalidRequest, err.Error())
 	}
-	if err := p.tenant.ClientDisable(ctx, parameters.ClientID, parameters.Reason, "operator:machine"); err != nil {
+	if err := p.tenant.ClientDisable(ctx, parameters.ClientID, parameters.Reason, request.recordedActor); err != nil {
 		return tenantErrorResponse(request.RequestID, err)
 	}
 	return successResponse(request.RequestID, map[string]bool{"disabled": true})
@@ -1015,7 +1022,7 @@ func (p *Processor) handleAuthorize(ctx context.Context, request Request) Respon
 		CodeChallenge:       parameters.CodeChallenge,
 		CodeChallengeMethod: parameters.CodeChallengeMethod,
 		RequestURI:          parameters.RequestURI,
-	}, "operator:machine")
+	}, request.recordedActor)
 	if err != nil {
 		return deviceErrorResponse(request.RequestID, err)
 	}
@@ -1036,7 +1043,7 @@ func (p *Processor) handleInteractionComplete(ctx context.Context, request Reque
 		return errorResponse(request.RequestID, ErrorInvalidRequest, err.Error())
 	}
 	result, err := p.tenant.AuthorizationComplete(ctx, parameters.InteractionID, parameters.InteractionSecret,
-		parameters.SessionID, parameters.SessionSecret, "operator:machine")
+		parameters.SessionID, parameters.SessionSecret, request.recordedActor)
 	if err != nil {
 		return tenantErrorResponse(request.RequestID, err)
 	}
@@ -1099,7 +1106,7 @@ func (p *Processor) handleTokenExchange(ctx context.Context, request Request) Re
 		DPoPProof:    parameters.DPoPProof,
 		DPoPMethod:   parameters.HTTPMethod,
 		DPoPURI:      parameters.HTTPURI,
-	}, "operator:machine")
+	}, request.recordedActor)
 	if err != nil {
 		// The device grant's three outcomes reach the wire through the token
 		// endpoint, so they have to be mapped here as well as on the device
@@ -1125,7 +1132,7 @@ func (p *Processor) handleRefreshFamilyRevoke(ctx context.Context, request Reque
 	if err := decodeParameters(request.Parameters, &parameters); err != nil {
 		return errorResponse(request.RequestID, ErrorInvalidRequest, err.Error())
 	}
-	if err := p.tenant.RefreshFamilyRevoke(ctx, parameters.FamilyID, parameters.Reason, "operator:machine"); err != nil {
+	if err := p.tenant.RefreshFamilyRevoke(ctx, parameters.FamilyID, parameters.Reason, request.recordedActor); err != nil {
 		return tenantErrorResponse(request.RequestID, err)
 	}
 	return successResponse(request.RequestID, map[string]bool{"revoked": true})
@@ -1165,7 +1172,7 @@ func (p *Processor) handleConsentGrant(ctx context.Context, request Request) Res
 		return errorResponse(request.RequestID, ErrorInvalidRequest, err.Error())
 	}
 	consent, err := p.tenant.ConsentGrant(ctx, parameters.SessionID, parameters.SessionSecret,
-		parameters.ClientID, parameters.Scopes, "operator:machine")
+		parameters.ClientID, parameters.Scopes, request.recordedActor)
 	if err != nil {
 		return tenantErrorResponse(request.RequestID, err)
 	}
@@ -1183,7 +1190,7 @@ func (p *Processor) handleConsentWithdraw(ctx context.Context, request Request) 
 	if err := decodeParameters(request.Parameters, &parameters); err != nil {
 		return errorResponse(request.RequestID, ErrorInvalidRequest, err.Error())
 	}
-	if err := p.tenant.ConsentWithdraw(ctx, parameters.PrincipalID, parameters.ClientID, "operator:machine"); err != nil {
+	if err := p.tenant.ConsentWithdraw(ctx, parameters.PrincipalID, parameters.ClientID, request.recordedActor); err != nil {
 		return tenantErrorResponse(request.RequestID, err)
 	}
 	return successResponse(request.RequestID, map[string]bool{"withdrawn": true})
@@ -1226,7 +1233,7 @@ func (p *Processor) handleLogout(ctx context.Context, request Request) Response 
 		IDTokenHint:           parameters.IDTokenHint,
 		PostLogoutRedirectURI: parameters.PostLogoutRedirectURI,
 		State:                 parameters.State,
-	}, "operator:machine")
+	}, request.recordedActor)
 	if err != nil {
 		return tenantErrorResponse(request.RequestID, err)
 	}
@@ -1313,7 +1320,7 @@ func (p *Processor) handleRevoke(ctx context.Context, request Request) Response 
 	if err := p.tenant.Revoke(ctx, identity.TokenRequest{
 		ClientID:     parameters.ClientID,
 		ClientSecret: parameters.ClientSecret,
-	}, parameters.Token, "operator:machine"); err != nil {
+	}, parameters.Token, request.recordedActor); err != nil {
 		return tenantErrorResponse(request.RequestID, err)
 	}
 	return successResponse(request.RequestID, map[string]bool{"acknowledged": true})
@@ -1372,7 +1379,7 @@ func (p *Processor) handlePasskeyRegisterFinish(ctx context.Context, request Req
 	if err != nil {
 		return errorResponse(request.RequestID, ErrorInvalidRequest, "client_data_json must be base64")
 	}
-	stored, err := p.tenant.PasskeyRegisterFinish(ctx, parameters.PrincipalID, attestation, clientData, "operator:machine")
+	stored, err := p.tenant.PasskeyRegisterFinish(ctx, parameters.PrincipalID, attestation, clientData, request.recordedActor)
 	if err != nil {
 		return tenantErrorResponse(request.RequestID, err)
 	}
@@ -1406,7 +1413,7 @@ func (p *Processor) handlePasskeyRemove(ctx context.Context, request Request) Re
 	if err := decodeParameters(request.Parameters, &parameters); err != nil {
 		return errorResponse(request.RequestID, ErrorInvalidRequest, err.Error())
 	}
-	if err := p.tenant.PasskeyRemove(ctx, parameters.CredentialID, "operator:machine"); err != nil {
+	if err := p.tenant.PasskeyRemove(ctx, parameters.CredentialID, request.recordedActor); err != nil {
 		return tenantErrorResponse(request.RequestID, err)
 	}
 	return successResponse(request.RequestID, map[string]bool{"removed": true})
@@ -1456,7 +1463,7 @@ func (p *Processor) handleAuthnVerifyPasskey(ctx context.Context, request Reques
 		return errorResponse(request.RequestID, ErrorInvalidRequest, "signature must be base64")
 	}
 	result, err := p.tenant.AuthenticationVerifyPasskey(ctx, parameters.TransactionID,
-		parameters.CredentialID, authData, clientData, signature, "operator:machine")
+		parameters.CredentialID, authData, clientData, signature, request.recordedActor)
 	if err != nil {
 		return tenantErrorResponse(request.RequestID, err)
 	}
@@ -1464,6 +1471,10 @@ func (p *Processor) handleAuthnVerifyPasskey(ctx context.Context, request Reques
 }
 
 func tenantErrorResponse(requestID string, err error) Response {
+	if errors.Is(err, identity.ErrActorTenantMismatch) {
+		return errorResponse(requestID, ErrorActorTenantMismatch,
+			"actor belongs to a different tenant than the record this operation writes")
+	}
 	if errors.Is(err, identity.ErrInvalidLogoutHint) {
 		return errorResponse(requestID, ErrorInvalidLogoutHint,
 			"id_token_hint is not a token this deployment issued")
@@ -1782,6 +1793,7 @@ func (p *Processor) handleVersion(_ context.Context, request Request) Response {
 		Arch:            info.Arch,
 		ProtocolVersion: ProtocolVersion,
 		Operations:      Operations,
+		RequestFields:   requestFields(),
 	})
 }
 

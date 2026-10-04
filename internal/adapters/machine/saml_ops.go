@@ -63,7 +63,7 @@ func (p *Processor) handleSAMLProviderRegister(ctx context.Context, request Requ
 	provider, err := p.tenant.SAMLProviderRegister(ctx, parameters.TenantID,
 		parameters.Name, parameters.EntityID, parameters.SSOURL,
 		parameters.Certificates, parameters.IdentifierNamespace, parameters.Linking,
-		"operator:machine")
+		request.recordedActor)
 	if err != nil {
 		return samlErrorResponse(request.RequestID, err)
 	}
@@ -101,7 +101,7 @@ func (p *Processor) handleSAMLProviderDisable(ctx context.Context, request Reque
 		return errorResponse(request.RequestID, ErrorInvalidRequest, err.Error())
 	}
 	if err := p.tenant.SAMLProviderDisable(ctx, parameters.TenantID,
-		parameters.ProviderID, parameters.Reason, "operator:machine"); err != nil {
+		parameters.ProviderID, parameters.Reason, request.recordedActor); err != nil {
 		return samlErrorResponse(request.RequestID, err)
 	}
 	return successResponse(request.RequestID, map[string]any{
@@ -125,7 +125,7 @@ func (p *Processor) handleSAMLLoginStart(ctx context.Context, request Request) R
 		return errorResponse(request.RequestID, ErrorInvalidRequest, err.Error())
 	}
 	login, err := p.tenant.SAMLLoginStart(ctx, parameters.TenantID,
-		parameters.ProviderID, parameters.ConsumerURL, "operator:machine")
+		parameters.ProviderID, parameters.ConsumerURL, request.recordedActor)
 	if err != nil {
 		return samlErrorResponse(request.RequestID, err)
 	}
@@ -153,7 +153,7 @@ func (p *Processor) handleSAMLLoginComplete(ctx context.Context, request Request
 			"the SAML assertion was rejected")
 	}
 	result, err := p.tenant.SAMLLoginComplete(ctx, parameters.TenantID,
-		parameters.LoginID, document, "operator:machine")
+		parameters.LoginID, document, request.recordedActor)
 	if err != nil {
 		return samlErrorResponse(request.RequestID, err)
 	}
