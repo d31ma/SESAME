@@ -8,6 +8,7 @@ export default class SesameTransportHelper {
   private static readonly JSON_TYPE = 'application/json';
   private static readonly ORIGIN_RULE = 'sesame.origin must be an https origin without a path, or http on a loopback address';
   private static readonly SIZE_RULE = "SESAME's answer is larger than the response limit";
+  private static readonly PATH_RULE = 'the request path must stay on sesame.origin';
 
   async exchange(request: BehaviorHttpRequest, execution: BehaviorExecution): Promise<BehaviorJsonValue> {
     const response = await fetch(this.address(this.origin(), request), this.options(request));
@@ -51,7 +52,14 @@ export default class SesameTransportHelper {
     for (const [name, value] of Object.entries(request.query)) {
       target.searchParams.set(name, String(value));
     }
+    this.requireSameOrigin(target, origin);
     return target.toString();
+  }
+
+  private requireSameOrigin(target: URL, origin: URL): void {
+    if (target.origin !== origin.origin) {
+      throw new Error(SesameTransportHelper.PATH_RULE);
+    }
   }
 
   private options(request: BehaviorHttpRequest): RequestInit {
