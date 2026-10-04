@@ -82,6 +82,57 @@ func (test *ActorAttributionTest) TestRefusedCrossTenantRevokeRecordsNothing() {
 	Assert.Equals("", test.actors(setup, "session.revoked"))
 }
 
+func (test *ActorAttributionTest) TestTenantRecordCallRecordsTheCallingPrincipal() {
+	setup := SesameTestSetup{}.Provision()
+	defer setup.Remove()
+	administrator := setup.SignIn("acme", true)
+	engine := test.engine()
+	callers := &CallerService{engineService: engine}
+	clients := &OidcClientController{
+		tenantCallService:   &TenantCallService{callerService: callers, engineService: engine},
+		tenantRecordService: &TenantRecordService{callerService: callers, engineService: engine},
+	}
+	request := test.request(setup.Credential(administrator))
+	registered, _ := clients.PostRegister(request, OidcClientRegisterRequest{
+		TenantID: administrator.TenantID, Name: "Portal", ClientType: "confidential",
+		Redirects: []string{"https://rp.example/callback"}, Scopes: []string{"openid"}, Audience: "first_party",
+	})
+
+	_, err := clients.PostDisable(request, OidcClientDisableRequest{ClientID: registered.Client.ClientID, Reason: "retired"})
+	test.finish(engine)
+
+	Assert.IsTrue(err == nil)
+	Assert.Equals(test.principalActor(administrator), test.actors(setup, "oidc_client.disabled"))
+}
+
+func (test *ActorAttributionTest) TestCallerCallRecordsTheCallingPrincipal() {
+	setup := SesameTestSetup{}.Provision()
+	defer setup.Remove()
+	member := setup.SignInMember("acme", "member")
+	engine := test.engine()
+	callers := &CallerService{engineService: engine}
+	oidc := &OidcController{
+		engineService:            engine,
+		callerCallService:        &CallerCallService{callerService: callers, engineService: engine},
+		tenantRecordService:      &TenantRecordService{callerService: callers, engineService: engine},
+		interactionCookieService: &InteractionCookieService{},
+	}
+	registered := sesame.ClientRegistration{}
+	registerErr := engine.Call("oidc_client.register", map[string]any{
+		"tenant_id": member.TenantID, "name": "Portal", "client_type": "confidential",
+		"redirect_uris": []string{"https://rp.example/callback"}, "scopes": []string{"openid"}, "audience": "first_party",
+	}, &registered)
+	started, _ := oidc.PostDeviceAuthorize(OidcDeviceAuthorizeRequest{ClientID: registered.Client.ID, Scopes: []string{"openid"}})
+
+	_, err := oidc.PostDeviceDeny(test.request(setup.Credential(member)), OidcUserCodeRequest{UserCode: started.UserCode})
+	test.finish(engine)
+
+	Assert.IsTrue(registerErr == nil)
+	Assert.IsTrue(err == nil)
+	Assert.Equals("operator:machine", test.actors(setup, "oidc.device_authorization_started"))
+	Assert.Equals(test.principalActor(member), test.actors(setup, "oidc.device_authorization_denied"))
+}
+
 func (test *ActorAttributionTest) TestCallActsAsTheBoundCaller() {
 	setup := SesameTestSetup{}.Provision()
 	defer setup.Remove()
