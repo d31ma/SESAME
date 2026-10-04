@@ -613,7 +613,7 @@ principal on each request, so the audit ledger records who acted instead of
 | --- | --- |
 | `invalid_actor` | not exactly the three identifiers, unknown member, `null`, over 512 bytes, or sent to `standards.dispatch` |
 | `actor_session_invalid` | session unknown, expired, revoked, held by another principal or tenant, or principal suspended |
-| `actor_tenant_mismatch` | the operation would record an event in another tenant; nothing is written |
+| `actor_tenant_mismatch` | the operation would record an event in another tenant, or targets a record of another tenant (even when it would be a no-op or a state refusal); nothing is written |
 | `storage_not_configured` | the engine has no FYLO root, so it cannot check the session |
 
 See `api/schema/machine-v1.schema.json` and
