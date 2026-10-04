@@ -82,7 +82,9 @@ which override the file, and the file is read only by `sesame init`; it is not
 copied into the deployment or inherited by FYLO. Export `SESAME_DEPLOYMENT` or
 pass `--deployment` for later commands as usual.
 
-Serve it over HTTP with the Yon host. Tell it where the engine and the
+Serve it over HTTP with the Yon host. It needs `ty` 26.36.01 built from
+Tachyon commit `bf098bfc`, an unreleased build (see
+[docs/YON.md](docs/YON.md#what-you-need)). Tell it where the engine and the
 deployment are (absolute paths, in `.env` at the repository root), then start
 `ty`:
 
@@ -189,6 +191,9 @@ identity provider's client secret.
 Every request starts one engine, so the host is a developer preview with a
 throughput ceiling of a few requests per second;
 [ADR 0007](docs/adr/0007-sesame-ships-a-yon-host-project.md) records why.
+Never expose `ty` directly: a TLS-terminating reverse proxy that limits request
+rates per client is required in front of it
+([docs/YON.md](docs/YON.md#reverse-proxy-required)).
 
 The nine copy-in language SDKs that earlier releases shipped are retired.
 [docs/SDK_DISTRIBUTION.md](docs/SDK_DISTRIBUTION.md) shows how each former SDK
