@@ -286,3 +286,27 @@ func TestAttributedDeviceDenialChecksTheTenant(t *testing.T) {
 			return fixture.service.DeviceAuthorizationDeny(ctx, fixture.tenantID, fixture.device.UserCode, actor)
 		}})
 }
+
+func TestAttributedRevocationOfARevokedRefreshTokenChecksTheTenant(t *testing.T) {
+	t.Parallel()
+	fixture, tokens := offlineFixture(t)
+	ctx := context.Background()
+	requireNoStep(t, fixture.service.RefreshFamilyRevoke(ctx, fixture.onlyFamily(t), "", actorTenantProbeOwner),
+		"RefreshFamilyRevoke")
+
+	assertActorTenantProbe(t, actorTenantProbe{service: fixture.service, tenant: fixture.tenantID, write: func(actor string) error {
+		return fixture.service.Revoke(ctx, fixture.refreshRequest(tokens.RefreshToken, ""), tokens.RefreshToken, actor)
+	}})
+}
+
+func TestAttributedLogoutOfAnEndedSessionChecksTheTenant(t *testing.T) {
+	t.Parallel()
+	fixture, tokens := offlineFixture(t)
+	ctx := context.Background()
+	requireNoStep(t, fixture.service.SessionRevoke(ctx, fixture.sessionID, "", actorTenantProbeOwner), "SessionRevoke")
+
+	assertActorTenantProbe(t, actorTenantProbe{service: fixture.service, tenant: fixture.tenantID, write: func(actor string) error {
+		_, err := fixture.service.Logout(ctx, LogoutRequest{IDTokenHint: tokens.IDToken}, actor)
+		return err
+	}})
+}

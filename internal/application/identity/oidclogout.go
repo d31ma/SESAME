@@ -97,6 +97,10 @@ func (s *Service) Logout(ctx context.Context, request LogoutRequest, actor strin
 		s.mu.Unlock()
 		return LogoutResult{}, ErrClientNotFound
 	}
+	if err := requireActorTenant(stored.Client.TenantID, actor); err != nil {
+		s.mu.Unlock()
+		return LogoutResult{}, err
+	}
 	session, sessionExists := s.sessions[sessionID]
 	// A hint naming a session belonging to somebody else, or to another
 	// tenant, ends nothing.

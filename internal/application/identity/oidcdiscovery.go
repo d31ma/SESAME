@@ -226,6 +226,9 @@ func (s *Service) Revoke(ctx context.Context, request TokenRequest, token, actor
 	if err != nil {
 		return err
 	}
+	if err := requireActorTenant(client.TenantID, actor); err != nil {
+		return err
+	}
 	if !strings.HasPrefix(token, oidcdomain.RefreshIDPrefix) {
 		return nil
 	}
