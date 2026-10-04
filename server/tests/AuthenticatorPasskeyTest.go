@@ -105,6 +105,75 @@ func (test *AuthenticatorPasskeyTest) TestRemovingAnotherPrincipalsPasskeyAnswer
 	Assert.Equals(0, len(intruderList.Passkeys))
 }
 
+func (test *AuthenticatorPasskeyTest) TestAdministratorListsAndRemovesAMembersPasskey() {
+	setup := SesameTestSetup{}.Provision()
+	defer setup.Remove()
+	administrator := setup.SignIn("acme", true)
+	member := setup.SignInMember("acme", "member")
+	controller := test.controller()
+	stored := test.register(controller, test.request(setup, member), test.key())
+
+	listed, listErr := controller.PostPasskeyListForPrincipal(
+		test.request(setup, administrator),
+		PrincipalReference{PrincipalID: member.PrincipalID},
+	)
+	removal, err := controller.PostPasskeyRemoveForPrincipal(
+		test.request(setup, administrator),
+		AuthenticatorPasskeyRemoveForPrincipalRequest{PrincipalID: member.PrincipalID, CredentialID: stored.CredentialID},
+	)
+	remaining, _ := controller.PostPasskeyList(test.request(setup, member))
+
+	Assert.IsTrue(listErr == nil)
+	Assert.Equals(1, len(listed.Passkeys))
+	Assert.IsTrue(err == nil)
+	Assert.IsTrue(removal.Removed)
+	Assert.Equals(0, len(remaining.Passkeys))
+}
+
+func (test *AuthenticatorPasskeyTest) TestAdministratorRemovalNamesTheOwnerOfThePasskey() {
+	setup := SesameTestSetup{}.Provision()
+	defer setup.Remove()
+	administrator := setup.SignIn("acme", true)
+	owner := setup.SignInMember("acme", "owner")
+	bystander := setup.SignInMember("acme", "bystander")
+	controller := test.controller()
+	stored := test.register(controller, test.request(setup, owner), test.key())
+
+	_, err := controller.PostPasskeyRemoveForPrincipal(
+		test.request(setup, administrator),
+		AuthenticatorPasskeyRemoveForPrincipalRequest{PrincipalID: bystander.PrincipalID, CredentialID: stored.CredentialID},
+	)
+	remaining, _ := controller.PostPasskeyList(test.request(setup, owner))
+
+	Assert.Equals(http.StatusNotFound, test.status(err))
+	Assert.Equals(`{"code":"passkey_not_found"}`, test.answer(err))
+	Assert.Equals(1, len(remaining.Passkeys))
+}
+
+func (test *AuthenticatorPasskeyTest) TestAdministratorCannotReachAnotherTenantsPasskeys() {
+	setup := SesameTestSetup{}.Provision()
+	defer setup.Remove()
+	administrator := setup.SignIn("acme", true)
+	stranger := setup.SignIn("globex", false)
+	controller := test.controller()
+	stored := test.register(controller, test.request(setup, stranger), test.key())
+
+	listed, listErr := controller.PostPasskeyListForPrincipal(
+		test.request(setup, administrator),
+		PrincipalReference{PrincipalID: stranger.PrincipalID},
+	)
+	_, removeErr := controller.PostPasskeyRemoveForPrincipal(
+		test.request(setup, administrator),
+		AuthenticatorPasskeyRemoveForPrincipalRequest{PrincipalID: stranger.PrincipalID, CredentialID: stored.CredentialID},
+	)
+	remaining, _ := controller.PostPasskeyList(test.request(setup, stranger))
+
+	Assert.Equals(`{"code":"tenant_mismatch"}`, test.answer(listErr))
+	Assert.Equals(0, len(listed.Passkeys))
+	Assert.Equals(`{"code":"tenant_mismatch"}`, test.answer(removeErr))
+	Assert.Equals(1, len(remaining.Passkeys))
+}
+
 func (test *AuthenticatorPasskeyTest) register(
 	controller *AuthenticatorController,
 	request *http.Request,
@@ -263,5 +332,9 @@ func (test *AuthenticatorPasskeyTest) controller() *AuthenticatorController {
 		callerService:       &CallerService{engineService: engine},
 		engineService:       engine,
 		recentSignInService: &RecentSignInService{engineService: engine},
+		principalTenantService: &PrincipalTenantService{
+			callerService: &CallerService{engineService: engine},
+			engineService: engine,
+		},
 	}
 }

@@ -6,15 +6,16 @@ import (
 )
 
 // @RequestRoute("/api/v1/authenticator")
-// @SignedIn
 // @NeedsAll
 type AuthenticatorController struct {
-	callerService       *CallerService
-	engineService       *EngineService
-	recentSignInService *RecentSignInService
+	callerService          *CallerService
+	engineService          *EngineService
+	recentSignInService    *RecentSignInService
+	principalTenantService *PrincipalTenantService
 }
 
 // @PostRoute("/set-password")
+// @SignedIn
 func (controller *AuthenticatorController) PostSetPassword(
 	request *http.Request,
 	// @FromBody
@@ -23,7 +24,7 @@ func (controller *AuthenticatorController) PostSetPassword(
 	var result AuthenticatorPasswordSet
 	caller, err := controller.recentCaller(request)
 	err = controller.send(err, EngineCall{
-		Operation:  "authenticator.set_password",
+		Operation:  controller.setPasswordOperation(),
 		Parameters: AuthenticatorSetPasswordRequest{PrincipalID: caller.PrincipalID, Password: body.Password},
 		Result:     &result,
 	})
@@ -31,6 +32,7 @@ func (controller *AuthenticatorController) PostSetPassword(
 }
 
 // @PostRoute("/totp-enroll")
+// @SignedIn
 func (controller *AuthenticatorController) PostTotpEnroll(
 	request *http.Request,
 	// @FromBody
@@ -47,6 +49,7 @@ func (controller *AuthenticatorController) PostTotpEnroll(
 }
 
 // @PostRoute("/totp-activate")
+// @SignedIn
 func (controller *AuthenticatorController) PostTotpActivate(
 	request *http.Request,
 	// @FromBody
@@ -63,30 +66,33 @@ func (controller *AuthenticatorController) PostTotpActivate(
 }
 
 // @PostRoute("/recovery-codes-issue")
+// @SignedIn
 func (controller *AuthenticatorController) PostRecoveryCodesIssue(request *http.Request) (AuthenticatorRecoveryCodes, error) {
 	var result AuthenticatorRecoveryCodes
 	caller, err := controller.recentCaller(request)
 	err = controller.send(err, EngineCall{
 		Operation:  "authenticator.recovery_codes_issue",
-		Parameters: AuthenticatorPrincipalRequest{PrincipalID: caller.PrincipalID},
+		Parameters: PrincipalReference{PrincipalID: caller.PrincipalID},
 		Result:     &result,
 	})
 	return result, err
 }
 
 // @PostRoute("/passkey-register-begin")
+// @SignedIn
 func (controller *AuthenticatorController) PostPasskeyRegisterBegin(request *http.Request) (AuthenticatorPasskeyChallenge, error) {
 	var result AuthenticatorPasskeyChallenge
 	caller, err := controller.recentCaller(request)
 	err = controller.send(err, EngineCall{
 		Operation:  "authenticator.passkey_register_begin",
-		Parameters: AuthenticatorPrincipalRequest{PrincipalID: caller.PrincipalID},
+		Parameters: PrincipalReference{PrincipalID: caller.PrincipalID},
 		Result:     &result,
 	})
 	return result, err
 }
 
 // @PostRoute("/passkey-register-finish")
+// @SignedIn
 func (controller *AuthenticatorController) PostPasskeyRegisterFinish(
 	request *http.Request,
 	// @FromBody
@@ -107,23 +113,59 @@ func (controller *AuthenticatorController) PostPasskeyRegisterFinish(
 }
 
 // @PostRoute("/passkey-list")
+// @SignedIn
 func (controller *AuthenticatorController) PostPasskeyList(request *http.Request) (AuthenticatorPasskeyList, error) {
 	caller, err := controller.callerService.Resolve(request)
 	return controller.passkeys(caller.PrincipalID, err)
 }
 
 // @PostRoute("/passkey-remove")
+// @SignedIn
 func (controller *AuthenticatorController) PostPasskeyRemove(
 	request *http.Request,
 	// @FromBody
 	body AuthenticatorPasskeyRemoveRequest,
 ) (AuthenticatorPasskeyRemoval, error) {
-	var result AuthenticatorPasskeyRemoval
 	caller, err := controller.recentCaller(request)
-	owned, err := controller.passkeys(caller.PrincipalID, err)
-	err = controller.requireOwned(controller.credentialIdentifiers(owned), body.CredentialID, err)
-	err = controller.send(err, EngineCall{Operation: "authenticator.passkey_remove", Parameters: body, Result: &result})
+	return controller.removePasskey(caller.PrincipalID, body.CredentialID, err)
+}
+
+// @PostRoute("/set-password-for-principal")
+// @Allow(Administrator)
+func (controller *AuthenticatorController) PostSetPasswordForPrincipal(
+	request *http.Request,
+	// @FromBody
+	body AuthenticatorSetPasswordRequest,
+) (AuthenticatorPasswordSet, error) {
+	var result AuthenticatorPasswordSet
+	err := controller.principalTenantService.Call(request, body.PrincipalID, EngineCall{
+		Operation:  controller.setPasswordOperation(),
+		Parameters: body,
+		Result:     &result,
+	})
 	return result, err
+}
+
+// @PostRoute("/passkey-list-for-principal")
+// @Allow(Administrator)
+func (controller *AuthenticatorController) PostPasskeyListForPrincipal(
+	request *http.Request,
+	// @FromBody
+	body PrincipalReference,
+) (AuthenticatorPasskeyList, error) {
+	_, err := controller.principalTenantService.Require(request, body.PrincipalID)
+	return controller.passkeys(body.PrincipalID, err)
+}
+
+// @PostRoute("/passkey-remove-for-principal")
+// @Allow(Administrator)
+func (controller *AuthenticatorController) PostPasskeyRemoveForPrincipal(
+	request *http.Request,
+	// @FromBody
+	body AuthenticatorPasskeyRemoveForPrincipalRequest,
+) (AuthenticatorPasskeyRemoval, error) {
+	_, err := controller.principalTenantService.Require(request, body.PrincipalID)
+	return controller.removePasskey(body.PrincipalID, body.CredentialID, err)
 }
 
 func (controller *AuthenticatorController) recentCaller(request *http.Request) (Caller, error) {
@@ -131,11 +173,27 @@ func (controller *AuthenticatorController) recentCaller(request *http.Request) (
 	return caller, controller.recentSignInService.Require(caller, err)
 }
 
+func (controller *AuthenticatorController) removePasskey(
+	principalID string,
+	credentialID string,
+	failure error,
+) (AuthenticatorPasskeyRemoval, error) {
+	var result AuthenticatorPasskeyRemoval
+	owned, failure := controller.passkeys(principalID, failure)
+	failure = controller.requireOwned(controller.credentialIdentifiers(owned), credentialID, failure)
+	failure = controller.send(failure, EngineCall{
+		Operation:  "authenticator.passkey_remove",
+		Parameters: AuthenticatorPasskeyRemoveRequest{CredentialID: credentialID},
+		Result:     &result,
+	})
+	return result, failure
+}
+
 func (controller *AuthenticatorController) passkeys(principalID string, failure error) (AuthenticatorPasskeyList, error) {
 	var result AuthenticatorPasskeyList
 	failure = controller.send(failure, EngineCall{
 		Operation:  "authenticator.passkey_list",
-		Parameters: AuthenticatorPrincipalRequest{PrincipalID: principalID},
+		Parameters: PrincipalReference{PrincipalID: principalID},
 		Result:     &result,
 	})
 	return result, failure
@@ -161,4 +219,8 @@ func (controller *AuthenticatorController) send(failure error, call EngineCall) 
 		return failure
 	}
 	return controller.engineService.Call(call.Operation, call.Parameters, call.Result)
+}
+
+func (controller *AuthenticatorController) setPasswordOperation() string {
+	return "authenticator.set_password"
 }

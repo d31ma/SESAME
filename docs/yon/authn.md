@@ -35,6 +35,9 @@ names the field path or the model, never the submitted value.
 | `POST /api/v1/authenticator/passkey-register-finish` | `authenticator.passkey_register_finish` | a signed-in caller | the caller only |
 | `POST /api/v1/authenticator/passkey-list` | `authenticator.passkey_list` | a signed-in caller | the caller only |
 | `POST /api/v1/authenticator/passkey-remove` | `authenticator.passkey_remove` | a signed-in caller | a passkey of the caller only |
+| `POST /api/v1/authenticator/set-password-for-principal` | `authenticator.set_password` | an administrator | a principal in the administrator's tenant |
+| `POST /api/v1/authenticator/passkey-list-for-principal` | `authenticator.passkey_list` | an administrator | a principal in the administrator's tenant |
+| `POST /api/v1/authenticator/passkey-remove-for-principal` | `authenticator.passkey_remove` | an administrator | a passkey of a principal in the administrator's tenant |
 | `POST /api/v1/token/jwks` | `token.jwks` | anyone | the public signing key set |
 
 ### Login steps are public
@@ -100,6 +103,28 @@ setting.
 Passkey routes need a deployment created with `sesame init --issuer`; without
 one they answer `500 {"code":"internal_error"}` (the engine reports
 `relying_party_not_configured`).
+
+### Administrator routes
+
+An operation that a principal may run on itself and an administrator may run
+on someone else has two routes: the self-service route above, and a
+`-for-principal` route whose body names the target with `principal_id`. The
+`-for-principal` routes need the `Administrator` role (`403` otherwise). The
+host loads the named principal first and answers
+`403 {"code":"tenant_mismatch"}` when it belongs to another tenant, so an
+administrator never reaches another tenant.
+
+- `set-password-for-principal` takes `{"principal_id","password"}`: a password
+  reset. The administrator chooses the new password; tell the principal to
+  change it.
+- `passkey-list-for-principal` takes `{"principal_id"}`.
+- `passkey-remove-for-principal` takes `{"principal_id","credential_id"}` and
+  removes the passkey only when it belongs to that principal; otherwise
+  `404 {"code":"passkey_not_found"}`. It is the lost-device response.
+
+The administrator routes do not apply the recent sign-in rule: the
+administrator's session is already held to the `Administrator` role, decided
+by the engine for every request.
 
 ## Not routed
 

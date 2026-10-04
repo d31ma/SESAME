@@ -191,6 +191,58 @@ func (test *AuthenticatorControllerTest) TestSessionInsideTheWindowMayChangeAuth
 	Assert.IsTrue(set.PasswordSet)
 }
 
+func (test *AuthenticatorControllerTest) TestAdministratorResetsAMembersPasswordWithAnOlderSession() {
+	setup := SesameTestSetup{}.Provision()
+	defer setup.Remove()
+	administrator := setup.SignIn("acme", true)
+	member := setup.SignInMember("acme", "member")
+	password := rand.Text()
+	controller := test.controllerAfter(11 * time.Minute)
+
+	set, err := controller.PostSetPasswordForPrincipal(
+		test.request(setup, administrator),
+		AuthenticatorSetPasswordRequest{PrincipalID: member.PrincipalID, Password: password},
+	)
+	login := test.loginAs(test.authn(controller), AuthnBeginRequest{
+		TenantID:            member.TenantID,
+		IdentifierNamespace: "email",
+		IdentifierValue:     "member@acme.test",
+	}, password)
+
+	Assert.IsTrue(err == nil)
+	Assert.IsTrue(set.PasswordSet)
+	Assert.Equals("password", login.Assurance)
+}
+
+func (test *AuthenticatorControllerTest) TestAdministratorCannotResetAPasswordInAnotherTenant() {
+	setup := SesameTestSetup{}.Provision()
+	defer setup.Remove()
+	administrator := setup.SignIn("acme", true)
+	stranger := setup.SignIn("globex", false)
+
+	set, err := test.controller().PostSetPasswordForPrincipal(
+		test.request(setup, administrator),
+		AuthenticatorSetPasswordRequest{PrincipalID: stranger.PrincipalID, Password: rand.Text()},
+	)
+
+	Assert.Equals(http.StatusForbidden, test.status(err))
+	Assert.Equals(`{"code":"tenant_mismatch"}`, test.answer(err))
+	Assert.IsTrue(!set.PasswordSet)
+}
+
+func (test *AuthenticatorControllerTest) TestPasswordResetRefusesAnAnonymousCaller() {
+	setup := SesameTestSetup{}.Provision()
+	defer setup.Remove()
+	member := setup.SignIn("acme", false)
+
+	_, err := test.controller().PostSetPasswordForPrincipal(
+		httptest.NewRequest(http.MethodPost, "/", nil),
+		AuthenticatorSetPasswordRequest{PrincipalID: member.PrincipalID, Password: rand.Text()},
+	)
+
+	Assert.Equals(`{"code":"session_rejected"}`, test.answer(err))
+}
+
 func (test *AuthenticatorControllerTest) signIn(setup *SesameTestSetup) (sesame.IssuedSession, string) {
 	client := setup.Open()
 	defer client.Close()
@@ -215,12 +267,15 @@ func (test *AuthenticatorControllerTest) loginWithPassword(
 	session sesame.IssuedSession,
 	password string,
 ) AuthnTransaction {
-	identifier := test.identifier()
-	begun, err := authn.PostBegin(AuthnBeginRequest{
+	return test.loginAs(authn, AuthnBeginRequest{
 		TenantID:            session.TenantID,
-		IdentifierNamespace: identifier.Namespace,
-		IdentifierValue:     identifier.Value,
-	})
+		IdentifierNamespace: test.identifier().Namespace,
+		IdentifierValue:     test.identifier().Value,
+	}, password)
+}
+
+func (test *AuthenticatorControllerTest) loginAs(authn *AuthnController, login AuthnBeginRequest, password string) AuthnTransaction {
+	begun, err := authn.PostBegin(login)
 	test.check(err)
 	verified, err := authn.PostVerifyPassword(AuthnVerifyPasswordRequest{TransactionID: begun.TransactionID, Password: password})
 	test.check(err)
@@ -287,6 +342,10 @@ func (test *AuthenticatorControllerTest) controllerAfter(elapsed time.Duration) 
 		callerService:       &CallerService{engineService: engine},
 		engineService:       engine,
 		recentSignInService: &RecentSignInService{engineService: engine, clockShift: elapsed},
+		principalTenantService: &PrincipalTenantService{
+			callerService: &CallerService{engineService: engine},
+			engineService: engine,
+		},
 	}
 }
 
