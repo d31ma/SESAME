@@ -466,3 +466,50 @@ func TestAuthenticationThroughMachineEdge(t *testing.T) {
 		t.Fatalf("completed transaction reuse = %#v", closed[1])
 	}
 }
+
+func TestPrincipalGetAcceptsExactlyOneLookupForm(t *testing.T) {
+	t.Parallel()
+
+	tenantService, err := identity.New(&memoryLedger{}, nil)
+	if err != nil {
+		t.Fatalf("identity.New() error = %v", err)
+	}
+	processor := New(system.New(buildinfo.New("", "", "")), tenantService)
+	tenantIDs := map[string]string{}
+	for _, name := range []string{"acme", "globex"} {
+		var boot identity.BootstrapResult
+		response := runRequests(t, processor,
+			`{"protocol_version":"1","request_id":"boot","operation":"tenant.bootstrap","parameters":{"name":"`+name+`"}}`,
+		)[0]
+		if err := json.Unmarshal(mustMarshal(t, response.Result), &boot); err != nil {
+			t.Fatalf("decode bootstrap: %v", err)
+		}
+		tenantIDs[name] = boot.Tenant.ID
+	}
+	created := runRequests(t, processor,
+		`{"protocol_version":"1","request_id":"create","operation":"principal.create","parameters":{"tenant_id":"`+tenantIDs["globex"]+`","kind":"human","identifier_namespace":"email","identifier_value":"victim@globex.example"}}`,
+	)[0]
+	var principal struct {
+		PrincipalID string `json:"principal_id"`
+	}
+	if err := json.Unmarshal(mustMarshal(t, created.Result), &principal); err != nil {
+		t.Fatalf("decode created principal: %v", err)
+	}
+
+	mixed := []string{
+		`{"tenant_id":"` + tenantIDs["acme"] + `","principal_id":"` + principal.PrincipalID + `"}`,
+		`{"tenant_id":"` + tenantIDs["globex"] + `","principal_id":"` + principal.PrincipalID + `"}`,
+		`{"principal_id":"` + principal.PrincipalID + `","identifier_namespace":"email"}`,
+		`{"principal_id":"` + principal.PrincipalID + `","identifier_value":"victim@globex.example"}`,
+		`{"principal_id":"` + principal.PrincipalID + `","tenant_id":"` + tenantIDs["globex"] + `","identifier_namespace":"email","identifier_value":"victim@globex.example"}`,
+		`{"tenant_id":"` + tenantIDs["globex"] + `","identifier_namespace":"email"}`,
+	}
+	for _, parameters := range mixed {
+		response := runRequests(t, processor,
+			`{"protocol_version":"1","request_id":"get","operation":"principal.get","parameters":`+parameters+`}`,
+		)[0]
+		if response.OK || response.Error == nil || response.Error.Code != ErrorInvalidRequest {
+			t.Errorf("principal.get %s = %#v, want %s", parameters, response, ErrorInvalidRequest)
+		}
+	}
+}

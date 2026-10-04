@@ -463,10 +463,13 @@ func (p *Processor) handlePrincipalGet(request Request) Response {
 	}
 
 	byID := parameters.PrincipalID != ""
+	namesIdentifier := parameters.TenantID != "" ||
+		parameters.IdentifierNamespace != "" ||
+		parameters.IdentifierValue != ""
 	byIdentifier := parameters.TenantID != "" &&
 		parameters.IdentifierNamespace != "" &&
 		parameters.IdentifierValue != ""
-	if byID == byIdentifier {
+	if byID == namesIdentifier || byID == byIdentifier {
 		return errorResponse(
 			request.RequestID,
 			ErrorInvalidRequest,
