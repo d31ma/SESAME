@@ -77,3 +77,10 @@ func TestStartWhenAvailableStartsAFreeDeployment(t *testing.T) {
 		t.Fatalf("Ping() error = %v", err)
 	}
 }
+
+func TestProtocolErrorNamesItsCode(t *testing.T) {
+	failure := &ProtocolError{Code: "principal_not_found", Message: "no such principal"}
+	if failure.ErrorCode() != "principal_not_found" {
+		t.Fatalf("ErrorCode() = %q, want principal_not_found", failure.ErrorCode())
+	}
+}

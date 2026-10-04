@@ -4,6 +4,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/d31ma/sesame/server/packages/host"
 	"github.com/d31ma/sesame/server/packages/sesame"
 )
 
@@ -50,7 +51,7 @@ func (service *EngineService) send(operation string, parameters any, result any)
 
 func (service *EngineService) busyWhenOutOfTime(failure error) error {
 	if errors.Is(failure, sesame.ErrDeploymentLocked) {
-		return &EngineBusyError{}
+		return &host.EngineBusyError{}
 	}
 	return failure
 }

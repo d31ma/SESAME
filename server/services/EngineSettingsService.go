@@ -3,6 +3,8 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+
+	"github.com/d31ma/sesame/server/packages/host"
 )
 
 // @Service
@@ -17,7 +19,7 @@ func (service *EngineSettingsService) Read() (EngineSettings, error) {
 
 func (service *EngineSettingsService) validated(settings EngineSettings, failure error) (EngineSettings, error) {
 	if !service.usable(settings, failure) {
-		return EngineSettings{}, &EngineNotConfiguredError{}
+		return EngineSettings{}, &host.EngineNotConfiguredError{}
 	}
 	return settings, nil
 }

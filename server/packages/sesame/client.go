@@ -83,6 +83,11 @@ func (e *ProtocolError) Error() string {
 	return fmt.Sprintf("sesame protocol error %s: %s", e.Code, e.Message)
 }
 
+// ErrorCode returns the stable machine-protocol error code.
+func (e *ProtocolError) ErrorCode() string {
+	return e.Code
+}
+
 // Client owns one long-lived local SESAME subprocess.
 type Client struct {
 	mu      sync.Mutex

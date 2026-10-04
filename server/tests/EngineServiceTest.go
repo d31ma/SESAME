@@ -2,6 +2,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/d31ma/sesame/server/packages/host"
 	"github.com/d31ma/sesame/server/packages/sesame"
 )
 
@@ -43,7 +44,7 @@ func (test *EngineServiceTest) TestCallAnswersBusyWhenAnotherEngineHoldsTheDeplo
 	err := test.engine().Call("system.ping", struct{}{}, &SystemPing{})
 	waited := time.Since(started)
 
-	var busy *EngineBusyError
+	var busy *host.EngineBusyError
 	Assert.IsTrue(errors.As(err, &busy))
 	Assert.IsTrue(waited >= 300*time.Millisecond)
 	Assert.IsTrue(waited < 5*time.Second)
@@ -129,14 +130,14 @@ func (test *EngineServiceTest) TestCallRefusesWithoutTheApplicationSnapshot() {
 
 	err := test.engine().Call("system.ping", struct{}{}, &SystemPing{})
 
-	var notConfigured *EngineNotConfiguredError
+	var notConfigured *host.EngineNotConfiguredError
 	Assert.IsTrue(errors.As(err, &notConfigured))
 }
 
 func (test *EngineServiceTest) refuses(setup *SesameTestSetup, settings map[string]any) bool {
 	setup.UseSettings(settings)
 	err := test.engine().Call("system.ping", struct{}{}, &SystemPing{})
-	var notConfigured *EngineNotConfiguredError
+	var notConfigured *host.EngineNotConfiguredError
 	return errors.As(err, &notConfigured)
 }
 
