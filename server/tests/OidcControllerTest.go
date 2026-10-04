@@ -347,7 +347,7 @@ func (test *OidcControllerTest) familyID(setup *SesameTestSetup) string {
 	found := ""
 	_ = filepath.WalkDir(events, func(path string, entry os.DirEntry, err error) error {
 		data, _ := os.ReadFile(path)
-		found = found + string(regexp.MustCompile(`rfm_[0-9a-f]{32}`).Find(data))
+		found += string(regexp.MustCompile(`rfm_[0-9a-f]{32}`).Find(data))
 		return nil
 	})
 	return found[:len("rfm_")+32]

@@ -9,7 +9,7 @@ import (
 // @Service
 type InteractionCookieService struct{}
 
-func (service *InteractionCookieService) Public(response sesame.StandardsResponse) sesame.StandardsResponse {
+func (service *InteractionCookieService) WithoutSecret(response sesame.StandardsResponse) sesame.StandardsResponse {
 	action := *response.Action
 	body, _ := json.Marshal(OidcInteractionStarted{
 		InteractionID: action.InteractionID,

@@ -14,14 +14,15 @@ func (controller *OidcController) PostInteractionGet(
 	request *http.Request,
 	// @FromCookie("__Secure-sesame_interaction")
 	interaction string,
-) (result OidcInteraction, err error) {
+) (OidcInteraction, error) {
+	var result OidcInteraction
 	handle := controller.interactionCookieService.Handle(interaction)
-	err = controller.tenantCallService.LoadAsCaller(request, EngineCall{
+	err := controller.tenantCallService.LoadAsCaller(request, EngineCall{
 		Operation:  "oidc.interaction_get",
 		Parameters: handle,
 		Result:     &result,
 	})
-	return
+	return result, err
 }
 
 // @PostRoute("/interaction-complete")
@@ -30,10 +31,11 @@ func (controller *OidcController) PostInteractionComplete(
 	request *http.Request,
 	// @FromCookie("__Secure-sesame_interaction")
 	interaction string,
-) (result OidcAuthorizationCode, err error) {
+) (OidcAuthorizationCode, error) {
+	var result OidcAuthorizationCode
 	handle := controller.interactionCookieService.Handle(interaction)
-	err = controller.tenantCallService.CallAsCaller(request, controller.completionFor(handle, &result))
-	return
+	err := controller.tenantCallService.CallAsCaller(request, controller.completionFor(handle, &result))
+	return result, err
 }
 
 // @PostRoute("/consent-grant")
@@ -42,9 +44,10 @@ func (controller *OidcController) PostConsentGrant(
 	request *http.Request,
 	// @FromBody
 	body OidcConsentGrantRequest,
-) (result OidcConsent, err error) {
-	err = controller.tenantCallService.CallAsCaller(request, controller.grantFor(body, &result))
-	return
+) (OidcConsent, error) {
+	var result OidcConsent
+	err := controller.tenantCallService.CallAsCaller(request, controller.grantFor(body, &result))
+	return result, err
 }
 
 // @PostRoute("/consent-get")
@@ -53,9 +56,10 @@ func (controller *OidcController) PostConsentGet(
 	request *http.Request,
 	// @FromBody
 	body OidcConsentRequest,
-) (result OidcConsent, err error) {
-	err = controller.tenantCallService.CallAsCaller(request, controller.consentFor("oidc.consent_get", body.ClientID, &result))
-	return
+) (OidcConsent, error) {
+	var result OidcConsent
+	err := controller.tenantCallService.CallAsCaller(request, controller.consentFor("oidc.consent_get", body.ClientID, &result))
+	return result, err
 }
 
 // @PostRoute("/consent-withdraw")
@@ -64,9 +68,10 @@ func (controller *OidcController) PostConsentWithdraw(
 	request *http.Request,
 	// @FromBody
 	body OidcConsentRequest,
-) (result OidcConsentWithdrawn, err error) {
-	err = controller.tenantCallService.CallAsCaller(request, controller.consentFor("oidc.consent_withdraw", body.ClientID, &result))
-	return
+) (OidcConsentWithdrawn, error) {
+	var result OidcConsentWithdrawn
+	err := controller.tenantCallService.CallAsCaller(request, controller.consentFor("oidc.consent_withdraw", body.ClientID, &result))
+	return result, err
 }
 
 // @PostRoute("/device-lookup")
@@ -75,9 +80,10 @@ func (controller *OidcController) PostDeviceLookup(
 	request *http.Request,
 	// @FromBody
 	body OidcUserCodeRequest,
-) (result OidcDeviceRequest, err error) {
-	err = controller.tenantCallService.CallAsCaller(request, controller.userCodeFor("oidc.device_lookup", body.UserCode, &result))
-	return
+) (OidcDeviceRequest, error) {
+	var result OidcDeviceRequest
+	err := controller.tenantCallService.CallAsCaller(request, controller.userCodeFor("oidc.device_lookup", body.UserCode, &result))
+	return result, err
 }
 
 // @PostRoute("/device-approve")
@@ -86,9 +92,10 @@ func (controller *OidcController) PostDeviceApprove(
 	request *http.Request,
 	// @FromBody
 	body OidcUserCodeRequest,
-) (result OidcDeviceRequest, err error) {
-	err = controller.tenantCallService.CallAsCaller(request, controller.approvalFor(body.UserCode, &result))
-	return
+) (OidcDeviceRequest, error) {
+	var result OidcDeviceRequest
+	err := controller.tenantCallService.CallAsCaller(request, controller.approvalFor(body.UserCode, &result))
+	return result, err
 }
 
 // @PostRoute("/device-deny")
@@ -97,9 +104,10 @@ func (controller *OidcController) PostDeviceDeny(
 	request *http.Request,
 	// @FromBody
 	body OidcUserCodeRequest,
-) (result OidcDeviceDenied, err error) {
-	err = controller.tenantCallService.CallAsCaller(request, controller.userCodeFor("oidc.device_deny", body.UserCode, &result))
-	return
+) (OidcDeviceDenied, error) {
+	var result OidcDeviceDenied
+	err := controller.tenantCallService.CallAsCaller(request, controller.userCodeFor("oidc.device_deny", body.UserCode, &result))
+	return result, err
 }
 
 // @PostRoute("/pushed-authorize")
@@ -107,9 +115,10 @@ func (controller *OidcController) PostDeviceDeny(
 func (controller *OidcController) PostPushedAuthorize(
 	// @FromBody
 	body OidcPushedAuthorizeRequest,
-) (result OidcPushedRequest, err error) {
-	err = controller.engineService.Call("oidc.pushed_authorize", body, &result)
-	return
+) (OidcPushedRequest, error) {
+	var result OidcPushedRequest
+	err := controller.engineService.Call("oidc.pushed_authorize", body, &result)
+	return result, err
 }
 
 // @PostRoute("/device-authorize")
@@ -117,9 +126,10 @@ func (controller *OidcController) PostPushedAuthorize(
 func (controller *OidcController) PostDeviceAuthorize(
 	// @FromBody
 	body OidcDeviceAuthorizeRequest,
-) (result OidcDeviceStarted, err error) {
-	err = controller.engineService.Call("oidc.device_authorize", body, &result)
-	return
+) (OidcDeviceStarted, error) {
+	var result OidcDeviceStarted
+	err := controller.engineService.Call("oidc.device_authorize", body, &result)
+	return result, err
 }
 
 // @PostRoute("/dpop-verify")
@@ -127,9 +137,10 @@ func (controller *OidcController) PostDeviceAuthorize(
 func (controller *OidcController) PostDpopVerify(
 	// @FromBody
 	body OidcDpopVerifyRequest,
-) (result OidcDpopVerification, err error) {
-	err = controller.engineService.Call("oidc.dpop_verify", body, &result)
-	return
+) (OidcDpopVerification, error) {
+	var result OidcDpopVerification
+	err := controller.engineService.Call("oidc.dpop_verify", body, &result)
+	return result, err
 }
 
 // @PostRoute("/refresh-family-get")
@@ -138,9 +149,10 @@ func (controller *OidcController) PostRefreshFamilyGet(
 	request *http.Request,
 	// @FromBody
 	body OidcRefreshFamilyReference,
-) (result OidcRefreshFamily, err error) {
-	err = controller.tenantCallService.Load(request, controller.familyLookup(body.FamilyID, &result))
-	return
+) (OidcRefreshFamily, error) {
+	var result OidcRefreshFamily
+	err := controller.tenantCallService.Load(request, controller.familyLookup(body.FamilyID, &result))
+	return result, err
 }
 
 // @PostRoute("/refresh-family-revoke")
@@ -149,10 +161,11 @@ func (controller *OidcController) PostRefreshFamilyRevoke(
 	request *http.Request,
 	// @FromBody
 	body OidcRefreshFamilyRevokeRequest,
-) (result OidcRefreshFamilyRevoked, err error) {
+) (OidcRefreshFamilyRevoked, error) {
+	var result OidcRefreshFamilyRevoked
 	revoke := EngineCall{Operation: "oidc.refresh_family_revoke", Parameters: body, Result: &result}
-	err = controller.tenantCallService.CallOwned(request, controller.familyLookup(body.FamilyID, &OidcRefreshFamily{}), revoke)
-	return
+	err := controller.tenantCallService.CallOwned(request, controller.familyLookup(body.FamilyID, &OidcRefreshFamily{}), revoke)
+	return result, err
 }
 
 func (controller *OidcController) familyLookup(familyID string, result *OidcRefreshFamily) EngineCall {

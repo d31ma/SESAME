@@ -54,7 +54,7 @@ func (service *StandardsAnswerService) interaction(response sesame.StandardsResp
 	if !service.interactive(response) {
 		return service.rendered(service.unavailable())
 	}
-	answer := service.rendered(service.interactionCookieService.Public(response))
+	answer := service.rendered(service.interactionCookieService.WithoutSecret(response))
 	answer.Header.Add(service.cookieHeader(), service.interactionCookieService.Cookie(*response.Action).String())
 	return answer
 }
