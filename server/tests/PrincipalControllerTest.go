@@ -115,6 +115,35 @@ func (test *PrincipalControllerTest) TestGetRefusesAnIdentifierOfAnotherTenant()
 	Assert.Equals("", principal.PrincipalID)
 }
 
+func (test *PrincipalControllerTest) TestGetRefusesAForeignPrincipalIDNamedWithTheCallersTenant() {
+	setup := SesameTestSetup{}.Provision()
+	defer setup.Remove()
+	administrator := setup.SignIn("acme", true)
+	other := setup.SignIn("globex", true)
+	lookup := PrincipalGetRequest{TenantID: administrator.TenantID, PrincipalID: other.PrincipalID}
+
+	principal, err := test.controller().PostGet(test.request(setup.Credential(administrator)), lookup)
+
+	var mixed *host.MixedPrincipalLookupError
+	Assert.IsTrue(errors.As(err, &mixed))
+	Assert.Equals("invalid_request", test.publicCode(err))
+	Assert.Equals("", principal.PrincipalID)
+	Assert.Equals("", principal.Identifier.Value)
+}
+
+func (test *PrincipalControllerTest) TestGetRefusesAPrincipalIDMixedWithAnIdentifier() {
+	setup := SesameTestSetup{}.Provision()
+	defer setup.Remove()
+	administrator := setup.SignIn("acme", true)
+	lookup := PrincipalGetRequest{PrincipalID: administrator.PrincipalID, IdentifierNamespace: "email", IdentifierValue: "person@acme.test"}
+
+	principal, err := test.controller().PostGet(test.request(setup.Credential(administrator)), lookup)
+
+	var mixed *host.MixedPrincipalLookupError
+	Assert.IsTrue(errors.As(err, &mixed))
+	Assert.Equals("", principal.PrincipalID)
+}
+
 func (test *PrincipalControllerTest) TestGetRefusesAnEmptyRequest() {
 	setup := SesameTestSetup{}.Provision()
 	defer setup.Remove()
@@ -174,6 +203,15 @@ func (test *PrincipalControllerTest) code(err error) string {
 	protocolError := &sesame.ProtocolError{}
 	errors.As(err, &protocolError)
 	return protocolError.Code
+}
+
+func (test *PrincipalControllerTest) publicCode(err error) string {
+	var coded host.CodedError
+	errors.As(err, &coded)
+	if coded == nil {
+		return ""
+	}
+	return coded.ErrorCode()
 }
 
 func (test *PrincipalControllerTest) anonymous() *http.Request {

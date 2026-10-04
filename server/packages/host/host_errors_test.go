@@ -10,6 +10,7 @@ func TestEveryHostErrorNamesItsCode(t *testing.T) {
 	cases := map[string]CodedError{
 		"engine_busy":               &EngineBusyError{},
 		"engine_not_configured":     &EngineNotConfiguredError{},
+		"invalid_request":           &MixedPrincipalLookupError{},
 		"passkey_not_found":         &PasskeyNotFoundError{},
 		"reauthentication_required": &ReauthenticationRequiredError{},
 		"session_rejected":          &SessionRejectedError{},
