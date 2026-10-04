@@ -30,10 +30,10 @@ records why it works this way.
   makes the server run that one instead.
 - A reverse proxy in front of `ty` that terminates TLS and limits request
   rates. It is not optional; see [Reverse proxy](#reverse-proxy-required).
-- macOS or Linux. The host has not been tested on Windows, where the Go
-  package can end only the `sesame` process and not the FYLO runtime it
-  started, so a request that gives up on an engine can leave the deployment
-  held until that runtime exits
+- A Unix host; the Yon host is developed and tested on macOS. It has not
+  been tested on Windows, where the Go package can end only the `sesame`
+  process and not the FYLO runtime it started, so a request that gives up on
+  an engine can leave the deployment held until that runtime exits
   ([ADR 0007](adr/0007-sesame-ships-a-yon-host-project.md)).
 
 ## Prepare an engine and a deployment
