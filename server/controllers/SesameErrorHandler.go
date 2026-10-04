@@ -54,13 +54,21 @@ func (handler *SesameErrorHandler) response(headers http.Header, status int, pro
 func (handler *SesameErrorHandler) headers(status int, code string) http.Header {
 	headers := http.Header{}
 	headers.Set("Content-Type", "application/json")
+	handler.retryLater(headers, status)
+	handler.challengeBearer(headers, code)
+	return headers
+}
+
+func (handler *SesameErrorHandler) retryLater(headers http.Header, status int) {
 	if status == http.StatusServiceUnavailable {
 		headers.Set("Retry-After", handler.retryAfterSeconds())
 	}
+}
+
+func (handler *SesameErrorHandler) challengeBearer(headers http.Header, code string) {
 	if code == handler.bearerRefusalCode() {
 		headers.Set("WWW-Authenticate", handler.bearerChallenge())
 	}
-	return headers
 }
 
 func (handler *SesameErrorHandler) bearerRefusalCode() string {

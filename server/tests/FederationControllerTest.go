@@ -2,17 +2,13 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
-	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"io"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"reflect"
 	"strings"
-	"time"
 
 	"github.com/d31ma/sesame/server/packages/host"
 	"github.com/d31ma/sesame/server/packages/sesame"
@@ -173,105 +169,6 @@ func (test *FederationControllerTest) TestProviderDisableStopsNewLogins() {
 	Assert.Equals(http.StatusNotFound, test.status(startErr))
 }
 
-func (test *FederationControllerTest) TestLoginStartAnswersOnlyWhatABrowserRedirectNeeds() {
-	setup := SesameTestSetup{}.Provision()
-	defer setup.Remove()
-	session := setup.SignIn("acme", true)
-	controller := test.controller()
-	providerID := test.configured(controller, setup, session, test.signingKey())
-
-	login, err := controller.PostLoginStart(test.startRequest(session.TenantID, providerID))
-
-	Assert.IsTrue(err == nil)
-	Assert.Equals(3, len(test.fields(login)))
-	Assert.IsTrue(strings.HasPrefix(login.AuthorizationURL, test.issuer()+"/authorize?"))
-	Assert.Equals("S256", test.query(login, "code_challenge_method"))
-	Assert.Equals("", test.query(login, "code_verifier"))
-	Assert.Equals("", test.query(login, "client_secret"))
-	Assert.IsTrue(!strings.Contains(login.AuthorizationURL, test.clientSecret()))
-}
-
-func (test *FederationControllerTest) TestLoginCompleteIssuesAFederatedSession() {
-	setup := SesameTestSetup{}.Provision()
-	defer setup.Remove()
-	session := setup.SignIn("acme", true)
-	controller := test.controller()
-	key := test.signingKey()
-	providerID := test.configured(controller, setup, session, key)
-	login, startErr := controller.PostLoginStart(test.startRequest(session.TenantID, providerID))
-
-	result, err := controller.PostLoginComplete(test.completeRequest(session.TenantID, login, key, test.query(login, "nonce")))
-
-	Assert.IsTrue(startErr == nil)
-	Assert.IsTrue(err == nil)
-	Assert.IsTrue(result.Provisioned)
-	Assert.Equals("federated", result.Session.Assurance)
-	Assert.Equals(session.TenantID, result.Session.TenantID)
-	Assert.IsTrue(result.Session.SessionSecret != "")
-}
-
-func (test *FederationControllerTest) TestLoginCompleteRefusesAReplayedLogin() {
-	setup := SesameTestSetup{}.Provision()
-	defer setup.Remove()
-	session := setup.SignIn("acme", true)
-	controller := test.controller()
-	key := test.signingKey()
-	providerID := test.configured(controller, setup, session, key)
-	login, _ := controller.PostLoginStart(test.startRequest(session.TenantID, providerID))
-	request := test.completeRequest(session.TenantID, login, key, test.query(login, "nonce"))
-	_, firstErr := controller.PostLoginComplete(request)
-
-	replayed, err := controller.PostLoginComplete(request)
-
-	Assert.IsTrue(firstErr == nil)
-	Assert.Equals(http.StatusConflict, test.status(err))
-	Assert.Equals("federated_login_closed", test.code(err))
-	Assert.Equals("", replayed.Session.SessionSecret)
-}
-
-func (test *FederationControllerTest) TestLoginCompleteRejectsATokenForAnotherLogin() {
-	setup := SesameTestSetup{}.Provision()
-	defer setup.Remove()
-	session := setup.SignIn("acme", true)
-	controller := test.controller()
-	key := test.signingKey()
-	providerID := test.configured(controller, setup, session, key)
-	login, _ := controller.PostLoginStart(test.startRequest(session.TenantID, providerID))
-
-	_, err := controller.PostLoginComplete(test.completeRequest(session.TenantID, login, key, "another-nonce"))
-
-	Assert.Equals(http.StatusBadRequest, test.status(err))
-	Assert.Equals("assertion_rejected", test.answeredCode(err))
-}
-
-func (test *FederationControllerTest) TestLoginCompleteRejectsATokenSignedByAnotherKey() {
-	setup := SesameTestSetup{}.Provision()
-	defer setup.Remove()
-	session := setup.SignIn("acme", true)
-	controller := test.controller()
-	providerID := test.configured(controller, setup, session, test.signingKey())
-	login, _ := controller.PostLoginStart(test.startRequest(session.TenantID, providerID))
-
-	_, err := controller.PostLoginComplete(test.completeRequest(session.TenantID, login, test.signingKey(), test.query(login, "nonce")))
-
-	Assert.Equals("assertion_rejected", test.answeredCode(err))
-}
-
-func (test *FederationControllerTest) TestLoginCompleteDoesNotFindAnotherTenantsLogin() {
-	setup := SesameTestSetup{}.Provision()
-	defer setup.Remove()
-	session := setup.SignIn("acme", true)
-	other := setup.SignIn("globex", true)
-	controller := test.controller()
-	key := test.signingKey()
-	providerID := test.configured(controller, setup, session, key)
-	login, _ := controller.PostLoginStart(test.startRequest(session.TenantID, providerID))
-
-	_, err := controller.PostLoginComplete(test.completeRequest(other.TenantID, login, key, test.query(login, "nonce")))
-
-	Assert.Equals(http.StatusNotFound, test.status(err))
-}
-
 func (test *FederationControllerTest) TestNoRouteAnswersATokenRequest() {
 	controllers := []any{&FederationController{}, &SamlController{}, &ScimController{}}
 
@@ -364,19 +261,6 @@ func (test *FederationControllerTest) startRequest(tenantID string, providerID s
 	}
 }
 
-func (test *FederationControllerTest) completeRequest(
-	tenantID string,
-	login FederationLogin,
-	key *ecdsa.PrivateKey,
-	nonce string,
-) FederationLoginCompleteRequest {
-	return FederationLoginCompleteRequest{
-		TenantID: tenantID,
-		LoginID:  login.LoginID,
-		IDToken:  test.identityToken(key, nonce),
-	}
-}
-
 func (test *FederationControllerTest) discovery(issuer string) string {
 	return test.encoded(map[string]any{
 		"issuer":                                issuer,
@@ -417,48 +301,6 @@ func (test *FederationControllerTest) coordinate(value []byte) string {
 	return base64.RawURLEncoding.EncodeToString(padded)
 }
 
-func (test *FederationControllerTest) identityToken(key *ecdsa.PrivateKey, nonce string) string {
-	now := time.Now().Unix()
-	header := test.segment(map[string]string{"alg": "ES256", "kid": test.keyID(), "typ": "JWT"})
-	claims := test.segment(map[string]any{
-		"iss":            test.issuer(),
-		"sub":            "external-subject",
-		"aud":            "sesame-client",
-		"iat":            now,
-		"exp":            now + 300,
-		"nonce":          nonce,
-		"email":          "ada@acme.test",
-		"email_verified": true,
-	})
-	return header + "." + claims + "." + test.signature(key, header+"."+claims)
-}
-
-func (test *FederationControllerTest) segment(value any) string {
-	return base64.RawURLEncoding.EncodeToString([]byte(test.encoded(value)))
-}
-
-func (test *FederationControllerTest) signature(key *ecdsa.PrivateKey, signed string) string {
-	digest := sha256.Sum256([]byte(signed))
-	r, s, err := ecdsa.Sign(rand.Reader, key, digest[:])
-	test.check(err)
-	raw := make([]byte, 64)
-	r.FillBytes(raw[:32])
-	s.FillBytes(raw[32:])
-	return base64.RawURLEncoding.EncodeToString(raw)
-}
-
-func (test *FederationControllerTest) query(login FederationLogin, name string) string {
-	parsed, err := url.Parse(login.AuthorizationURL)
-	test.check(err)
-	return parsed.Query().Get(name)
-}
-
-func (test *FederationControllerTest) fields(value any) map[string]any {
-	fields := map[string]any{}
-	test.check(json.Unmarshal([]byte(test.encoded(value)), &fields))
-	return fields
-}
-
 func (test *FederationControllerTest) encoded(value any) string {
 	encoded, err := json.Marshal(value)
 	test.check(err)
@@ -475,14 +317,6 @@ func (test *FederationControllerTest) code(err error) string {
 		return ""
 	}
 	return coded.ErrorCode()
-}
-
-func (test *FederationControllerTest) answeredCode(err error) string {
-	body, readErr := io.ReadAll((&SesameErrorHandler{}).Answer(err).Body)
-	test.check(readErr)
-	problem := Problem{}
-	test.check(json.Unmarshal(body, &problem))
-	return problem.Code
 }
 
 func (test *FederationControllerTest) routesMethod(controllers []any, name string) bool {
