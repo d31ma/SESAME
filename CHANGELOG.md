@@ -190,8 +190,9 @@ Fixes from the security review of the Yon host, before any release:
   privilege changes (`authenticator/set-password-for-principal`,
   `authenticator/passkey-remove-for-principal`, `grant/create`,
   `group/member-add`, `principal/suspend`, `oidc-client/rotate-secret`,
-  federation and SAML provider registration and configuration, SCIM client
-  registration and token rotation) need a session issued within 10 minutes
+  `federation/provider-register`, `federation/provider-configure`,
+  `saml/provider-register`, `scim/client-register` and
+  `scim/client-rotate-token`) need a session issued within 10 minutes
   (`403 reauthentication_required`), as self-service authenticator changes
   already did. Revocations do not.
 - **Interaction secret ignored.** `oidc/interaction-get` now needs the
