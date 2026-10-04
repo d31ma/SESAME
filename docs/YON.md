@@ -100,7 +100,8 @@ Do not set a value in both places: `ty` refuses a `.env` value that overwrites
 a value from a JSON file. When a path is missing or relative, the wait is out
 of range, or an allowlist entry is not an absolute `https` URL without a
 fragment, every request that needs the engine answers
-`500 {"code":"internal_error"}` and the engine is not started.
+`500 {"code":"internal_error"}` (internally the host's `engine_not_configured`)
+and the engine is not started.
 
 ## Run
 
@@ -279,7 +280,7 @@ JSON `{"code":"<code>"}` through one code-to-status table:
 
 | Status | When |
 | --- | --- |
-| `400` | The engine or the host refused the request as invalid (`invalid_request`, `redirect_not_allowed`, ...). |
+| `400` | The engine or the host refused the request as invalid: `invalid_request` (also the host's answer to `principal/get` naming `principal_id` together with `tenant_id` or an identifier field), `redirect_not_allowed` (a `login-start` URL not in the allowlist settings), and the engine's other validation codes. |
 | `401` | `session_rejected`, `session_inactive`, `actor_session_invalid`, `provisioning_denied` (with `WWW-Authenticate: Bearer`). |
 | `403` | `tenant_mismatch`, `actor_tenant_mismatch`, `access_denied`, `administrator_required` (an administrative call by a caller that is not an administrator, for example through `ty handler invoke`), `reauthentication_required` (a credential or privilege change with a session issued more than 10 minutes ago) and other refusals. |
 | `404` | A named record does not exist (`principal_not_found`, ...). |
