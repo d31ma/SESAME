@@ -160,7 +160,8 @@ caller resolved in the controller). Cross-tenant administration is not available
 An `EngineCall` marked `Privileged` (credential and privilege changes:
 `authenticator/set-password-for-principal`,
 `authenticator/passkey-remove-for-principal`, `grant/create`,
-`group/member-add`, `principal/suspend`, `oidc-client/rotate-secret`, the
+`group/member-add`, `principal/suspend`, `oidc-client/register`,
+`oidc-client/rotate-secret`, the
 self-service authenticator changes, and the federation, SAML and SCIM
 credential routes listed in docs/yon/federation.md) also needs a session
 issued within the last 10 minutes (`RecentSignInService`,

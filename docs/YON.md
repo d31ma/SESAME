@@ -404,7 +404,7 @@ The Go SDK and the host errors have ordinary Go tests:
 
 `tools/yon-smoke/smoke.sh` checks the running server end to end with `curl`.
 It needs `ty`, `curl` and `jq` on `PATH`, an engine built from this tree and
-the FYLO executable (with `chex` beside it):
+the FYLO executable (with `chex` beside it or on `PATH`):
 
 ```bash
 go build -trimpath -o /tmp/sesame-smoke/sesame ./cmd/sesame

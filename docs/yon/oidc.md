@@ -146,7 +146,7 @@ name another principal, session or tenant.
 
 | Route | Operation | Who may call | Bound to the caller |
 | --- | --- | --- | --- |
-| `POST /api/v1/oidc-client/register` | `oidc_client.register` | an administrator | the body's `tenant_id` must be the caller's tenant |
+| `POST /api/v1/oidc-client/register` | `oidc_client.register` | an administrator, signed in within 10 minutes (older: `403 {"code":"reauthentication_required"}`) | the body's `tenant_id` must be the caller's tenant; registering mints a client secret |
 | `POST /api/v1/oidc-client/get` | `oidc_client.get` | an administrator | the client is loaded, then refused unless it is in the caller's tenant |
 | `POST /api/v1/oidc-client/rotate-secret` | `oidc_client.rotate_secret` | an administrator, signed in within 10 minutes (older: `403 {"code":"reauthentication_required"}`) | as `get`; nothing is rotated otherwise |
 | `POST /api/v1/oidc-client/disable` | `oidc_client.disable` | an administrator | as `get`; nothing is disabled otherwise |

@@ -153,6 +153,10 @@ and releases use UTC-derived CalVer in `YY.WW.DD` form.
 
 ### Changed
 
+- `/api.json` now publishes the response model of the OIDC self-service and
+  protocol routes under `/api/v1/oidc`, and models with the same shape and
+  meaning were merged (`AuthnIssuedSession`, `DisableOutcome`, `RevokeOutcome`,
+  `OidcClientReference`, `AuthorizeSessionQuestion`). No JSON field changed.
 - CI runs the Go package tests in `server/packages` instead of nine SDK
   contract jobs and the client-bundle job, and checks formatting of the Go
   module sources only (Yon handler files are checked by `ty`). The Yon host's
@@ -193,8 +197,8 @@ Fixes from the security review of the Yon host, before any release:
 - **Privileged changes from an old session.** Administrator credential and
   privilege changes (`authenticator/set-password-for-principal`,
   `authenticator/passkey-remove-for-principal`, `grant/create`,
-  `group/member-add`, `principal/suspend`, `oidc-client/rotate-secret`,
-  `federation/provider-register`, `federation/provider-configure`,
+  `group/member-add`, `principal/suspend`, `oidc-client/register`,
+  `oidc-client/rotate-secret`, `federation/provider-register`, `federation/provider-configure`,
   `saml/provider-register`, `scim/client-register` and
   `scim/client-rotate-token`) need a session issued within 10 minutes
   (`403 reauthentication_required`), as self-service authenticator changes

@@ -582,7 +582,12 @@ table (parsed from the processor, so the manifest cannot claim an operation
 the engine does not route), against this document (so no operation ships
 undocumented), and against the route annotations in `server/controllers` (so
 a route cannot appear or disappear, and a new operation cannot ship, without
-recording how it is reached). Every operation stays reachable through this
+recording how it is reached). Each `routed` or `standard_endpoint` entry also
+records, under `access`, the guard every one of its routes declares
+(`public`, `signed_in` or `administrator`; a method annotation wins over the
+controller's). `test/contract` fails when a route has no guard, two guards, or
+a guard other than the recorded one, so changing who may call a route changes
+this manifest in the same commit. Every operation stays reachable through this
 protocol and the Go package, routed or not.
 
 `fixtures.ndjson` holds request and response pairs. A test replays each
