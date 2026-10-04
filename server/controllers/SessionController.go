@@ -27,19 +27,30 @@ func (controller *SessionController) PostRevoke(
 ) (SessionRevocation, error) {
 	var result SessionRevocation
 	caller, err := controller.callerService.Resolve(request)
-	err = controller.revoke(caller, body, &result, err)
+	err = controller.send(controller.ownSession(caller, body), &result, err)
 	return result, err
 }
 
-func (controller *SessionController) revoke(
-	caller Caller,
-	body SessionRevokeReason,
-	result *SessionRevocation,
-	failure error,
-) error {
+// @PostRoute("/revoke-by-id")
+// @Allow(Administrator)
+func (controller *SessionController) PostRevokeByID(
+	request *http.Request,
+	// @FromBody
+	body SessionRevokeRequest,
+) (SessionRevocation, error) {
+	var result SessionRevocation
+	_, err := controller.callerService.Resolve(request)
+	err = controller.send(body, &result, err)
+	return result, err
+}
+
+func (controller *SessionController) ownSession(caller Caller, body SessionRevokeReason) SessionRevokeRequest {
+	return SessionRevokeRequest{SessionID: caller.SessionID, Reason: body.Reason}
+}
+
+func (controller *SessionController) send(order SessionRevokeRequest, result *SessionRevocation, failure error) error {
 	if failure != nil {
 		return failure
 	}
-	order := SessionRevokeRequest{SessionID: caller.SessionID, Reason: body.Reason}
 	return controller.engineService.Call("session.revoke", order, result)
 }

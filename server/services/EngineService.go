@@ -18,13 +18,14 @@ type EngineService struct {
 	actor                 *sesame.Actor
 }
 
-func (service *EngineService) ActAs(caller Caller) {
-	service.actor = &sesame.Actor{TenantID: caller.TenantID, PrincipalID: caller.PrincipalID, SessionID: caller.SessionID}
-}
-
 func (service *EngineService) Call(operation string, parameters any, result any) error {
 	service.opening.Do(service.open)
-	return service.send(operation, parameters, result)
+	failure := service.attributable(service.failure)
+	return service.send(service.attribution(), EngineCall{Operation: operation, Parameters: parameters, Result: result}, failure)
+}
+
+func (service *EngineService) ActAs(caller Caller) {
+	service.actor = &sesame.Actor{TenantID: caller.TenantID, PrincipalID: caller.PrincipalID, SessionID: caller.SessionID}
 }
 
 func (service *EngineService) open() {
@@ -47,21 +48,25 @@ func (service *EngineService) start(settings EngineSettings, failure error) (*se
 	})
 }
 
-func (service *EngineService) send(operation string, parameters any, result any) error {
-	if service.failure != nil {
-		return service.failure
-	}
-	if service.actor == nil {
-		return service.client.Request(context.Background(), operation, parameters, result)
-	}
-	return service.sendAsActor(operation, parameters, result)
-}
-
-func (service *EngineService) sendAsActor(operation string, parameters any, result any) error {
-	if failure := service.client.RequireActor(); failure != nil {
+func (service *EngineService) attributable(failure error) error {
+	if failure != nil || service.actor == nil {
 		return failure
 	}
-	return service.client.Request(sesame.WithActor(context.Background(), *service.actor), operation, parameters, result)
+	return service.client.RequireActor()
+}
+
+func (service *EngineService) attribution() context.Context {
+	if service.actor == nil {
+		return context.Background()
+	}
+	return sesame.WithActor(context.Background(), *service.actor)
+}
+
+func (service *EngineService) send(attribution context.Context, call EngineCall, failure error) error {
+	if failure != nil {
+		return failure
+	}
+	return service.client.Request(attribution, call.Operation, call.Parameters, call.Result)
 }
 
 func (service *EngineService) busyWhenOutOfTime(failure error) error {

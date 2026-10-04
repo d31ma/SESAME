@@ -107,6 +107,63 @@ func (test *SessionControllerTest) TestRevokeRefusesAnAlreadyRevokedCredential()
 	Assert.Equals(http.StatusUnauthorized, test.status(err))
 }
 
+func (test *SessionControllerTest) TestRevokeByIDEndsASessionOfTheCallersTenant() {
+	setup := SesameTestSetup{}.Provision()
+	defer setup.Remove()
+	administrator := setup.SignIn("acme", true)
+	member := setup.SignInMember("acme", "member")
+	revoking := test.controller()
+	checking := test.controller()
+
+	revocation, err := revoking.PostRevokeByID(test.request(setup.Credential(administrator)), SessionRevokeRequest{SessionID: member.SessionID, Reason: "compromised"})
+	test.finish(revoking)
+	_, revokedErr := checking.PostVerify(SessionCredential{SessionID: member.SessionID, SessionSecret: member.Secret})
+
+	Assert.IsTrue(err == nil)
+	Assert.IsTrue(revocation.Revoked)
+	Assert.Equals(`{"code":"session_inactive"}`, test.answer(revokedErr))
+}
+
+func (test *SessionControllerTest) TestRevokeByIDRefusesASessionOfAnotherTenant() {
+	setup := SesameTestSetup{}.Provision()
+	defer setup.Remove()
+	administrator := setup.SignIn("acme", true)
+	other := setup.SignInMember("globex", "member")
+	revoking := test.controller()
+	checking := test.controller()
+
+	revocation, err := revoking.PostRevokeByID(test.request(setup.Credential(administrator)), SessionRevokeRequest{SessionID: other.SessionID})
+	test.finish(revoking)
+	still, otherErr := checking.PostVerify(SessionCredential{SessionID: other.SessionID, SessionSecret: other.Secret})
+
+	Assert.Equals(http.StatusForbidden, test.status(err))
+	Assert.Equals(`{"code":"actor_tenant_mismatch"}`, test.answer(err))
+	Assert.IsTrue(!revocation.Revoked)
+	Assert.IsTrue(otherErr == nil)
+	Assert.Equals("active", still.Status)
+}
+
+func (test *SessionControllerTest) TestRevokeByIDAnswersNotFoundForAnUnknownSession() {
+	setup := SesameTestSetup{}.Provision()
+	defer setup.Remove()
+	administrator := setup.SignIn("acme", true)
+
+	_, err := test.controller().PostRevokeByID(test.request(setup.Credential(administrator)), SessionRevokeRequest{SessionID: "ses_00000000000000000000000000000000"})
+
+	Assert.Equals(http.StatusNotFound, test.status(err))
+}
+
+func (test *SessionControllerTest) TestRevokeByIDRefusesAnAnonymousCaller() {
+	setup := SesameTestSetup{}.Provision()
+	defer setup.Remove()
+	member := setup.SignInMember("acme", "member")
+
+	revocation, err := test.controller().PostRevokeByID(httptest.NewRequest(http.MethodPost, "/", nil), SessionRevokeRequest{SessionID: member.SessionID})
+
+	Assert.Equals(`{"code":"session_rejected"}`, test.answer(err))
+	Assert.IsTrue(!revocation.Revoked)
+}
+
 func (test *SessionControllerTest) request(credential string) *http.Request {
 	request := httptest.NewRequest(http.MethodPost, "/", nil)
 	request.Header.Set("Sesame-Session", credential)
