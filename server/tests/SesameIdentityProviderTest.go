@@ -57,6 +57,20 @@ func (test *SesameIdentityProviderTest) TestIdentifyGivesAMemberNoRoles() {
 	Assert.Equals(0, len(identity.Roles))
 }
 
+func (test *SesameIdentityProviderTest) TestIdentifyGivesAMemberOfTheAdministratorsTenantNoRoles() {
+	setup := SesameTestSetup{}.Provision()
+	defer setup.Remove()
+	administrator := setup.SignIn("acme", true)
+	member := setup.SignInMember("acme", "member")
+
+	identity, err := test.provider().Identify(test.request(setup.Credential(member)))
+
+	Assert.IsTrue(err == nil)
+	Assert.Equals(administrator.TenantID, member.TenantID)
+	Assert.Equals(member.PrincipalID, identity.User)
+	Assert.Equals(0, len(identity.Roles))
+}
+
 func (test *SesameIdentityProviderTest) TestIdentifyFailsClosedWhenTheEngineIsBusy() {
 	setup := SesameTestSetup{}.Provision()
 	defer setup.Remove()

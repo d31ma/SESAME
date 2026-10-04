@@ -32,7 +32,8 @@ func (SesameTestSetup) Provision() *SesameTestSetup {
 	setup.deployment = filepath.Join(directory, "deployment")
 	output, err := exec.Command(setup.binary, "init",
 		"--deployment", setup.deployment,
-		"--fylo-binary", setup.lookPath("fylo")).CombinedOutput()
+		"--fylo-binary", setup.lookPath("fylo"),
+		"--issuer", "https://sesame.test").CombinedOutput()
 	setup.checkCommand(err, output)
 	setup.UseWait(2000)
 	return setup
@@ -72,10 +73,18 @@ func (setup *SesameTestSetup) CloseLater(client *sesame.Client, delay time.Durat
 }
 
 func (setup *SesameTestSetup) SignIn(tenantName string, administrator bool) sesame.IssuedSession {
+	return setup.signIn(tenantName, "person", administrator)
+}
+
+func (setup *SesameTestSetup) SignInMember(tenantName string, name string) sesame.IssuedSession {
+	return setup.signIn(tenantName, name, false)
+}
+
+func (setup *SesameTestSetup) signIn(tenantName string, name string, administrator bool) sesame.IssuedSession {
 	client := setup.Open()
 	defer client.Close()
 	ctx := context.Background()
-	identifier := sesame.PrincipalIdentifier{Namespace: "email", Value: "person@" + tenantName + ".test"}
+	identifier := sesame.PrincipalIdentifier{Namespace: "email", Value: name + "@" + tenantName + ".test"}
 	tenantID, principalID := setup.createPrincipal(client, tenantName, identifier, administrator)
 	password := setup.randomText()
 	setup.check(client.SetPassword(ctx, principalID, password))
