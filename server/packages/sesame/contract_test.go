@@ -12,10 +12,9 @@ import (
 	"time"
 )
 
-// TestSDKContractScenario drives the shared cross-language SDK corpus. The
-// Node (clients/node/contract.test.js) and Python
-// (clients/python/test_contract.py) suites run the identical sequence, so any
-// divergence between SDKs fails in that SDK's own suite.
+// TestSDKContractScenario drives the contract scenario against a real compiled
+// engine, so a divergence between this package and the machine protocol fails
+// here rather than in a mock.
 func TestSDKContractScenario(t *testing.T) {
 	t.Parallel()
 

@@ -76,14 +76,15 @@ grants access. See
 go get github.com/d31ma/sesame/server/packages@<commit>
 ```
 
-Go is the one SESAME client not distributed as a file to copy. It is its own
-module, `github.com/d31ma/sesame/server/packages`, and Go resolves it at a
-commit as a pseudo-version. The module uses the Go standard library only, so
+It is its own module, `github.com/d31ma/sesame/server/packages`, and Go
+resolves it at a commit as a pseudo-version: use the commit of the release
+whose engine you run. The module uses the Go standard library only, so
 importing it adds nothing else to your module graph.
 Earlier releases published it as `github.com/d31ma/sesame/clients/go/sesame`;
 change that import path when you upgrade.
 [docs/SDK_DISTRIBUTION.md](../../docs/SDK_DISTRIBUTION.md) covers verification
-and what this model costs.
+and how other languages reach SESAME (the Yon host's HTTP API or the machine
+protocol).
 
-The client spawns a SESAME executable; the file does not carry one. Releases
-publish native binaries alongside the client bundle.
+The client spawns a SESAME executable; the module does not carry one. Releases
+publish native binaries for each built platform.
