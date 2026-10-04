@@ -12,6 +12,7 @@ func TestEveryHostErrorNamesItsCode(t *testing.T) {
 		"engine_busy":               &EngineBusyError{},
 		"engine_not_configured":     &EngineNotConfiguredError{},
 		"invalid_request":           &MixedPrincipalLookupError{},
+		"operation_not_public":      &OperationNotPublicError{},
 		"passkey_not_found":         &PasskeyNotFoundError{},
 		"reauthentication_required": &ReauthenticationRequiredError{},
 		"redirect_not_allowed":      &RedirectNotAllowedError{},
