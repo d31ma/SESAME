@@ -139,6 +139,11 @@ and releases use UTC-derived CalVer in `YY.WW.DD` form.
   route's access (`public`, `signed_in` or `administrator`), and the check
   fails when a controller's effective access annotation differs, so changing
   who may call a route changes the manifest in the same commit.
+- `tools/yon-smoke/smoke.sh`: an end-to-end `ty serve` smoke test with `curl`
+  that asserts exact status codes per access level, cross-tenant refusals,
+  undeclared body fields, the unrouted login exchange, `503` + `Retry-After`
+  when the deployment is held, clean shutdown and a server log without
+  secrets. The local release gate runs it.
 - `sesame authn set-password` is documented as the way to give the bootstrap
   administrator its first password ([docs/YON.md](docs/YON.md)).
 

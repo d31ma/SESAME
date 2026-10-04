@@ -390,7 +390,8 @@ PATH=/tmp/sesame-test:$PATH ty test --coverage
 ```
 
 `ty test` calls controllers directly, so it cannot reach the route guard; the
-guard's `401`, `403` and `500` answers are checked against `ty serve`.
+guard's `401` and `403` answers are checked against `ty serve` by the
+[smoke test](#smoke-test) below.
 
 The Go SDK and the host errors have ordinary Go tests:
 
