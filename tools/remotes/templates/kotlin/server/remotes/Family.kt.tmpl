@@ -1,0 +1,12 @@
+@HTTPClient({"path":"{{.Family.Path}}","adapter":"sesame","setup":"SesameSetup"})
+interface {{.Family.ClassName}} {
+{{- range $index, $method := .Family.Methods}}
+{{- if $index}}
+{{end}}
+    @{{$method.Verb.Pascal}}Request("{{$method.Path}}")
+    fun {{if eq $method.Words.Camel "suspend"}}suspend{{$.Family.Words.Pascal}}{{else}}{{$method.Words.Camel}}{{end}}(
+{{- if $method.Header}}@RequestHeader("{{$method.Header}}") {{$method.HeaderParameter.Camel}}: String{{if $method.HasBody}}, {{end}}{{end}}
+{{- if $method.HasBody}}@RequestBody body: Any?{{end -}}
+    ): Any?
+{{- end}}
+}
