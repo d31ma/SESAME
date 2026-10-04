@@ -46,7 +46,7 @@ that already sets `SESAME_DEPLOYMENT` can point it somewhere else without
 unsetting anything, and preferring the environment would make the flag they
 just typed a lie.
 
-## Initialization from `.env`
+## Initialization from an environment file
 
 `sesame init` can read its three initialization values from a dotenv file:
 
@@ -57,11 +57,11 @@ SESAME_ISSUER=https://id.example.com
 ```
 
 ```bash
-sesame init --env-file .env
+sesame init --env-file sesame.env
 ```
 
 The file is deliberately explicit. SESAME does not search the current or
-parent directories for `.env`, because changing directories must not silently
+parent directories for an environment file, because changing directories must not silently
 select a different FYLO executable or deployment. A missing or malformed file
 fails before any deployment or keys are created.
 
@@ -75,12 +75,15 @@ Only `SESAME_DEPLOYMENT`, `FYLO_BINARY`, and `SESAME_ISSUER` are consumed by
 initialization. The parser does not add any file value to `os.Environ`, so
 unrelated application settings and secrets do not become visible to SESAME or
 the FYLO child. The file is not copied into the deployment. Generated signing,
-sealing, and snapshot keys must never be placed in `.env`; `sesame init`
+sealing, and snapshot keys must never be placed in that file; `sesame init`
 creates those directly in the deployment's private key directory.
 
-The repository's [`.env.example`](../.env.example) is safe to copy. Actual
-`.env` files are ignored by Git; the example is the deliberate tracked
-exception.
+The repository's [`sesame.env.example`](../sesame.env.example) is safe to
+copy. `sesame.env` and `.env` files are ignored by Git; the examples are the
+deliberate tracked exceptions. Use `sesame.env`, not `.env`: the repository
+root is also a Yon project, and `ty` reserves the project-root `.env` for
+`YON_` names (it refuses any other name with `TY2010`). Any path passed to
+`--env-file` keeps working.
 
 `SESAME_DEPLOYMENT` and the `FYLO_*` pair are alternatives, exactly as their
 flags are. Setting both is refused rather than silently resolved.

@@ -1,0 +1,12 @@
+{
+  "name": "sesame",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "serve": "ty serve",
+    "start": "ty start",
+    "bundle": "ty bundle",
+    "preview": "ty preview --watch",
+    "test": "ty test --coverage"
+  }
+}

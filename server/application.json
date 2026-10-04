@@ -1,0 +1,12 @@
+{
+  "server": {
+    "host": "127.0.0.1",
+    "port": 8080
+  },
+  "names": {
+    "words": ["sesame", "fylo", "oidc", "saml", "scim", "jwks", "totp", "dpop", "passkey", "goroutines"]
+  },
+  "sesame": {
+    "waitmilliseconds": 5000
+  }
+}

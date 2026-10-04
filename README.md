@@ -63,14 +63,14 @@ sesame doctor
 ```
 
 For programmatic initialization without exporting those values, copy
-[`.env.example`](.env.example), edit it, and pass it explicitly:
+[`sesame.env.example`](sesame.env.example), edit it, and pass it explicitly:
 
 ```bash
-cp .env.example .env
-sesame init --env-file .env
+cp sesame.env.example sesame.env
+sesame init --env-file sesame.env
 ```
 
-SESAME never discovers `.env` implicitly. Flags override exported variables,
+SESAME never discovers an environment file implicitly. Flags override exported variables,
 which override the file, and the file is read only by `sesame init`; it is not
 copied into the deployment or inherited by FYLO. Export `SESAME_DEPLOYMENT` or
 pass `--deployment` for later commands as usual.
