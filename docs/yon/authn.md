@@ -83,6 +83,19 @@ that is not among them with `404 {"code":"passkey_not_found"}`, byte for byte
 the answer for a credential that does not exist, so a caller cannot learn other
 principals' credential IDs.
 
+### Recent sign-in for authenticator changes
+
+Every self-service route that changes an authenticator (`set-password`,
+`totp-enroll`, `totp-activate`, `recovery-codes-issue`,
+`passkey-register-begin`, `passkey-register-finish`, `passkey-remove`) needs a
+session issued in the last 10 minutes. The host reads the session's
+`issued_at` from `session.verify`; the engine sets it once, when the session is
+issued at sign-in, and never refreshes it. An older session answers
+`403 {"code":"reauthentication_required"}` before anything changes: sign in
+again and retry with the new session. `passkey-list` and `session/revoke`
+work with any valid session. The window is fixed at 10 minutes and has no
+setting.
+
 `totp-enroll` and `recovery-codes-issue` return their secrets exactly once.
 Passkey routes need a deployment created with `sesame init --issuer`; without
 one they answer `500 {"code":"internal_error"}` (the engine reports
@@ -97,13 +110,13 @@ one they answer `500 {"code":"internal_error"}` (the engine reports
 
 ## Known gaps
 
-- **No reauthentication before authenticator changes.** A valid session is
-  enough to change the password, enroll a passkey or reissue recovery codes.
-  A stolen session secret therefore lets the thief add a lasting factor. The
-  engine offers no reauthentication or step-up check for these operations, so
-  the host does not invent one. Keep session lifetimes short and revoke
-  sessions on suspicion. Closing this needs an engine operation (for example,
+- **Recent sign-in is not proof of the current credential.** A session secret
+  stolen within 10 minutes of sign-in can still change the password or add a
+  passkey, and no route asks for the current password first. The engine has
+  no reauthentication primitive for `authenticator.*`, so the host does not
+  invent one. Closing this needs an engine operation (for example,
   authenticator changes that require a freshly verified login transaction).
+  Keep session lifetimes short and revoke sessions on suspicion.
 - **No throttling of public login steps.** Each transaction allows five
   attempts and every engine start is serialized, but nothing limits how many
   transactions a client may begin. Put a rate limit in front of `ty`

@@ -259,5 +259,9 @@ func (test *AuthenticatorPasskeyTest) check(err error) {
 
 func (test *AuthenticatorPasskeyTest) controller() *AuthenticatorController {
 	engine := &EngineService{engineSettingsService: &EngineSettingsService{}}
-	return &AuthenticatorController{callerService: &CallerService{engineService: engine}, engineService: engine}
+	return &AuthenticatorController{
+		callerService:       &CallerService{engineService: engine},
+		engineService:       engine,
+		recentSignInService: &RecentSignInService{engineService: engine},
+	}
 }

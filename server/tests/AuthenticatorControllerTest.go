@@ -150,7 +150,45 @@ func (test *AuthenticatorControllerTest) TestEverySelfServiceRouteRefusesAnAnony
 	_, list := controller.PostPasskeyList(anonymous)
 	_, remove := controller.PostPasskeyRemove(anonymous, AuthenticatorPasskeyRemoveRequest{CredentialID: "AAAA"})
 
-	Assert.IsTrue(test.allRejected([]error{password, enroll, activate, recovery, begin, finish, list, remove}))
+	Assert.IsTrue(test.allAnswer(`{"code":"session_rejected"}`,
+		[]error{password, enroll, activate, recovery, begin, finish, list, remove}))
+}
+
+func (test *AuthenticatorControllerTest) TestStaleSessionCannotChangeAnyAuthenticator() {
+	setup := SesameTestSetup{}.Provision()
+	defer setup.Remove()
+	session, password := test.signIn(setup)
+	controller := test.controllerAfter(11 * time.Minute)
+	request := test.request(setup, session)
+
+	_, setErr := controller.PostSetPassword(request, AuthenticatorPassword{Password: rand.Text()})
+	_, enrollErr := controller.PostTotpEnroll(request, AuthenticatorTotpIssuer{})
+	_, activateErr := controller.PostTotpActivate(request, AuthenticatorTotpCode{Code: "123456"})
+	_, recoveryErr := controller.PostRecoveryCodesIssue(request)
+	_, beginErr := controller.PostPasskeyRegisterBegin(request)
+	_, finishErr := controller.PostPasskeyRegisterFinish(request, AuthenticatorPasskeyAttestation{})
+	_, removeErr := controller.PostPasskeyRemove(request, AuthenticatorPasskeyRemoveRequest{CredentialID: "AAAA"})
+	listed, listErr := controller.PostPasskeyList(request)
+	login := test.loginWithPassword(test.authn(controller), session, password)
+
+	Assert.Equals(http.StatusForbidden, test.status(setErr))
+	Assert.IsTrue(test.allAnswer(`{"code":"reauthentication_required"}`,
+		[]error{setErr, enrollErr, activateErr, recoveryErr, beginErr, finishErr, removeErr}))
+	Assert.IsTrue(listErr == nil)
+	Assert.Equals(0, len(listed.Passkeys))
+	Assert.Equals("password", login.Assurance)
+}
+
+func (test *AuthenticatorControllerTest) TestSessionInsideTheWindowMayChangeAuthenticators() {
+	setup := SesameTestSetup{}.Provision()
+	defer setup.Remove()
+	session, _ := test.signIn(setup)
+	controller := test.controllerAfter(9 * time.Minute)
+
+	set, err := controller.PostSetPassword(test.request(setup, session), AuthenticatorPassword{Password: rand.Text()})
+
+	Assert.IsTrue(err == nil)
+	Assert.IsTrue(set.PasswordSet)
 }
 
 func (test *AuthenticatorControllerTest) signIn(setup *SesameTestSetup) (sesame.IssuedSession, string) {
@@ -210,9 +248,9 @@ func (test *AuthenticatorControllerTest) request(setup *SesameTestSetup, session
 	return request
 }
 
-func (test *AuthenticatorControllerTest) allRejected(failures []error) bool {
+func (test *AuthenticatorControllerTest) allAnswer(answer string, failures []error) bool {
 	for _, failure := range failures {
-		if test.answer(failure) != `{"code":"session_rejected"}` {
+		if test.answer(failure) != answer {
 			return false
 		}
 	}
@@ -240,8 +278,16 @@ func (test *AuthenticatorControllerTest) check(err error) {
 }
 
 func (test *AuthenticatorControllerTest) controller() *AuthenticatorController {
+	return test.controllerAfter(0)
+}
+
+func (test *AuthenticatorControllerTest) controllerAfter(elapsed time.Duration) *AuthenticatorController {
 	engine := test.engine()
-	return &AuthenticatorController{callerService: &CallerService{engineService: engine}, engineService: engine}
+	return &AuthenticatorController{
+		callerService:       &CallerService{engineService: engine},
+		engineService:       engine,
+		recentSignInService: &RecentSignInService{engineService: engine, clockShift: elapsed},
+	}
 }
 
 func (test *AuthenticatorControllerTest) authn(controller *AuthenticatorController) *AuthnController {

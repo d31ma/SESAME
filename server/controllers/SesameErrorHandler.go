@@ -100,6 +100,7 @@ func (handler *SesameErrorHandler) unauthorizedCodes() []string {
 func (handler *SesameErrorHandler) forbiddenCodes() []string {
 	return []string{
 		"tenant_mismatch", "actor_tenant_mismatch", "access_denied", "provisioning_denied", "provisioning_forbidden",
+		"reauthentication_required",
 		"client_disabled", "consent_required", "subject_not_linked", "saml_subject_not_linked",
 	}
 }
