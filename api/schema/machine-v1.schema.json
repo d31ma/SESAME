@@ -41,6 +41,34 @@
         },
         "parameters": {
           "type": "object"
+        },
+        "actor": {
+          "$ref": "#/$defs/actor"
+        }
+      }
+    },
+    "actor": {
+      "description": "Optional. The calling principal a trusted host attributes this request to. Send it only to an engine whose system.version request_fields lists \"actor\". It changes the recorded audit actor, never what is allowed.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tenant_id",
+        "principal_id",
+        "session_id"
+      ],
+      "x-max-serialized-bytes": 512,
+      "properties": {
+        "tenant_id": {
+          "type": "string",
+          "pattern": "^tnt_[0-9A-Fa-f]{32}$"
+        },
+        "principal_id": {
+          "type": "string",
+          "pattern": "^prn_[0-9A-Fa-f]{32}$"
+        },
+        "session_id": {
+          "type": "string",
+          "pattern": "^ses_[0-9A-Fa-f]{32}$"
         }
       }
     },
@@ -102,12 +130,89 @@
         "code": {
           "type": "string",
           "enum": [
+            "access_denied",
+            "actor_session_invalid",
+            "actor_tenant_mismatch",
+            "assertion_rejected",
+            "authorization_pending",
+            "client_disabled",
+            "client_exists",
+            "client_not_found",
+            "consent_not_found",
+            "consent_required",
+            "device_authorization_not_found",
+            "dpop_foreign_origin",
+            "dpop_key_mismatch",
+            "dpop_proof_expired",
+            "dpop_proof_invalid",
+            "dpop_proof_not_bound",
+            "dpop_proof_replayed",
+            "dpop_required",
+            "federated_login_closed",
+            "federated_login_expired",
+            "federated_login_not_found",
             "frame_too_large",
+            "grant_exists",
+            "grant_not_found",
+            "group_exists",
+            "group_member_exists",
+            "group_member_not_found",
+            "group_not_found",
+            "identifier_conflict",
+            "interaction_closed",
+            "interaction_not_found",
+            "internal_error",
+            "invalid_actor",
+            "invalid_grant",
             "invalid_json",
+            "invalid_logout_hint",
+            "invalid_post_logout_redirect_uri",
+            "invalid_redirect_uri",
             "invalid_request",
-            "unsupported_protocol",
+            "issuer_not_configured",
             "operation_not_found",
-            "internal_error"
+            "passkey_challenge_expired",
+            "passkey_exists",
+            "passkey_not_found",
+            "passkey_rejected",
+            "principal_not_found",
+            "provider_document_rejected",
+            "provider_not_configured",
+            "provider_not_found",
+            "provisioning_client_not_found",
+            "provisioning_denied",
+            "provisioning_forbidden",
+            "refresh_family_not_found",
+            "relying_party_not_configured",
+            "request_uri_conflict",
+            "request_uri_not_found",
+            "role_exists",
+            "role_not_found",
+            "saml_assertion_rejected",
+            "saml_login_not_found",
+            "saml_provider_not_found",
+            "saml_subject_not_linked",
+            "scim_group_not_found",
+            "scim_unsupported",
+            "scim_user_conflict",
+            "scim_user_not_found",
+            "scope_not_allowed",
+            "secrets_not_configured",
+            "session_inactive",
+            "session_not_found",
+            "signing_not_configured",
+            "slow_down",
+            "stale_policy_version",
+            "storage_not_configured",
+            "subject_not_linked",
+            "tenant_not_found",
+            "totp_already_active",
+            "totp_invalid_code",
+            "totp_not_enrolled",
+            "transaction_closed",
+            "transaction_not_found",
+            "unsupported_protocol",
+            "user_code_not_found"
           ]
         },
         "message": {
@@ -118,6 +223,62 @@
         },
         "details": {
           "type": "object"
+        }
+      }
+    },
+    "system_version_result": {
+      "description": "The system.version result. request_fields lists the optional request envelope fields this engine accepts.",
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "commit",
+        "built_at",
+        "go_version",
+        "os",
+        "arch",
+        "protocol_version",
+        "operations",
+        "request_fields"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "commit": {
+          "type": "string"
+        },
+        "built_at": {
+          "type": "string"
+        },
+        "go_version": {
+          "type": "string"
+        },
+        "os": {
+          "type": "string"
+        },
+        "arch": {
+          "type": "string"
+        },
+        "protocol_version": {
+          "const": "1"
+        },
+        "operations": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "request_fields": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "actor"
+            ]
+          }
         }
       }
     }
