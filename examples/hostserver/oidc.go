@@ -28,7 +28,7 @@ import (
 // is HttpOnly and short-lived because it is bearer-equivalent for the
 // duration of one login.
 const (
-	interactionCookie = "sesame_interaction"
+	interactionCookie = "__Secure-sesame_interaction"
 	// sessionCookieName carries the authenticated session across the consent
 	// round trip, which is a second request the user makes after logging in.
 	sessionCookieName = "sesame_session"
@@ -234,7 +234,7 @@ func redirectWithCode(
 
 func clearCookies(writer http.ResponseWriter) {
 	for _, name := range []string{interactionCookie, sessionCookieName} {
-		http.SetCookie(writer, &http.Cookie{Name: name, Path: "/", MaxAge: -1})
+		http.SetCookie(writer, &http.Cookie{Name: name, Path: "/", MaxAge: -1, HttpOnly: true, Secure: true})
 	}
 }
 
