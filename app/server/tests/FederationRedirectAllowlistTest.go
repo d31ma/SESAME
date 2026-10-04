@@ -23,7 +23,7 @@ func (test *FederationRedirectAllowlistTest) TestLoginStartRefusesAnAttackersRed
 	Assert.Equals(http.StatusBadRequest, setup.Status(err))
 	Assert.IsTrue(setup.RedirectNotAllowed(err))
 	Assert.Equals("", login.AuthorizationURL)
-	Assert.IsTrue(controller.federatedLoginService.engineService.client == nil)
+	Assert.IsTrue(controller.federatedLoginService.engineHelper.client == nil)
 }
 
 func (test *FederationRedirectAllowlistTest) TestLoginStartMatchesTheRedirectURIExactly() {
@@ -49,7 +49,7 @@ func (test *FederationRedirectAllowlistTest) TestLoginStartRefusesEveryRedirectU
 
 	Assert.Equals(http.StatusBadRequest, setup.Status(err))
 	Assert.IsTrue(setup.RedirectNotAllowed(err))
-	Assert.IsTrue(controller.federatedLoginService.engineService.client == nil)
+	Assert.IsTrue(controller.federatedLoginService.engineHelper.client == nil)
 }
 
 func (test *FederationRedirectAllowlistTest) TestSamlConsumerURLsDoNotAllowAFederationRedirect() {
@@ -106,7 +106,7 @@ func (test *FederationRedirectAllowlistTest) allRefusedBeforeTheEngine(addresses
 	for _, address := range addresses {
 		controller := test.controller()
 		_, err := controller.PostLoginStart(test.startRequest(address))
-		refusals = append(refusals, SesameTestSetup{}.RedirectNotAllowed(err) && controller.federatedLoginService.engineService.client == nil)
+		refusals = append(refusals, SesameTestSetup{}.RedirectNotAllowed(err) && controller.federatedLoginService.engineHelper.client == nil)
 	}
 	return !slices.Contains(refusals, false)
 }
@@ -118,7 +118,7 @@ func (test *FederationRedirectAllowlistTest) allFailClosed(setup *SesameTestSetu
 		controller := test.controller()
 		_, err := controller.PostLoginStart(test.startRequest(test.redirectURI()))
 		var unconfigured *host.EngineNotConfiguredError
-		refusals = append(refusals, errors.As(err, &unconfigured) && controller.federatedLoginService.engineService.client == nil)
+		refusals = append(refusals, errors.As(err, &unconfigured) && controller.federatedLoginService.engineHelper.client == nil)
 	}
 	return !slices.Contains(refusals, false)
 }

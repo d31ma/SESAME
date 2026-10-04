@@ -87,6 +87,6 @@ func (test *RoleControllerTest) creation(tenantID string, action string) RoleCre
 }
 
 func (test *RoleControllerTest) controller() *RoleController {
-	engine := &EngineService{engineSettingsService: &EngineSettingsService{}}
+	engine := &EngineHelper{engineSettingsHelper: &EngineSettingsHelper{}}
 	return &RoleController{tenantCallService: SesameTestSetup{}.TenantCalls(engine)}
 }

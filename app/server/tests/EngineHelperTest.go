@@ -7,11 +7,11 @@ import (
 )
 
 // @Test(SesameTestSetup, {"partition":"tests"})
-type EngineServiceTest struct {
+type EngineHelperTest struct {
 	behaviors *BehaviorContext
 }
 
-func (test *EngineServiceTest) TestCallReturnsTheEngineResult() {
+func (test *EngineHelperTest) TestCallReturnsTheEngineResult() {
 	setup := SesameTestSetup{}.Provision()
 	defer setup.Remove()
 
@@ -22,7 +22,7 @@ func (test *EngineServiceTest) TestCallReturnsTheEngineResult() {
 	Assert.Equals("ok", readiness.Status)
 }
 
-func (test *EngineServiceTest) TestCallReturnsProtocolErrorsUnchanged() {
+func (test *EngineHelperTest) TestCallReturnsProtocolErrorsUnchanged() {
 	setup := SesameTestSetup{}.Provision()
 	defer setup.Remove()
 
@@ -33,7 +33,7 @@ func (test *EngineServiceTest) TestCallReturnsProtocolErrorsUnchanged() {
 	Assert.Equals("operation_not_found", protocolError.Code)
 }
 
-func (test *EngineServiceTest) TestCallAnswersBusyWhenAnotherEngineHoldsTheDeployment() {
+func (test *EngineHelperTest) TestCallAnswersBusyWhenAnotherEngineHoldsTheDeployment() {
 	setup := SesameTestSetup{}.Provision()
 	defer setup.Remove()
 	holder := setup.Open()
@@ -50,7 +50,7 @@ func (test *EngineServiceTest) TestCallAnswersBusyWhenAnotherEngineHoldsTheDeplo
 	Assert.IsTrue(waited < 5*time.Second)
 }
 
-func (test *EngineServiceTest) TestCallAnswersBusyWhenTheEngineCannotStartWithinTheWait() {
+func (test *EngineHelperTest) TestCallAnswersBusyWhenTheEngineCannotStartWithinTheWait() {
 	setup := SesameTestSetup{}.Provision()
 	defer setup.Remove()
 	setup.UseWait(1)
@@ -61,7 +61,7 @@ func (test *EngineServiceTest) TestCallAnswersBusyWhenTheEngineCannotStartWithin
 	Assert.IsTrue(errors.As(err, &busy))
 }
 
-func (test *EngineServiceTest) TestCallWaitsForTheDeploymentToBeReleased() {
+func (test *EngineHelperTest) TestCallWaitsForTheDeploymentToBeReleased() {
 	setup := SesameTestSetup{}.Provision()
 	defer setup.Remove()
 	holder := setup.Open()
@@ -72,7 +72,7 @@ func (test *EngineServiceTest) TestCallWaitsForTheDeploymentToBeReleased() {
 	Assert.IsTrue(err == nil)
 }
 
-func (test *EngineServiceTest) TestCallUsesOneEnginePerInvocation() {
+func (test *EngineHelperTest) TestCallUsesOneEnginePerInvocation() {
 	setup := SesameTestSetup{}.Provision()
 	defer setup.Remove()
 	engine := setup.Engine()
@@ -86,7 +86,7 @@ func (test *EngineServiceTest) TestCallUsesOneEnginePerInvocation() {
 	Assert.Equals(int64(1), metrics.RequestsTotal["system.ping"])
 }
 
-func (test *EngineServiceTest) TestCallUsesTheDefaultWaitWhenNoneIsSet() {
+func (test *EngineHelperTest) TestCallUsesTheDefaultWaitWhenNoneIsSet() {
 	setup := SesameTestSetup{}.Provision()
 	defer setup.Remove()
 	setup.UseSettings(map[string]any{"binary": setup.binary, "deployment": setup.deployment})
@@ -96,28 +96,28 @@ func (test *EngineServiceTest) TestCallUsesTheDefaultWaitWhenNoneIsSet() {
 	Assert.IsTrue(err == nil)
 }
 
-func (test *EngineServiceTest) TestCallRefusesSettingsWithoutPaths() {
+func (test *EngineHelperTest) TestCallRefusesSettingsWithoutPaths() {
 	setup := SesameTestSetup{}.Provision()
 	defer setup.Remove()
 
 	Assert.IsTrue(test.refuses(setup, map[string]any{}))
 }
 
-func (test *EngineServiceTest) TestCallRefusesARelativeBinary() {
+func (test *EngineHelperTest) TestCallRefusesARelativeBinary() {
 	setup := SesameTestSetup{}.Provision()
 	defer setup.Remove()
 
 	Assert.IsTrue(test.refuses(setup, map[string]any{"binary": "sesame", "deployment": setup.deployment}))
 }
 
-func (test *EngineServiceTest) TestCallRefusesARelativeDeployment() {
+func (test *EngineHelperTest) TestCallRefusesARelativeDeployment() {
 	setup := SesameTestSetup{}.Provision()
 	defer setup.Remove()
 
 	Assert.IsTrue(test.refuses(setup, map[string]any{"binary": setup.binary, "deployment": "deployment"}))
 }
 
-func (test *EngineServiceTest) TestCallRefusesAWaitPastTheLimit() {
+func (test *EngineHelperTest) TestCallRefusesAWaitPastTheLimit() {
 	setup := SesameTestSetup{}.Provision()
 	defer setup.Remove()
 
@@ -126,7 +126,7 @@ func (test *EngineServiceTest) TestCallRefusesAWaitPastTheLimit() {
 	}))
 }
 
-func (test *EngineServiceTest) TestCallRefusesANegativeWait() {
+func (test *EngineHelperTest) TestCallRefusesANegativeWait() {
 	setup := SesameTestSetup{}.Provision()
 	defer setup.Remove()
 
@@ -135,7 +135,7 @@ func (test *EngineServiceTest) TestCallRefusesANegativeWait() {
 	}))
 }
 
-func (test *EngineServiceTest) TestCallRefusesWithoutTheApplicationSnapshot() {
+func (test *EngineHelperTest) TestCallRefusesWithoutTheApplicationSnapshot() {
 	setup := SesameTestSetup{}.Provision()
 	setup.Remove()
 
@@ -145,7 +145,7 @@ func (test *EngineServiceTest) TestCallRefusesWithoutTheApplicationSnapshot() {
 	Assert.IsTrue(errors.As(err, &notConfigured))
 }
 
-func (test *EngineServiceTest) refuses(setup *SesameTestSetup, settings map[string]any) bool {
+func (test *EngineHelperTest) refuses(setup *SesameTestSetup, settings map[string]any) bool {
 	setup.UseSettings(settings)
 	err := setup.Engine().Call("system.ping", struct{}{}, &SystemPing{})
 	var notConfigured *host.EngineNotConfiguredError

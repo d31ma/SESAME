@@ -188,7 +188,7 @@ func (test *AuthorizeControllerTest) TestDecideBatchRejectsAnAnonymousCaller() {
 	Assert.Equals(0, len(answer.Decisions))
 }
 
-func (test *AuthorizeControllerTest) grantReader(engine *EngineService, request *http.Request, member sesame.IssuedSession) {
+func (test *AuthorizeControllerTest) grantReader(engine *EngineHelper, request *http.Request, member sesame.IssuedSession) {
 	calls := SesameTestSetup{}.TenantCalls(engine)
 	role, err := (&RoleController{tenantCallService: calls}).PostCreate(request, RoleCreateRequest{
 		TenantID:    member.TenantID,
@@ -222,6 +222,6 @@ func (test *AuthorizeControllerTest) decodeStrictly(body string, target any) err
 	return decoder.Decode(target)
 }
 
-func (test *AuthorizeControllerTest) controller(engine *EngineService) *AuthorizeController {
+func (test *AuthorizeControllerTest) controller(engine *EngineHelper) *AuthorizeController {
 	return SesameTestSetup{}.Authorize(engine)
 }

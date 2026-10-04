@@ -7,7 +7,7 @@ import (
 // @NeedsAll
 type TenantCallService struct {
 	callerService        *CallerService
-	engineService        *EngineService
+	engineHelper         *EngineHelper
 	administratorService *AdministratorService
 	recentSignInService  *RecentSignInService
 }
@@ -71,7 +71,7 @@ func (service *TenantCallService) fetch(lookup EngineCall, failure error) (json.
 		return nil, failure
 	}
 	record := json.RawMessage{}
-	failure = service.engineService.Call(lookup.Operation, lookup.Parameters, &record)
+	failure = service.engineHelper.Call(lookup.Operation, lookup.Parameters, &record)
 	return record, failure
 }
 
@@ -102,5 +102,5 @@ func (service *TenantCallService) send(call EngineCall, failure error) error {
 	if failure != nil {
 		return failure
 	}
-	return service.engineService.Call(call.Operation, call.Parameters, call.Result)
+	return service.engineHelper.Call(call.Operation, call.Parameters, call.Result)
 }

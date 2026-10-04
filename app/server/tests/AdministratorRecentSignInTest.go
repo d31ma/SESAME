@@ -96,18 +96,17 @@ func (test *AdministratorRecentSignInTest) TestAdministratorInsideTheWindowMayRo
 	Assert.IsTrue(rotated.Token != "")
 }
 
-func (test *AdministratorRecentSignInTest) federation(engine *EngineService, elapsed time.Duration) *FederationController {
+func (test *AdministratorRecentSignInTest) federation(engine *EngineHelper, elapsed time.Duration) *FederationController {
 	return SesameTestSetup{}.Federation(engine, elapsed)
 }
 
-func (test *AdministratorRecentSignInTest) saml(engine *EngineService, elapsed time.Duration) *SamlController {
+func (test *AdministratorRecentSignInTest) saml(engine *EngineHelper, elapsed time.Duration) *SamlController {
 	return SesameTestSetup{}.Saml(engine, elapsed)
 }
 
-func (test *AdministratorRecentSignInTest) scim(engine *EngineService, elapsed time.Duration) *ScimController {
+func (test *AdministratorRecentSignInTest) scim(engine *EngineHelper, elapsed time.Duration) *ScimController {
 	return SesameTestSetup{}.Scim(engine, elapsed)
 }
-
 
 func (test *AdministratorRecentSignInTest) staleAge() time.Duration {
 	return 11 * time.Minute

@@ -7,18 +7,18 @@ import (
 // @Service
 // @NeedsAll
 type FederatedLoginService struct {
-	engineService         *EngineService
-	engineSettingsService *EngineSettingsService
+	engineHelper         *EngineHelper
+	engineSettingsHelper *EngineSettingsHelper
 }
 
 func (service *FederatedLoginService) StartFederation(redirectURI string, call EngineCall) error {
-	settings, failure := service.engineSettingsService.Read()
+	settings, failure := service.engineSettingsHelper.Read()
 	failure = service.requireListed(settings.FederationRedirectAddresses, redirectURI, failure)
 	return service.allowedCall(call, failure)
 }
 
 func (service *FederatedLoginService) StartSaml(consumerURL string, call EngineCall) error {
-	settings, failure := service.engineSettingsService.Read()
+	settings, failure := service.engineSettingsHelper.Read()
 	failure = service.requireListed(settings.SamlConsumerAddresses, consumerURL, failure)
 	return service.allowedCall(call, failure)
 }
@@ -34,5 +34,5 @@ func (service *FederatedLoginService) allowedCall(call EngineCall, failure error
 	if failure != nil {
 		return failure
 	}
-	return service.engineService.Call(call.Operation, call.Parameters, call.Result)
+	return service.engineHelper.Call(call.Operation, call.Parameters, call.Result)
 }

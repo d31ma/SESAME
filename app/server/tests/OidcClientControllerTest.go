@@ -191,7 +191,7 @@ func (test *OidcClientControllerTest) TestAnonymousCallerIsRejected() {
 	Assert.IsTrue(errors.As(getErr, &rejected))
 }
 
-func (test *OidcClientControllerTest) authenticationCode(engine *EngineService, clientID string, secret string) string {
+func (test *OidcClientControllerTest) authenticationCode(engine *EngineHelper, clientID string, secret string) string {
 	err := engine.Call("oidc.introspect", map[string]string{
 		"token": "not-a-token", "client_id": clientID, "client_secret": secret,
 	}, &map[string]any{})
@@ -225,10 +225,10 @@ func (test *OidcClientControllerTest) registration(tenantID string, clientType s
 	}
 }
 
-func (test *OidcClientControllerTest) controller(engine *EngineService) *OidcClientController {
+func (test *OidcClientControllerTest) controller(engine *EngineHelper) *OidcClientController {
 	return test.controllerAfter(engine, 0)
 }
 
-func (test *OidcClientControllerTest) controllerAfter(engine *EngineService, elapsed time.Duration) *OidcClientController {
+func (test *OidcClientControllerTest) controllerAfter(engine *EngineHelper, elapsed time.Duration) *OidcClientController {
 	return SesameTestSetup{}.OidcClients(engine, elapsed)
 }

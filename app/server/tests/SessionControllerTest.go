@@ -196,7 +196,7 @@ func (test *SessionControllerTest) answer(err error) string {
 }
 
 func (test *SessionControllerTest) finish(controller *SessionController) {
-	SesameTestSetup{}.Finish(controller.publicCallService.engineService)
+	SesameTestSetup{}.Finish(controller.publicCallService.engineHelper)
 }
 
 func (test *SessionControllerTest) controller() *SessionController {

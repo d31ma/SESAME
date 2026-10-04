@@ -104,6 +104,6 @@ func (test *PrincipalTenantServiceTest) TestCallRefusesAPrincipalOfAnotherTenant
 }
 
 func (test *PrincipalTenantServiceTest) service() *PrincipalTenantService {
-	engine := &EngineService{engineSettingsService: &EngineSettingsService{}}
+	engine := &EngineHelper{engineSettingsHelper: &EngineSettingsHelper{}}
 	return &PrincipalTenantService{tenantCallService: SesameTestSetup{}.TenantCalls(engine)}
 }

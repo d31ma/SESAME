@@ -183,7 +183,7 @@ func (test *GroupControllerTest) controller() *GroupController {
 	return test.controllerWith(SesameTestSetup{}.Engine(), 0)
 }
 
-func (test *GroupControllerTest) controllerWith(engine *EngineService, elapsed time.Duration) *GroupController {
+func (test *GroupControllerTest) controllerWith(engine *EngineHelper, elapsed time.Duration) *GroupController {
 	calls := SesameTestSetup{}.TenantCallsAfter(engine, elapsed)
 	return &GroupController{
 		tenantCallService:      calls,

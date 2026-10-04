@@ -341,5 +341,5 @@ func (test *AuthenticatorControllerTest) controllerAfter(elapsed time.Duration) 
 }
 
 func (test *AuthenticatorControllerTest) authn(controller *AuthenticatorController) *AuthnController {
-	return SesameTestSetup{}.Authn(controller.principalTenantService.tenantCallService.engineService)
+	return SesameTestSetup{}.Authn(controller.principalTenantService.tenantCallService.engineHelper)
 }

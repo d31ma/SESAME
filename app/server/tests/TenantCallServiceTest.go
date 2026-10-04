@@ -111,6 +111,6 @@ func (test *TenantCallServiceTest) tenantLookup(tenantID string, result *map[str
 }
 
 func (test *TenantCallServiceTest) calls() *TenantCallService {
-	engine := &EngineService{engineSettingsService: &EngineSettingsService{}}
+	engine := &EngineHelper{engineSettingsHelper: &EngineSettingsHelper{}}
 	return SesameTestSetup{}.TenantCalls(engine)
 }

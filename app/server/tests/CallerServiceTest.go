@@ -110,5 +110,5 @@ func (test *CallerServiceTest) TestRequireTenantRefusesAnEmptyTenant() {
 }
 
 func (test *CallerServiceTest) callers() *CallerService {
-	return &CallerService{engineService: &EngineService{engineSettingsService: &EngineSettingsService{}}}
+	return &CallerService{engineHelper: &EngineHelper{engineSettingsHelper: &EngineSettingsHelper{}}}
 }

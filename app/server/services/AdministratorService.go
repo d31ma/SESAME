@@ -7,12 +7,12 @@ import (
 // @Service
 // @NeedsAll
 type AdministratorService struct {
-	engineService *EngineService
+	engineHelper *EngineHelper
 }
 
 func (service *AdministratorService) Roles(caller Caller) ([]string, error) {
 	answer := AdministratorAnswer{}
-	failure := service.engineService.Call("authorize.decide", service.question(caller), &answer)
+	failure := service.engineHelper.Call("authorize.decide", service.question(caller), &answer)
 	return service.roles(answer, failure), failure
 }
 

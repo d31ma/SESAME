@@ -49,7 +49,7 @@ func (test *TenantControllerTest) TestGetRejectsAnAnonymousCaller() {
 }
 
 func (test *TenantControllerTest) controller() *TenantController {
-	engine := &EngineService{engineSettingsService: &EngineSettingsService{}}
+	engine := &EngineHelper{engineSettingsHelper: &EngineSettingsHelper{}}
 	calls := SesameTestSetup{}.TenantCalls(engine)
 	return &TenantController{tenantCallService: calls}
 }

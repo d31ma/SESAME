@@ -240,14 +240,14 @@ func (test *GrantControllerTest) controllers() (*GrantController, *RoleControlle
 	return test.controllersWith(SesameTestSetup{}.Engine(), 0)
 }
 
-func (test *GrantControllerTest) group(engine *EngineService, request *http.Request, tenantID string) string {
+func (test *GrantControllerTest) group(engine *EngineHelper, request *http.Request, tenantID string) string {
 	_, _, groups := test.controllersWith(engine, 0)
 	group, _ := groups.PostCreate(request, GroupCreateRequest{TenantID: tenantID, Name: "editors"})
 	return group.GroupID
 }
 
 func (test *GrantControllerTest) controllersWith(
-	engine *EngineService,
+	engine *EngineHelper,
 	elapsed time.Duration,
 ) (*GrantController, *RoleController, *GroupController) {
 	calls := SesameTestSetup{}.TenantCallsAfter(engine, elapsed)

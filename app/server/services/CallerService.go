@@ -9,7 +9,7 @@ import (
 // @Service
 // @NeedsAll
 type CallerService struct {
-	engineService *EngineService
+	engineHelper *EngineHelper
 }
 
 func (service *CallerService) Resolve(request *http.Request) (Caller, error) {
@@ -38,7 +38,7 @@ func (service *CallerService) verify(credential SessionCredential, failure error
 		return Session{}, failure
 	}
 	session := Session{}
-	failure = service.engineService.Call("session.verify", credential, &session)
+	failure = service.engineHelper.Call("session.verify", credential, &session)
 	return session, failure
 }
 
@@ -57,7 +57,7 @@ func (service *CallerService) caller(credential SessionCredential, session Sessi
 
 func (service *CallerService) actAs(caller Caller, failure error) error {
 	if failure == nil {
-		service.engineService.ActAs(caller)
+		service.engineHelper.ActAs(caller)
 	}
 	return failure
 }

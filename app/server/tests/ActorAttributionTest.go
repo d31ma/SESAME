@@ -155,7 +155,7 @@ func (test *ActorAttributionTest) TestRejectedCallerBindsNoActor() {
 	administrator := setup.SignIn("acme", true)
 	engine := setup.Engine()
 
-	_, rejected := (&CallerService{engineService: engine}).Resolve(httptest.NewRequest(http.MethodPost, "/", nil))
+	_, rejected := (&CallerService{engineHelper: engine}).Resolve(httptest.NewRequest(http.MethodPost, "/", nil))
 	err := engine.Call("principal.create", test.creation(administrator.TenantID), &Principal{})
 	test.finish(engine)
 
@@ -223,10 +223,10 @@ func (test *ActorAttributionTest) creation(tenantID string) PrincipalCreateReque
 	return PrincipalCreateRequest{TenantID: tenantID, Kind: "human", IdentifierNamespace: "email", IdentifierValue: "created@acme.test"}
 }
 
-func (test *ActorAttributionTest) finish(engine *EngineService) {
+func (test *ActorAttributionTest) finish(engine *EngineHelper) {
 	SesameTestSetup{}.Finish(engine)
 }
 
-func (test *ActorAttributionTest) principals(engine *EngineService) *PrincipalController {
+func (test *ActorAttributionTest) principals(engine *EngineHelper) *PrincipalController {
 	return SesameTestSetup{}.Principals(engine, 0)
 }

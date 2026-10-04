@@ -3,7 +3,7 @@ import "net/http"
 // @Service
 // @NeedsAll
 type ScimProvisioningService struct {
-	engineService *EngineService
+	engineHelper *EngineHelper
 }
 
 func (service *ScimProvisioningService) Create(request *http.Request, body ScimResourceCreateRequest, call EngineCall) error {
@@ -24,5 +24,5 @@ func (service *ScimProvisioningService) Patch(request *http.Request, body ScimRe
 
 func (service *ScimProvisioningService) provision(request *http.Request, parameters ScimEngineCall, call EngineCall) error {
 	parameters.Token = HeaderUtils{}.BearerToken(request.Header)
-	return service.engineService.Call(call.Operation, parameters, call.Result)
+	return service.engineHelper.Call(call.Operation, parameters, call.Result)
 }

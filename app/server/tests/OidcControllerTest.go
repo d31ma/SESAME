@@ -336,7 +336,7 @@ func (test *OidcControllerTest) TestARefreshFamilyIsRevokedOnlyByItsTenantsAdmin
 	Assert.Equals("invalid_grant", refreshed["error"])
 }
 
-func (test *OidcControllerTest) refreshToken(engine *EngineService, session sesame.IssuedSession, registered sesame.ClientRegistration) string {
+func (test *OidcControllerTest) refreshToken(engine *EngineHelper, session sesame.IssuedSession, registered sesame.ClientRegistration) string {
 	cookie := test.authorizeScope(engine, registered, "openid offline_access")
 	completed, err := test.controller(engine).PostInteractionComplete(SesameTestSetup{}.Request(test.credential(session)), cookie)
 	SesameTestSetup{}.Check(err)
@@ -351,7 +351,7 @@ func (test *OidcControllerTest) refreshToken(engine *EngineService, session sesa
 	return token
 }
 
-func (test *OidcControllerTest) refresh(engine *EngineService, registered sesame.ClientRegistration, refreshToken string) map[string]any {
+func (test *OidcControllerTest) refresh(engine *EngineHelper, registered sesame.ClientRegistration, refreshToken string) map[string]any {
 	form := url.Values{}
 	form.Set("grant_type", "refresh_token")
 	form.Set("refresh_token", refreshToken)
@@ -371,7 +371,7 @@ func (test *OidcControllerTest) familyID(setup *SesameTestSetup) string {
 	return found[:len("rfm_")+32]
 }
 
-func (test *OidcControllerTest) register(engine *EngineService, tenantID string, audience string) sesame.ClientRegistration {
+func (test *OidcControllerTest) register(engine *EngineHelper, tenantID string, audience string) sesame.ClientRegistration {
 	registered := sesame.ClientRegistration{}
 	SesameTestSetup{}.Check(engine.Call("oidc_client.register", map[string]any{
 		"tenant_id": tenantID, "name": "Portal", "client_type": "confidential",
@@ -381,11 +381,11 @@ func (test *OidcControllerTest) register(engine *EngineService, tenantID string,
 	return registered
 }
 
-func (test *OidcControllerTest) authorize(engine *EngineService, registered sesame.ClientRegistration) string {
+func (test *OidcControllerTest) authorize(engine *EngineHelper, registered sesame.ClientRegistration) string {
 	return test.authorizeScope(engine, registered, "openid")
 }
 
-func (test *OidcControllerTest) authorizeScope(engine *EngineService, registered sesame.ClientRegistration, scope string) string {
+func (test *OidcControllerTest) authorizeScope(engine *EngineHelper, registered sesame.ClientRegistration, scope string) string {
 	query := url.Values{}
 	query.Set("client_id", registered.Client.ID)
 	query.Set("redirect_uri", "https://rp.example/callback")
@@ -415,7 +415,7 @@ func (test *OidcControllerTest) pushed(registered sesame.ClientRegistration, sec
 }
 
 func (test *OidcControllerTest) boundToken(
-	engine *EngineService,
+	engine *EngineHelper,
 	session sesame.IssuedSession,
 	registered sesame.ClientRegistration,
 	key *ecdsa.PrivateKey,
@@ -438,7 +438,7 @@ func (test *OidcControllerTest) boundToken(
 	return token
 }
 
-func (test *OidcControllerTest) redeemDevice(engine *EngineService, registered sesame.ClientRegistration, deviceCode string) map[string]any {
+func (test *OidcControllerTest) redeemDevice(engine *EngineHelper, registered sesame.ClientRegistration, deviceCode string) map[string]any {
 	form := url.Values{}
 	form.Set("grant_type", "urn:ietf:params:oauth:grant-type:device_code")
 	form.Set("device_code", deviceCode)
@@ -520,10 +520,10 @@ func (test *OidcControllerTest) credential(session sesame.IssuedSession) string 
 	return session.SessionID + ":" + session.Secret
 }
 
-func (test *OidcControllerTest) controller(engine *EngineService) *OidcController {
+func (test *OidcControllerTest) controller(engine *EngineHelper) *OidcController {
 	return SesameTestSetup{}.Oidc(engine)
 }
 
-func (test *OidcControllerTest) standards(engine *EngineService) *StandardsController {
+func (test *OidcControllerTest) standards(engine *EngineHelper) *StandardsController {
 	return SesameTestSetup{}.Standards(engine)
 }

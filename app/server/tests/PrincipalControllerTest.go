@@ -247,6 +247,6 @@ func (test *PrincipalControllerTest) controller() *PrincipalController {
 	return test.controllerWith(SesameTestSetup{}.Engine(), 0)
 }
 
-func (test *PrincipalControllerTest) controllerWith(engine *EngineService, elapsed time.Duration) *PrincipalController {
+func (test *PrincipalControllerTest) controllerWith(engine *EngineHelper, elapsed time.Duration) *PrincipalController {
 	return SesameTestSetup{}.Principals(engine, elapsed)
 }

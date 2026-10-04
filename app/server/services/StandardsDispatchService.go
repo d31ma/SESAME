@@ -12,7 +12,7 @@ import (
 // @Service
 // @NeedsAll
 type StandardsDispatchService struct {
-	engineService *EngineService
+	engineHelper *EngineHelper
 }
 
 func (service *StandardsDispatchService) Dispatch(request *http.Request, endpoint string) (sesame.StandardsResponse, error) {
@@ -51,7 +51,7 @@ func (service *StandardsDispatchService) proofHeader() string {
 
 func (service *StandardsDispatchService) send(translated sesame.StandardsRequest) (sesame.StandardsResponse, error) {
 	response := sesame.StandardsResponse{}
-	failure := service.engineService.Call("standards.dispatch", translated, &response)
+	failure := service.engineHelper.Call("standards.dispatch", translated, &response)
 	return service.refusedWhenInvalid(response, failure)
 }
 

@@ -315,7 +315,7 @@ func (test *StandardsControllerTest) TestBusyEngineIsReportedToTheErrorHandler()
 	Assert.IsTrue(errors.As(err, &busy))
 }
 
-func (test *StandardsControllerTest) register(engine *EngineService, tenantID string, audience string) sesame.ClientRegistration {
+func (test *StandardsControllerTest) register(engine *EngineHelper, tenantID string, audience string) sesame.ClientRegistration {
 	registered := sesame.ClientRegistration{}
 	SesameTestSetup{}.Check(engine.Call("oidc_client.register", map[string]any{
 		"tenant_id": tenantID, "name": "Portal", "client_type": "confidential",
@@ -326,7 +326,7 @@ func (test *StandardsControllerTest) register(engine *EngineService, tenantID st
 }
 
 func (test *StandardsControllerTest) code(
-	engine *EngineService,
+	engine *EngineHelper,
 	session sesame.IssuedSession,
 	registered sesame.ClientRegistration,
 ) string {
@@ -342,7 +342,7 @@ func (test *StandardsControllerTest) code(
 }
 
 func (test *StandardsControllerTest) tokens(
-	engine *EngineService,
+	engine *EngineHelper,
 	session sesame.IssuedSession,
 	registered sesame.ClientRegistration,
 ) map[string]any {
@@ -444,6 +444,6 @@ func (test *StandardsControllerTest) object(response *http.Response) map[string]
 	return decoded
 }
 
-func (test *StandardsControllerTest) controller(engine *EngineService) *StandardsController {
+func (test *StandardsControllerTest) controller(engine *EngineHelper) *StandardsController {
 	return SesameTestSetup{}.Standards(engine)
 }
