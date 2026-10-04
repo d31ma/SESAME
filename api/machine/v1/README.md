@@ -26,7 +26,7 @@ one SESAME subprocess and one authoritative FYLO root.
 | Operation | Parameters | Result |
 | --- | --- | --- |
 | `system.ping` | `{}` | `{"status":"ok"}` |
-| `system.version` | `{}` | immutable build metadata, the machine protocol version, and every operation this binary routes |
+| `system.version` | `{}` | immutable build metadata, the machine protocol version, every operation this binary routes, and the optional request fields it accepts (`request_fields`) |
 | `system.readiness` | `{}` | readiness status and optional reason code |
 | `system.metrics` | `{}` | uptime, goroutines, heap, storage flag, per-operation request and per-code error counters (excluding the in-flight request) |
 | `tenant.bootstrap` | `{"name":...}` | `{"tenant":{...},"created":bool}` |
@@ -562,6 +562,8 @@ The reported list is the same set as the dispatch table and
 client that trusts what the engine reports is trusting something checked.
 
 - `protocol_version` is required and currently must equal `"1"`.
+- `actor` is optional; send it only when `system.version` lists it in
+  `request_fields` (see [Actor attribution](#actor-attribution)).
 - Unknown and duplicate object fields are rejected.
 - Every request receives at most one response with the same `request_id`.
 - Human-readable error messages are not a parsing contract.
@@ -579,6 +581,40 @@ document (so no operation ships undocumented), and against each SDK's source
 (so a gap cannot be opened or closed without recording it). A gap means no
 typed method, not no access: every SDK reaches every operation through its
 generic request escape hatch.
+
+`fixtures.ndjson` holds request and response pairs. A test replays each
+request and compares the response byte for byte: a pair whose response is
+`storage_not_configured` runs against an engine without a FYLO root, and
+every other pair against an empty storage-backed engine.
+
+## Actor attribution
+
+A host that serves SESAME operations for a signed-in principal can name that
+principal on each request, so the audit ledger records who acted instead of
+`operator:machine`:
+
+```json
+{"protocol_version":"1","request_id":"r-1","operation":"principal.suspend","parameters":{"principal_id":"prn_..."},"actor":{"tenant_id":"tnt_...","principal_id":"prn_...","session_id":"ses_..."}}
+```
+
+- Send `actor` only when `system.version` returns `"actor"` in
+  `request_fields`. Older engines reject it as an unknown field.
+- Without `actor`, nothing changes: the engine records `operator:machine`.
+- The engine checks the session behind the actor by ID: it must be active
+  and belong to that principal in that tenant, and the principal must be
+  active. It does not need the session secret.
+- An attributed write records
+  `principal:<tenant_id>/<principal_id>/<session_id>`, and may only record
+  events in the actor's own tenant.
+- The actor never grants access. It changes who is recorded, and can only
+  cause a refusal.
+
+| Code | When |
+| --- | --- |
+| `invalid_actor` | not exactly the three identifiers, unknown member, `null`, over 512 bytes, or sent to `standards.dispatch` |
+| `actor_session_invalid` | session unknown, expired, revoked, held by another principal or tenant, or principal suspended |
+| `actor_tenant_mismatch` | the operation would record an event in another tenant; nothing is written |
+| `storage_not_configured` | the engine has no FYLO root, so it cannot check the session |
 
 See `api/schema/machine-v1.schema.json` and
 `docs/rfcs/0001-machine-protocol-v1.md`.
