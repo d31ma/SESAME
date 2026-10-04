@@ -248,9 +248,5 @@ func (test *PrincipalControllerTest) controller() *PrincipalController {
 }
 
 func (test *PrincipalControllerTest) controllerWith(engine *EngineService, elapsed time.Duration) *PrincipalController {
-	calls := SesameTestSetup{}.TenantCallsAfter(engine, elapsed)
-	return &PrincipalController{
-		tenantCallService:      calls,
-		principalTenantService: &PrincipalTenantService{tenantCallService: calls},
-	}
+	return SesameTestSetup{}.Principals(engine, elapsed)
 }

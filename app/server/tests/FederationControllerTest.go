@@ -175,18 +175,7 @@ func (test *FederationControllerTest) TestNoRouteAnswersATokenRequest() {
 }
 
 func (test *FederationControllerTest) controller() *FederationController {
-	settings := &EngineSettingsService{}
-	engine := &EngineService{engineSettingsService: settings}
-	return &FederationController{
-		engineService:         engine,
-		engineSettingsService: settings,
-		tenantCallService: &TenantCallService{
-			callerService:        &CallerService{engineService: engine},
-			engineService:        engine,
-			administratorService: &AdministratorService{engineService: engine},
-			recentSignInService:  &RecentSignInService{},
-		},
-	}
+	return SesameTestSetup{}.Federation(SesameTestSetup{}.Engine(), 0)
 }
 
 func (test *FederationControllerTest) issuer() string {

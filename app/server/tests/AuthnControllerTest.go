@@ -268,5 +268,5 @@ func (test *AuthnControllerTest) decodeStrictly(body string, target any) error {
 }
 
 func (test *AuthnControllerTest) controller() *AuthnController {
-	return &AuthnController{engineService: &EngineService{engineSettingsService: &EngineSettingsService{}}}
+	return SesameTestSetup{}.Authn(SesameTestSetup{}.Engine())
 }

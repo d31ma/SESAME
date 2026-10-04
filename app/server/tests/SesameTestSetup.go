@@ -148,6 +148,116 @@ func (SesameTestSetup) TenantCallsAfter(engine *EngineService, elapsed time.Dura
 	}
 }
 
+func (SesameTestSetup) PublicCalls(engine *EngineService) *PublicCallService {
+	return &PublicCallService{engineService: engine}
+}
+
+func (SesameTestSetup) FederatedLogins(engine *EngineService) *FederatedLoginService {
+	return &FederatedLoginService{engineService: engine, engineSettingsService: engine.engineSettingsService}
+}
+
+func (setup SesameTestSetup) Authenticator(engine *EngineService, elapsed time.Duration) *AuthenticatorController {
+	calls := setup.TenantCallsAfter(engine, elapsed)
+	principals := &PrincipalTenantService{tenantCallService: calls}
+	return &AuthenticatorController{
+		authenticatorService:   &AuthenticatorService{tenantCallService: calls},
+		passkeyService:         &PasskeyService{tenantCallService: calls, principalTenantService: principals},
+		principalTenantService: principals,
+	}
+}
+
+func (setup SesameTestSetup) Authn(engine *EngineService) *AuthnController {
+	return &AuthnController{publicCallService: setup.PublicCalls(engine)}
+}
+
+func (setup SesameTestSetup) Authorize(engine *EngineService) *AuthorizeController {
+	return &AuthorizeController{authorizeService: &AuthorizeService{tenantCallService: setup.TenantCalls(engine)}}
+}
+
+func (setup SesameTestSetup) Federation(engine *EngineService, elapsed time.Duration) *FederationController {
+	return &FederationController{
+		federatedLoginService: setup.FederatedLogins(engine),
+		publicCallService:     setup.PublicCalls(engine),
+		tenantCallService:     setup.TenantCallsAfter(engine, elapsed),
+	}
+}
+
+func (setup SesameTestSetup) Saml(engine *EngineService, elapsed time.Duration) *SamlController {
+	return &SamlController{
+		federatedLoginService: setup.FederatedLogins(engine),
+		publicCallService:     setup.PublicCalls(engine),
+		tenantCallService:     setup.TenantCallsAfter(engine, elapsed),
+	}
+}
+
+func (setup SesameTestSetup) Scim(engine *EngineService, elapsed time.Duration) *ScimController {
+	return &ScimController{
+		scimProvisioningService: &ScimProvisioningService{engineService: engine},
+		tenantCallService:       setup.TenantCallsAfter(engine, elapsed),
+	}
+}
+
+func (setup SesameTestSetup) Groups(engine *EngineService) *GroupController {
+	calls := setup.TenantCalls(engine)
+	return &GroupController{tenantCallService: calls, principalTenantService: &PrincipalTenantService{tenantCallService: calls}}
+}
+
+func (setup SesameTestSetup) Principals(engine *EngineService, elapsed time.Duration) *PrincipalController {
+	calls := setup.TenantCallsAfter(engine, elapsed)
+	principals := &PrincipalTenantService{tenantCallService: calls}
+	return &PrincipalController{
+		tenantCallService:      calls,
+		principalLookupService: &PrincipalLookupService{tenantCallService: calls, principalTenantService: principals},
+		principalTenantService: principals,
+	}
+}
+
+func (setup SesameTestSetup) OidcClients(engine *EngineService, elapsed time.Duration) *OidcClientController {
+	calls := setup.TenantCallsAfter(engine, elapsed)
+	return &OidcClientController{tenantCallService: calls, oidcClientTenantService: &OidcClientTenantService{tenantCallService: calls}}
+}
+
+func (setup SesameTestSetup) Oidc(engine *EngineService) *OidcController {
+	calls := setup.TenantCalls(engine)
+	return &OidcController{
+		oidcInteractionService:     &OidcInteractionService{tenantCallService: calls},
+		oidcDeviceService:          &OidcDeviceService{tenantCallService: calls},
+		publicCallService:          setup.PublicCalls(engine),
+		tenantCallService:          calls,
+		refreshFamilyTenantService: &RefreshFamilyTenantService{tenantCallService: calls},
+	}
+}
+
+func (SesameTestSetup) Standards(engine *EngineService) *StandardsController {
+	return &StandardsController{standardsEndpointService: &StandardsEndpointService{
+		standardsDispatchService: &StandardsDispatchService{engineService: engine},
+		standardsAnswerService:   &StandardsAnswerService{},
+	}}
+}
+
+func (setup SesameTestSetup) Sessions(engine *EngineService, elapsed time.Duration) *SessionController {
+	calls := setup.TenantCallsAfter(engine, elapsed)
+	return &SessionController{
+		publicCallService: setup.PublicCalls(engine),
+		sessionService:    &SessionService{tenantCallService: calls},
+		tenantCallService: calls,
+	}
+}
+
+func (setup SesameTestSetup) System(engine *EngineService) *SystemController {
+	return &SystemController{publicCallService: setup.PublicCalls(engine), tenantCallService: setup.TenantCalls(engine)}
+}
+
+func (setup SesameTestSetup) Token(engine *EngineService) *TokenController {
+	return &TokenController{publicCallService: setup.PublicCalls(engine)}
+}
+
+func (SesameTestSetup) Finish(engine *EngineService) {
+	if engine.client != nil {
+		engine.client.Close()
+	}
+}
+
 func (SesameTestSetup) Status(err error) int {
 	return (&SesameErrorHandler{}).Answer(err).StatusCode
 }

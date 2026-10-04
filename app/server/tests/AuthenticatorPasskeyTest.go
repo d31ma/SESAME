@@ -23,7 +23,7 @@ func (test *AuthenticatorPasskeyTest) TestRegisteredPasskeySignsTheCallerInWithM
 	session := setup.SignIn("acme", false)
 	key := test.key()
 	controller := test.controller()
-	authn := &AuthnController{engineService: controller.tenantCallService.engineService}
+	authn := SesameTestSetup{}.Authn(controller.principalTenantService.tenantCallService.engineService)
 
 	stored := test.register(controller, setup.SignedIn(session), key)
 	listed, listErr := controller.PostPasskeyList(setup.SignedIn(session))
@@ -62,7 +62,7 @@ func (test *AuthenticatorPasskeyTest) TestRemovedPasskeyNoLongerSignsIn() {
 	session := setup.SignIn("acme", false)
 	key := test.key()
 	controller := test.controller()
-	authn := &AuthnController{engineService: controller.tenantCallService.engineService}
+	authn := SesameTestSetup{}.Authn(controller.principalTenantService.tenantCallService.engineService)
 	stored := test.register(controller, setup.SignedIn(session), key)
 
 	removal, err := controller.PostPasskeyRemove(
@@ -310,15 +310,5 @@ func (test *AuthenticatorPasskeyTest) answer(err error) string {
 }
 
 func (test *AuthenticatorPasskeyTest) controller() *AuthenticatorController {
-	engine := &EngineService{engineSettingsService: &EngineSettingsService{}}
-	calls := &TenantCallService{
-		callerService:        &CallerService{engineService: engine},
-		engineService:        engine,
-		administratorService: &AdministratorService{engineService: engine},
-		recentSignInService:  &RecentSignInService{},
-	}
-	return &AuthenticatorController{
-		tenantCallService:      calls,
-		principalTenantService: &PrincipalTenantService{tenantCallService: calls},
-	}
+	return SesameTestSetup{}.Authenticator(SesameTestSetup{}.Engine(), 0)
 }

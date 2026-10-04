@@ -76,16 +76,7 @@ func (test *ScimUserTest) TestUserDeprovisionDeactivatesTheUser() {
 }
 
 func (test *ScimUserTest) controller() *ScimController {
-	engine := &EngineService{engineSettingsService: &EngineSettingsService{}}
-	return &ScimController{
-		engineService: engine,
-		tenantCallService: &TenantCallService{
-			callerService:        &CallerService{engineService: engine},
-			engineService:        engine,
-			administratorService: &AdministratorService{engineService: engine},
-			recentSignInService:  &RecentSignInService{},
-		},
-	}
+	return SesameTestSetup{}.Scim(SesameTestSetup{}.Engine(), 0)
 }
 
 func (test *ScimUserTest) patchBody(path string, value string) string {

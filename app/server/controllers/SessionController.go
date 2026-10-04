@@ -3,7 +3,8 @@ import "net/http"
 // @RequestRoute("/api/v1/session")
 // @NeedsAll
 type SessionController struct {
-	engineService     *EngineService
+	publicCallService *PublicCallService
+	sessionService    *SessionService
 	tenantCallService *TenantCallService
 }
 
@@ -14,7 +15,7 @@ func (controller *SessionController) PostVerify(
 	body SessionCredential,
 ) (Session, error) {
 	var result Session
-	err := controller.engineService.Call("session.verify", body, &result)
+	err := controller.publicCallService.Call(EngineCall{Operation: "session.verify", Parameters: body, Result: &result})
 	return result, err
 }
 
@@ -26,10 +27,7 @@ func (controller *SessionController) PostRevoke(
 	body SessionRevokeReason,
 ) (RevokeOutcome, error) {
 	var result RevokeOutcome
-	err := controller.tenantCallService.CallAsCaller(request, func(caller Caller) EngineCall {
-		order := SessionRevokeRequest{SessionID: caller.SessionID, Reason: body.Reason}
-		return EngineCall{Operation: controller.revokeOperation(), Parameters: order, Result: &result}
-	})
+	err := controller.sessionService.RevokeOwn(request, body, EngineCall{Operation: controller.revokeOperation(), Result: &result})
 	return result, err
 }
 

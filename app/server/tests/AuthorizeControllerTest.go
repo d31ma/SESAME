@@ -223,5 +223,5 @@ func (test *AuthorizeControllerTest) decodeStrictly(body string, target any) err
 }
 
 func (test *AuthorizeControllerTest) controller(engine *EngineService) *AuthorizeController {
-	return &AuthorizeController{tenantCallService: SesameTestSetup{}.TenantCalls(engine)}
+	return SesameTestSetup{}.Authorize(engine)
 }

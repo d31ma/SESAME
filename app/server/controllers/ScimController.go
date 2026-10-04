@@ -3,8 +3,8 @@ import "net/http"
 // @RequestRoute("/api/v1/scim")
 // @NeedsAll
 type ScimController struct {
-	engineService     *EngineService
-	tenantCallService *TenantCallService
+	scimProvisioningService *ScimProvisioningService
+	tenantCallService       *TenantCallService
 }
 
 // @PostRoute("/client-register")
@@ -19,7 +19,6 @@ func (controller *ScimController) PostClientRegister(
 		Operation:  "scim.client_register",
 		Parameters: body,
 		Result:     &result,
-		Privileged: true,
 	})
 	return result, err
 }
@@ -36,7 +35,6 @@ func (controller *ScimController) PostClientRotateToken(
 		Operation:  "scim.client_rotate_token",
 		Parameters: body,
 		Result:     &result,
-		Privileged: true,
 	})
 	return result, err
 }
@@ -65,7 +63,7 @@ func (controller *ScimController) PostUserCreate(
 	body ScimResourceCreateRequest,
 ) (ScimUser, error) {
 	var result ScimUser
-	err := controller.provision(request, "scim.user_create", ScimEngineCall{Body: body.Body}, &result)
+	err := controller.scimProvisioningService.Create(request, body, EngineCall{Operation: "scim.user_create", Result: &result})
 	return result, err
 }
 
@@ -77,7 +75,7 @@ func (controller *ScimController) PostUserGet(
 	body ScimResourceRequest,
 ) (ScimUser, error) {
 	var result ScimUser
-	err := controller.provision(request, "scim.user_get", ScimEngineCall{ResourceID: body.ResourceID}, &result)
+	err := controller.scimProvisioningService.Resource(request, body, EngineCall{Operation: "scim.user_get", Result: &result})
 	return result, err
 }
 
@@ -89,7 +87,7 @@ func (controller *ScimController) PostUserList(
 	body ScimListRequest,
 ) (ScimUserList, error) {
 	var result ScimUserList
-	err := controller.provision(request, "scim.user_list", controller.listCall(body), &result)
+	err := controller.scimProvisioningService.List(request, body, EngineCall{Operation: "scim.user_list", Result: &result})
 	return result, err
 }
 
@@ -101,7 +99,7 @@ func (controller *ScimController) PostUserPatch(
 	body ScimResourcePatchRequest,
 ) (ScimUser, error) {
 	var result ScimUser
-	err := controller.provision(request, "scim.user_patch", controller.patchCall(body), &result)
+	err := controller.scimProvisioningService.Patch(request, body, EngineCall{Operation: "scim.user_patch", Result: &result})
 	return result, err
 }
 
@@ -113,7 +111,7 @@ func (controller *ScimController) PostUserDeprovision(
 	body ScimResourceRequest,
 ) (DeprovisionOutcome, error) {
 	var result DeprovisionOutcome
-	err := controller.provision(request, "scim.user_deprovision", ScimEngineCall{ResourceID: body.ResourceID}, &result)
+	err := controller.scimProvisioningService.Resource(request, body, EngineCall{Operation: "scim.user_deprovision", Result: &result})
 	return result, err
 }
 
@@ -125,7 +123,7 @@ func (controller *ScimController) PostGroupCreate(
 	body ScimResourceCreateRequest,
 ) (ScimGroup, error) {
 	var result ScimGroup
-	err := controller.provision(request, "scim.group_create", ScimEngineCall{Body: body.Body}, &result)
+	err := controller.scimProvisioningService.Create(request, body, EngineCall{Operation: "scim.group_create", Result: &result})
 	return result, err
 }
 
@@ -137,7 +135,7 @@ func (controller *ScimController) PostGroupGet(
 	body ScimResourceRequest,
 ) (ScimGroup, error) {
 	var result ScimGroup
-	err := controller.provision(request, "scim.group_get", ScimEngineCall{ResourceID: body.ResourceID}, &result)
+	err := controller.scimProvisioningService.Resource(request, body, EngineCall{Operation: "scim.group_get", Result: &result})
 	return result, err
 }
 
@@ -149,7 +147,7 @@ func (controller *ScimController) PostGroupList(
 	body ScimListRequest,
 ) (ScimGroupList, error) {
 	var result ScimGroupList
-	err := controller.provision(request, "scim.group_list", controller.listCall(body), &result)
+	err := controller.scimProvisioningService.List(request, body, EngineCall{Operation: "scim.group_list", Result: &result})
 	return result, err
 }
 
@@ -161,7 +159,7 @@ func (controller *ScimController) PostGroupPatch(
 	body ScimResourcePatchRequest,
 ) (ScimGroup, error) {
 	var result ScimGroup
-	err := controller.provision(request, "scim.group_patch", controller.patchCall(body), &result)
+	err := controller.scimProvisioningService.Patch(request, body, EngineCall{Operation: "scim.group_patch", Result: &result})
 	return result, err
 }
 
@@ -173,19 +171,6 @@ func (controller *ScimController) PostGroupDeprovision(
 	body ScimResourceRequest,
 ) (DeprovisionOutcome, error) {
 	var result DeprovisionOutcome
-	err := controller.provision(request, "scim.group_deprovision", ScimEngineCall{ResourceID: body.ResourceID}, &result)
+	err := controller.scimProvisioningService.Resource(request, body, EngineCall{Operation: "scim.group_deprovision", Result: &result})
 	return result, err
-}
-
-func (controller *ScimController) provision(request *http.Request, operation string, call ScimEngineCall, result any) error {
-	call.Token = HeaderUtils{}.BearerToken(request.Header)
-	return controller.engineService.Call(operation, call, result)
-}
-
-func (controller *ScimController) listCall(body ScimListRequest) ScimEngineCall {
-	return ScimEngineCall{Filter: body.Filter, StartIndex: body.StartIndex, Count: body.Count}
-}
-
-func (controller *ScimController) patchCall(body ScimResourcePatchRequest) ScimEngineCall {
-	return ScimEngineCall{ResourceID: body.ResourceID, Body: body.Body}
 }

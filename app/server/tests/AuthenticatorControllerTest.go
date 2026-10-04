@@ -337,19 +337,9 @@ func (test *AuthenticatorControllerTest) controller() *AuthenticatorController {
 }
 
 func (test *AuthenticatorControllerTest) controllerAfter(elapsed time.Duration) *AuthenticatorController {
-	engine := SesameTestSetup{}.Engine()
-	calls := &TenantCallService{
-		callerService:        &CallerService{engineService: engine},
-		engineService:        engine,
-		administratorService: &AdministratorService{engineService: engine},
-		recentSignInService:  &RecentSignInService{clockShift: elapsed},
-	}
-	return &AuthenticatorController{
-		tenantCallService:      calls,
-		principalTenantService: &PrincipalTenantService{tenantCallService: calls},
-	}
+	return SesameTestSetup{}.Authenticator(SesameTestSetup{}.Engine(), elapsed)
 }
 
 func (test *AuthenticatorControllerTest) authn(controller *AuthenticatorController) *AuthnController {
-	return &AuthnController{engineService: controller.tenantCallService.engineService}
+	return SesameTestSetup{}.Authn(controller.principalTenantService.tenantCallService.engineService)
 }

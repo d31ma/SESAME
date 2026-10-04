@@ -53,7 +53,7 @@ func (service *TenantCallService) administrator(request *http.Request, call Engi
 }
 
 func (service *TenantCallService) recentWhenPrivileged(caller Caller, call EngineCall, failure error) error {
-	if !call.Privileged {
+	if !service.recentSignInService.Privileged(call) {
 		return failure
 	}
 	return service.recentSignInService.Require(caller, failure)

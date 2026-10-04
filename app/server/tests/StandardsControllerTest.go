@@ -445,8 +445,5 @@ func (test *StandardsControllerTest) object(response *http.Response) map[string]
 }
 
 func (test *StandardsControllerTest) controller(engine *EngineService) *StandardsController {
-	return &StandardsController{
-		standardsDispatchService: &StandardsDispatchService{engineService: engine},
-		standardsAnswerService:   &StandardsAnswerService{},
-	}
+	return SesameTestSetup{}.Standards(engine)
 }

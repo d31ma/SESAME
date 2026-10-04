@@ -3,8 +3,8 @@ import "net/http"
 // @RequestRoute("/api/v1/federation")
 // @NeedsAll
 type FederationController struct {
-	engineService         *EngineService
-	engineSettingsService *EngineSettingsService
+	federatedLoginService *FederatedLoginService
+	publicCallService     *PublicCallService
 	tenantCallService     *TenantCallService
 }
 
@@ -20,7 +20,6 @@ func (controller *FederationController) PostProviderRegister(
 		Operation:  "federation.provider_register",
 		Parameters: body,
 		Result:     &result,
-		Privileged: true,
 	})
 	return result, err
 }
@@ -37,7 +36,6 @@ func (controller *FederationController) PostProviderConfigure(
 		Operation:  "federation.provider_configure",
 		Parameters: body,
 		Result:     &result,
-		Privileged: true,
 	})
 	return result, err
 }
@@ -81,8 +79,11 @@ func (controller *FederationController) PostLoginStart(
 	body FederationLoginStartRequest,
 ) (FederationLogin, error) {
 	var result FederationLogin
-	err := controller.engineSettingsService.RequireFederationRedirectURI(body.RedirectURI)
-	err = controller.allowedCall(err, EngineCall{Operation: "federation.login_start", Parameters: body, Result: &result})
+	err := controller.federatedLoginService.StartFederation(body.RedirectURI, EngineCall{
+		Operation:  "federation.login_start",
+		Parameters: body,
+		Result:     &result,
+	})
 	return result, err
 }
 
@@ -93,13 +94,6 @@ func (controller *FederationController) PostLoginComplete(
 	body FederationLoginCompleteRequest,
 ) (FederatedLoginResult, error) {
 	var result FederatedLoginResult
-	err := controller.engineService.Call("federation.login_complete", body, &result)
+	err := controller.publicCallService.Call(EngineCall{Operation: "federation.login_complete", Parameters: body, Result: &result})
 	return result, err
-}
-
-func (controller *FederationController) allowedCall(failure error, call EngineCall) error {
-	if failure != nil {
-		return failure
-	}
-	return controller.engineService.Call(call.Operation, call.Parameters, call.Result)
 }

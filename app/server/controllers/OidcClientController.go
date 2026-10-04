@@ -4,7 +4,8 @@ import "net/http"
 // @Allow(Administrator)
 // @NeedsAll
 type OidcClientController struct {
-	tenantCallService *TenantCallService
+	tenantCallService       *TenantCallService
+	oidcClientTenantService *OidcClientTenantService
 }
 
 // @PostRoute("/register")
@@ -18,7 +19,6 @@ func (controller *OidcClientController) PostRegister(
 		Operation:  "oidc_client.register",
 		Parameters: body,
 		Result:     &result,
-		Privileged: true,
 	})
 	return result, err
 }
@@ -30,7 +30,7 @@ func (controller *OidcClientController) PostGet(
 	body OidcClientReference,
 ) (OidcClient, error) {
 	var result OidcClient
-	err := controller.tenantCallService.Load(request, controller.lookup(body.ClientID, &result))
+	err := controller.tenantCallService.Load(request, EngineCall{Operation: "oidc_client.get", Parameters: body, Result: &result})
 	return result, err
 }
 
@@ -41,11 +41,10 @@ func (controller *OidcClientController) PostRotateSecret(
 	body OidcClientReference,
 ) (OidcClientSecret, error) {
 	var result OidcClientSecret
-	err := controller.tenantCallService.CallOwned(request, controller.lookup(body.ClientID, &OidcClient{}), EngineCall{
+	err := controller.oidcClientTenantService.Call(request, body.ClientID, EngineCall{
 		Operation:  "oidc_client.rotate_secret",
 		Parameters: body,
 		Result:     &result,
-		Privileged: true,
 	})
 	return result, err
 }
@@ -57,18 +56,10 @@ func (controller *OidcClientController) PostDisable(
 	body OidcClientDisableRequest,
 ) (DisableOutcome, error) {
 	var result DisableOutcome
-	err := controller.tenantCallService.CallOwned(request, controller.lookup(body.ClientID, &OidcClient{}), EngineCall{
+	err := controller.oidcClientTenantService.Call(request, body.ClientID, EngineCall{
 		Operation:  "oidc_client.disable",
 		Parameters: body,
 		Result:     &result,
 	})
 	return result, err
-}
-
-func (controller *OidcClientController) lookup(clientID string, result *OidcClient) EngineCall {
-	return EngineCall{
-		Operation:  "oidc_client.get",
-		Parameters: OidcClientReference{ClientID: clientID},
-		Result:     result,
-	}
 }

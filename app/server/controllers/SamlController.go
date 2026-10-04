@@ -3,8 +3,8 @@ import "net/http"
 // @RequestRoute("/api/v1/saml")
 // @NeedsAll
 type SamlController struct {
-	engineService         *EngineService
-	engineSettingsService *EngineSettingsService
+	federatedLoginService *FederatedLoginService
+	publicCallService     *PublicCallService
 	tenantCallService     *TenantCallService
 }
 
@@ -15,8 +15,11 @@ func (controller *SamlController) PostLoginStart(
 	body SamlLoginStartRequest,
 ) (SamlLogin, error) {
 	var result SamlLogin
-	err := controller.engineSettingsService.RequireSamlConsumerURL(body.ConsumerURL)
-	err = controller.allowedCall(err, EngineCall{Operation: "saml.login_start", Parameters: body, Result: &result})
+	err := controller.federatedLoginService.StartSaml(body.ConsumerURL, EngineCall{
+		Operation:  "saml.login_start",
+		Parameters: body,
+		Result:     &result,
+	})
 	return result, err
 }
 
@@ -27,7 +30,7 @@ func (controller *SamlController) PostLoginComplete(
 	body SamlLoginCompleteRequest,
 ) (FederatedLoginResult, error) {
 	var result FederatedLoginResult
-	err := controller.engineService.Call("saml.login_complete", body, &result)
+	err := controller.publicCallService.Call(EngineCall{Operation: "saml.login_complete", Parameters: body, Result: &result})
 	return result, err
 }
 
@@ -43,7 +46,6 @@ func (controller *SamlController) PostProviderRegister(
 		Operation:  "saml.provider_register",
 		Parameters: body,
 		Result:     &result,
-		Privileged: true,
 	})
 	return result, err
 }
@@ -78,11 +80,4 @@ func (controller *SamlController) PostProviderDisable(
 		Result:     &result,
 	})
 	return result, err
-}
-
-func (controller *SamlController) allowedCall(failure error, call EngineCall) error {
-	if failure != nil {
-		return failure
-	}
-	return controller.engineService.Call(call.Operation, call.Parameters, call.Result)
 }

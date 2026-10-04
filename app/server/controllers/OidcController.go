@@ -3,8 +3,11 @@ import "net/http"
 // @RequestRoute("/api/v1/oidc")
 // @NeedsAll
 type OidcController struct {
-	engineService     *EngineService
-	tenantCallService *TenantCallService
+	oidcInteractionService     *OidcInteractionService
+	oidcDeviceService          *OidcDeviceService
+	publicCallService          *PublicCallService
+	tenantCallService          *TenantCallService
+	refreshFamilyTenantService *RefreshFamilyTenantService
 }
 
 // @PostRoute("/interaction-get")
@@ -15,12 +18,7 @@ func (controller *OidcController) PostInteractionGet(
 	interaction string,
 ) (OidcInteraction, error) {
 	var result OidcInteraction
-	handle := InteractionCookieUtils{}.Handle(interaction)
-	err := controller.tenantCallService.LoadAsCaller(request, EngineCall{
-		Operation:  "oidc.interaction_get",
-		Parameters: handle,
-		Result:     &result,
-	})
+	err := controller.oidcInteractionService.Interaction(request, interaction, EngineCall{Operation: "oidc.interaction_get", Result: &result})
 	return result, err
 }
 
@@ -32,8 +30,10 @@ func (controller *OidcController) PostInteractionComplete(
 	interaction string,
 ) (OidcAuthorizationCode, error) {
 	var result OidcAuthorizationCode
-	handle := InteractionCookieUtils{}.Handle(interaction)
-	err := controller.tenantCallService.CallAsCaller(request, controller.completionFor(handle, &result))
+	err := controller.oidcInteractionService.CompleteInteraction(request, interaction, EngineCall{
+		Operation: "oidc.interaction_complete",
+		Result:    &result,
+	})
 	return result, err
 }
 
@@ -45,7 +45,7 @@ func (controller *OidcController) PostConsentGrant(
 	body OidcConsentGrantRequest,
 ) (OidcConsent, error) {
 	var result OidcConsent
-	err := controller.tenantCallService.CallAsCaller(request, controller.grantFor(body, &result))
+	err := controller.oidcInteractionService.GrantConsent(request, body, EngineCall{Operation: "oidc.consent_grant", Result: &result})
 	return result, err
 }
 
@@ -57,7 +57,7 @@ func (controller *OidcController) PostConsentGet(
 	body OidcClientReference,
 ) (OidcConsent, error) {
 	var result OidcConsent
-	err := controller.tenantCallService.CallAsCaller(request, controller.consentFor("oidc.consent_get", body.ClientID, &result))
+	err := controller.oidcInteractionService.Consent(request, body, EngineCall{Operation: "oidc.consent_get", Result: &result})
 	return result, err
 }
 
@@ -69,7 +69,7 @@ func (controller *OidcController) PostConsentWithdraw(
 	body OidcClientReference,
 ) (OidcConsentWithdrawn, error) {
 	var result OidcConsentWithdrawn
-	err := controller.tenantCallService.CallAsCaller(request, controller.consentFor("oidc.consent_withdraw", body.ClientID, &result))
+	err := controller.oidcInteractionService.Consent(request, body, EngineCall{Operation: "oidc.consent_withdraw", Result: &result})
 	return result, err
 }
 
@@ -81,7 +81,7 @@ func (controller *OidcController) PostDeviceLookup(
 	body OidcUserCodeRequest,
 ) (OidcDeviceRequest, error) {
 	var result OidcDeviceRequest
-	err := controller.tenantCallService.CallAsCaller(request, controller.userCodeFor("oidc.device_lookup", body.UserCode, &result))
+	err := controller.oidcDeviceService.UserCode(request, body, EngineCall{Operation: "oidc.device_lookup", Result: &result})
 	return result, err
 }
 
@@ -93,7 +93,7 @@ func (controller *OidcController) PostDeviceApprove(
 	body OidcUserCodeRequest,
 ) (OidcDeviceRequest, error) {
 	var result OidcDeviceRequest
-	err := controller.tenantCallService.CallAsCaller(request, controller.approvalFor(body.UserCode, &result))
+	err := controller.oidcDeviceService.Approve(request, body, EngineCall{Operation: "oidc.device_approve", Result: &result})
 	return result, err
 }
 
@@ -105,7 +105,7 @@ func (controller *OidcController) PostDeviceDeny(
 	body OidcUserCodeRequest,
 ) (OidcDeviceDenied, error) {
 	var result OidcDeviceDenied
-	err := controller.tenantCallService.CallAsCaller(request, controller.userCodeFor("oidc.device_deny", body.UserCode, &result))
+	err := controller.oidcDeviceService.UserCode(request, body, EngineCall{Operation: "oidc.device_deny", Result: &result})
 	return result, err
 }
 
@@ -116,7 +116,7 @@ func (controller *OidcController) PostPushedAuthorize(
 	body OidcPushedAuthorizeRequest,
 ) (OidcPushedRequest, error) {
 	var result OidcPushedRequest
-	err := controller.engineService.Call("oidc.pushed_authorize", body, &result)
+	err := controller.publicCallService.Call(EngineCall{Operation: "oidc.pushed_authorize", Parameters: body, Result: &result})
 	return result, err
 }
 
@@ -127,7 +127,7 @@ func (controller *OidcController) PostDeviceAuthorize(
 	body OidcDeviceAuthorizeRequest,
 ) (OidcDeviceStarted, error) {
 	var result OidcDeviceStarted
-	err := controller.engineService.Call("oidc.device_authorize", body, &result)
+	err := controller.publicCallService.Call(EngineCall{Operation: "oidc.device_authorize", Parameters: body, Result: &result})
 	return result, err
 }
 
@@ -138,7 +138,7 @@ func (controller *OidcController) PostDpopVerify(
 	body OidcDpopVerifyRequest,
 ) (OidcDpopVerification, error) {
 	var result OidcDpopVerification
-	err := controller.engineService.Call("oidc.dpop_verify", body, &result)
+	err := controller.publicCallService.Call(EngineCall{Operation: "oidc.dpop_verify", Parameters: body, Result: &result})
 	return result, err
 }
 
@@ -150,7 +150,7 @@ func (controller *OidcController) PostRefreshFamilyGet(
 	body OidcRefreshFamilyReference,
 ) (OidcRefreshFamily, error) {
 	var result OidcRefreshFamily
-	err := controller.tenantCallService.Load(request, controller.familyLookup(body.FamilyID, &result))
+	err := controller.tenantCallService.Load(request, EngineCall{Operation: "oidc.refresh_family_get", Parameters: body, Result: &result})
 	return result, err
 }
 
@@ -162,62 +162,10 @@ func (controller *OidcController) PostRefreshFamilyRevoke(
 	body OidcRefreshFamilyRevokeRequest,
 ) (RevokeOutcome, error) {
 	var result RevokeOutcome
-	revoke := EngineCall{Operation: "oidc.refresh_family_revoke", Parameters: body, Result: &result}
-	err := controller.tenantCallService.CallOwned(request, controller.familyLookup(body.FamilyID, &OidcRefreshFamily{}), revoke)
+	err := controller.refreshFamilyTenantService.Call(request, body.FamilyID, EngineCall{
+		Operation:  "oidc.refresh_family_revoke",
+		Parameters: body,
+		Result:     &result,
+	})
 	return result, err
-}
-
-func (controller *OidcController) familyLookup(familyID string, result *OidcRefreshFamily) EngineCall {
-	return EngineCall{
-		Operation:  "oidc.refresh_family_get",
-		Parameters: OidcRefreshFamilyReference{FamilyID: familyID},
-		Result:     result,
-	}
-}
-
-func (controller *OidcController) consentFor(operation string, clientID string, result any) func(caller Caller) EngineCall {
-	return func(caller Caller) EngineCall {
-		parameters := OidcConsentParameters{PrincipalID: caller.PrincipalID, ClientID: clientID}
-		return EngineCall{Operation: operation, Parameters: parameters, Result: result}
-	}
-}
-
-func (controller *OidcController) userCodeFor(operation string, userCode string, result any) func(caller Caller) EngineCall {
-	return func(caller Caller) EngineCall {
-		parameters := OidcUserCodeParameters{TenantID: caller.TenantID, UserCode: userCode}
-		return EngineCall{Operation: operation, Parameters: parameters, Result: result}
-	}
-}
-
-func (controller *OidcController) approvalFor(userCode string, result *OidcDeviceRequest) func(caller Caller) EngineCall {
-	return func(caller Caller) EngineCall {
-		return EngineCall{Operation: "oidc.device_approve", Result: result, Parameters: OidcDeviceApproval{
-			TenantID:      caller.TenantID,
-			UserCode:      userCode,
-			SessionID:     caller.SessionID,
-			SessionSecret: caller.SessionSecret,
-		}}
-	}
-}
-
-func (controller *OidcController) completionFor(handle OidcInteractionHandle, result *OidcAuthorizationCode) func(caller Caller) EngineCall {
-	return func(caller Caller) EngineCall {
-		return EngineCall{Operation: "oidc.interaction_complete", Result: result, Parameters: OidcInteractionCompletion{
-			InteractionID:     handle.InteractionID,
-			InteractionSecret: handle.InteractionSecret,
-			SessionID:         caller.SessionID,
-			SessionSecret:     caller.SessionSecret,
-		}}
-	}
-}
-
-func (controller *OidcController) grantFor(body OidcConsentGrantRequest, result *OidcConsent) func(caller Caller) EngineCall {
-	return func(caller Caller) EngineCall {
-		return EngineCall{Operation: "oidc.consent_grant", Result: result, Parameters: OidcConsentGrantParameters{
-			SessionID:     caller.SessionID,
-			SessionSecret: caller.SessionSecret,
-			ClientID:      body.ClientID,
-			Scopes:        body.Scopes,
-		}}
-	}
 }

@@ -3,7 +3,7 @@ import "net/http"
 // @RequestRoute("/api/v1/system")
 // @NeedsAll
 type SystemController struct {
-	engineService     *EngineService
+	publicCallService *PublicCallService
 	tenantCallService *TenantCallService
 }
 
@@ -11,7 +11,7 @@ type SystemController struct {
 // @Public
 func (controller *SystemController) PostPing() (SystemPing, error) {
 	var result SystemPing
-	err := controller.engineService.Call("system.ping", struct{}{}, &result)
+	err := controller.publicCallService.Call(EngineCall{Operation: "system.ping", Parameters: struct{}{}, Result: &result})
 	return result, err
 }
 
@@ -19,7 +19,7 @@ func (controller *SystemController) PostPing() (SystemPing, error) {
 // @Public
 func (controller *SystemController) PostVersion() (SystemVersion, error) {
 	var result SystemVersion
-	err := controller.engineService.Call(controller.versionOperation(), struct{}{}, &result)
+	err := controller.publicCallService.Call(EngineCall{Operation: controller.versionOperation(), Parameters: struct{}{}, Result: &result})
 	return result, err
 }
 
@@ -39,7 +39,7 @@ func (controller *SystemController) PostBuild(request *http.Request) (SystemBuil
 // @Public
 func (controller *SystemController) PostReadiness() (SystemReadiness, error) {
 	var result SystemReadiness
-	err := controller.engineService.Call("system.readiness", struct{}{}, &result)
+	err := controller.publicCallService.Call(EngineCall{Operation: "system.readiness", Parameters: struct{}{}, Result: &result})
 	return result, err
 }
 

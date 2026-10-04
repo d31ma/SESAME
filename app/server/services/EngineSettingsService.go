@@ -19,23 +19,6 @@ func (service *EngineSettingsService) Read() (EngineSettings, error) {
 	return service.validated(settings, failure)
 }
 
-func (service *EngineSettingsService) RequireSamlConsumerURL(consumerURL string) error {
-	settings, failure := service.Read()
-	return service.requireListed(settings.SamlConsumerAddresses, consumerURL, failure)
-}
-
-func (service *EngineSettingsService) RequireFederationRedirectURI(redirectURI string) error {
-	settings, failure := service.Read()
-	return service.requireListed(settings.FederationRedirectAddresses, redirectURI, failure)
-}
-
-func (service *EngineSettingsService) requireListed(allowed []string, address string, failure error) error {
-	if failure != nil || slices.Contains(allowed, address) {
-		return failure
-	}
-	return &host.RedirectNotAllowedError{}
-}
-
 func (service *EngineSettingsService) validated(settings EngineSettings, failure error) (EngineSettings, error) {
 	if !service.usable(settings, failure) {
 		return EngineSettings{}, &host.EngineNotConfiguredError{}

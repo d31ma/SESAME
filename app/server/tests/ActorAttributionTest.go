@@ -36,7 +36,7 @@ func (test *ActorAttributionTest) TestSelfServiceWriteRecordsTheCallingPrincipal
 	defer setup.Remove()
 	member := setup.SignInMember("acme", "member")
 	engine := setup.Engine()
-	sessions := &SessionController{engineService: engine, tenantCallService: setup.TenantCalls(engine)}
+	sessions := setup.Sessions(engine, 0)
 
 	_, err := sessions.PostRevoke(setup.SignedIn(member), SessionRevokeReason{Reason: "signed_out"})
 	test.finish(engine)
@@ -72,7 +72,7 @@ func (test *ActorAttributionTest) TestRefusedCrossTenantRevokeRecordsNothing() {
 	administrator := setup.SignIn("acme", true)
 	other := setup.SignInMember("globex", "member")
 	engine := setup.Engine()
-	sessions := &SessionController{engineService: engine, tenantCallService: setup.TenantCalls(engine)}
+	sessions := setup.Sessions(engine, 0)
 
 	_, err := sessions.PostRevokeByID(setup.SignedIn(administrator), SessionRevokeRequest{SessionID: other.SessionID})
 	test.finish(engine)
@@ -86,9 +86,7 @@ func (test *ActorAttributionTest) TestTenantRecordCallRecordsTheCallingPrincipal
 	defer setup.Remove()
 	administrator := setup.SignIn("acme", true)
 	engine := setup.Engine()
-	clients := &OidcClientController{
-		tenantCallService: setup.TenantCalls(engine),
-	}
+	clients := setup.OidcClients(engine, 0)
 	request := setup.SignedIn(administrator)
 	registered, _ := clients.PostRegister(request, OidcClientRegisterRequest{
 		TenantID: administrator.TenantID, Name: "Portal", ClientType: "confidential",
@@ -107,10 +105,7 @@ func (test *ActorAttributionTest) TestCallerCallRecordsTheCallingPrincipal() {
 	defer setup.Remove()
 	member := setup.SignInMember("acme", "member")
 	engine := setup.Engine()
-	oidc := &OidcController{
-		engineService:     engine,
-		tenantCallService: setup.TenantCalls(engine),
-	}
+	oidc := setup.Oidc(engine)
 	registered := sesame.ClientRegistration{}
 	registerErr := engine.Call("oidc_client.register", map[string]any{
 		"tenant_id": member.TenantID, "name": "Portal", "client_type": "confidential",
@@ -229,14 +224,9 @@ func (test *ActorAttributionTest) creation(tenantID string) PrincipalCreateReque
 }
 
 func (test *ActorAttributionTest) finish(engine *EngineService) {
-	if engine.client != nil {
-		engine.client.Close()
-	}
+	SesameTestSetup{}.Finish(engine)
 }
 
 func (test *ActorAttributionTest) principals(engine *EngineService) *PrincipalController {
-	return &PrincipalController{
-		tenantCallService:      SesameTestSetup{}.TenantCalls(engine),
-		principalTenantService: &PrincipalTenantService{tenantCallService: SesameTestSetup{}.TenantCalls(engine)},
-	}
+	return SesameTestSetup{}.Principals(engine, 0)
 }

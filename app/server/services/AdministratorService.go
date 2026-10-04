@@ -36,14 +36,7 @@ func (service *AdministratorService) administrator(roles []string, failure error
 }
 
 func (service *AdministratorService) question(caller Caller) AuthorizeSessionQuestion {
-	return AuthorizeSessionQuestion{
-		TenantID:      caller.TenantID,
-		PrincipalID:   caller.PrincipalID,
-		Action:        service.action(),
-		Resource:      service.resource(),
-		SessionID:     caller.SessionID,
-		SessionSecret: caller.SessionSecret,
-	}
+	return AuthorizeQuestionUtils{}.ForCaller(caller, AuthorizeQuestion{Action: service.action(), Resource: service.resource()})
 }
 
 func (service *AdministratorService) roles(answer AdministratorAnswer, failure error) []string {

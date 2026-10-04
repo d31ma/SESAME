@@ -111,11 +111,5 @@ func (test *SystemControllerTest) fieldNames(encoded []byte) []string {
 }
 
 func (test *SystemControllerTest) controller() *SystemController {
-	engine := &EngineService{engineSettingsService: &EngineSettingsService{}}
-	return &SystemController{engineService: engine, tenantCallService: &TenantCallService{
-		callerService:        &CallerService{engineService: engine},
-		engineService:        engine,
-		administratorService: &AdministratorService{engineService: engine},
-		recentSignInService:  &RecentSignInService{},
-	}}
+	return SesameTestSetup{}.System(SesameTestSetup{}.Engine())
 }

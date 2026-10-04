@@ -19,7 +19,6 @@ func (controller *GroupController) PostMemberAdd(
 		Operation:  "group.member_add",
 		Parameters: body,
 		Result:     &result,
-		Privileged: true,
 	})
 	return result, err
 }

@@ -30,7 +30,7 @@ func (test *SamlConsumerAllowlistTest) TestLoginStartRefusesAnAttackersConsumerU
 	Assert.Equals(http.StatusBadRequest, setup.Status(err))
 	Assert.IsTrue(setup.RedirectNotAllowed(err))
 	Assert.Equals("", login.LoginID)
-	Assert.IsTrue(controller.engineService.client == nil)
+	Assert.IsTrue(controller.federatedLoginService.engineService.client == nil)
 }
 
 func (test *SamlConsumerAllowlistTest) TestLoginStartMatchesTheConsumerURLExactly() {
@@ -56,7 +56,7 @@ func (test *SamlConsumerAllowlistTest) TestLoginStartRefusesEveryConsumerURLWhen
 
 	Assert.Equals(http.StatusBadRequest, setup.Status(err))
 	Assert.IsTrue(setup.RedirectNotAllowed(err))
-	Assert.IsTrue(controller.engineService.client == nil)
+	Assert.IsTrue(controller.federatedLoginService.engineService.client == nil)
 }
 
 func (test *SamlConsumerAllowlistTest) TestLoginStartAcceptsAListedConsumerURL() {
@@ -101,18 +101,7 @@ func (test *SamlConsumerAllowlistTest) allow(setup *SesameTestSetup, consumerURL
 }
 
 func (test *SamlConsumerAllowlistTest) controller() *SamlController {
-	settings := &EngineSettingsService{}
-	engine := &EngineService{engineSettingsService: settings}
-	return &SamlController{
-		engineService:         engine,
-		engineSettingsService: settings,
-		tenantCallService: &TenantCallService{
-			callerService:        &CallerService{engineService: engine},
-			engineService:        engine,
-			administratorService: &AdministratorService{engineService: engine},
-			recentSignInService:  &RecentSignInService{},
-		},
-	}
+	return SesameTestSetup{}.Saml(SesameTestSetup{}.Engine(), 0)
 }
 
 func (test *SamlConsumerAllowlistTest) consumerURL() string {
@@ -154,7 +143,7 @@ func (test *SamlConsumerAllowlistTest) allRefusedBeforeTheEngine(addresses []str
 	for _, address := range addresses {
 		controller := test.controller()
 		_, err := controller.PostLoginStart(test.startRequest(address))
-		refusals = append(refusals, SesameTestSetup{}.RedirectNotAllowed(err) && controller.engineService.client == nil)
+		refusals = append(refusals, SesameTestSetup{}.RedirectNotAllowed(err) && controller.federatedLoginService.engineService.client == nil)
 	}
 	return !slices.Contains(refusals, false)
 }
@@ -166,7 +155,7 @@ func (test *SamlConsumerAllowlistTest) allFailClosed(setup *SesameTestSetup, uns
 		controller := test.controller()
 		_, err := controller.PostLoginStart(test.startRequest(test.consumerURL()))
 		var unconfigured *host.EngineNotConfiguredError
-		refusals = append(refusals, errors.As(err, &unconfigured) && controller.engineService.client == nil)
+		refusals = append(refusals, errors.As(err, &unconfigured) && controller.federatedLoginService.engineService.client == nil)
 	}
 	return !slices.Contains(refusals, false)
 }

@@ -2,7 +2,7 @@
 // @Public
 // @NeedsAll
 type AuthnController struct {
-	engineService *EngineService
+	publicCallService *PublicCallService
 }
 
 // @PostRoute("/begin")
@@ -43,7 +43,7 @@ func (controller *AuthnController) PostPasskeyOptions(
 	body AuthnTransactionRequest,
 ) (AuthnPasskeyOptions, error) {
 	var result AuthnPasskeyOptions
-	err := controller.engineService.Call("authn.passkey_options", body, &result)
+	err := controller.publicCallService.Call(EngineCall{Operation: "authn.passkey_options", Parameters: body, Result: &result})
 	return result, err
 }
 
@@ -61,12 +61,12 @@ func (controller *AuthnController) PostComplete(
 	body AuthnCompleteRequest,
 ) (AuthnIssuedSession, error) {
 	var result AuthnIssuedSession
-	err := controller.engineService.Call("authn.complete", body, &result)
+	err := controller.publicCallService.Call(EngineCall{Operation: "authn.complete", Parameters: body, Result: &result})
 	return result, err
 }
 
 func (controller *AuthnController) advance(operation string, parameters any) (AuthnTransaction, error) {
 	var result AuthnTransaction
-	err := controller.engineService.Call(operation, parameters, &result)
+	err := controller.publicCallService.Call(EngineCall{Operation: operation, Parameters: parameters, Result: &result})
 	return result, err
 }

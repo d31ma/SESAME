@@ -18,7 +18,6 @@ func (controller *GrantController) PostCreate(
 		Operation:  "grant.create",
 		Parameters: body,
 		Result:     &result,
-		Privileged: true,
 	})
 	return result, err
 }

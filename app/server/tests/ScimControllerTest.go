@@ -126,14 +126,5 @@ func (test *ScimControllerTest) TestClientOfAnotherTenantIsNotFoundInTheCallersT
 }
 
 func (test *ScimControllerTest) controller() *ScimController {
-	engine := &EngineService{engineSettingsService: &EngineSettingsService{}}
-	return &ScimController{
-		engineService: engine,
-		tenantCallService: &TenantCallService{
-			callerService:        &CallerService{engineService: engine},
-			engineService:        engine,
-			administratorService: &AdministratorService{engineService: engine},
-			recentSignInService:  &RecentSignInService{},
-		},
-	}
+	return SesameTestSetup{}.Scim(SesameTestSetup{}.Engine(), 0)
 }

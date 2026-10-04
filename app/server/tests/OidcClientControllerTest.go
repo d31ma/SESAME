@@ -230,5 +230,5 @@ func (test *OidcClientControllerTest) controller(engine *EngineService) *OidcCli
 }
 
 func (test *OidcClientControllerTest) controllerAfter(engine *EngineService, elapsed time.Duration) *OidcClientController {
-	return &OidcClientController{tenantCallService: SesameTestSetup{}.TenantCallsAfter(engine, elapsed)}
+	return SesameTestSetup{}.OidcClients(engine, elapsed)
 }

@@ -1,13 +1,13 @@
 // @RequestRoute("/api/v1/token")
 // @NeedsAll
 type TokenController struct {
-	engineService *EngineService
+	publicCallService *PublicCallService
 }
 
 // @PostRoute("/jwks")
 // @Public
 func (controller *TokenController) PostJwks() (TokenKeySet, error) {
 	var result TokenKeySet
-	err := controller.engineService.Call("token.jwks", struct{}{}, &result)
+	err := controller.publicCallService.Call(EngineCall{Operation: "token.jwks", Parameters: struct{}{}, Result: &result})
 	return result, err
 }

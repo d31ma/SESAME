@@ -129,8 +129,7 @@ func (test *SessionControllerTest) TestRevokeByIDDoesNotNeedARecentSignIn() {
 	defer setup.Remove()
 	administrator := setup.SignIn("acme", true)
 	member := setup.SignInMember("acme", "member")
-	engine := &EngineService{engineSettingsService: &EngineSettingsService{}}
-	revoking := &SessionController{engineService: engine, tenantCallService: setup.TenantCallsAfter(engine, 11*time.Minute)}
+	revoking := setup.Sessions(setup.Engine(), 11*time.Minute)
 
 	revocation, err := revoking.PostRevokeByID(setup.SignedIn(administrator), SessionRevokeRequest{SessionID: member.SessionID, Reason: "compromised"})
 
@@ -197,12 +196,9 @@ func (test *SessionControllerTest) answer(err error) string {
 }
 
 func (test *SessionControllerTest) finish(controller *SessionController) {
-	if controller.engineService.client != nil {
-		controller.engineService.client.Close()
-	}
+	SesameTestSetup{}.Finish(controller.publicCallService.engineService)
 }
 
 func (test *SessionControllerTest) controller() *SessionController {
-	engine := &EngineService{engineSettingsService: &EngineSettingsService{}}
-	return &SessionController{engineService: engine, tenantCallService: SesameTestSetup{}.TenantCalls(engine)}
+	return SesameTestSetup{}.Sessions(SesameTestSetup{}.Engine(), 0)
 }

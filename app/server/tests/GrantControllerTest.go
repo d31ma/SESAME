@@ -251,8 +251,7 @@ func (test *GrantControllerTest) controllersWith(
 	elapsed time.Duration,
 ) (*GrantController, *RoleController, *GroupController) {
 	calls := SesameTestSetup{}.TenantCallsAfter(engine, elapsed)
-	principals := &PrincipalTenantService{tenantCallService: calls}
-	groups := &GroupController{tenantCallService: calls, principalTenantService: principals}
+	groups := &GroupController{tenantCallService: calls, principalTenantService: &PrincipalTenantService{tenantCallService: calls}}
 	grants := &GrantController{tenantCallService: calls}
 	return grants, &RoleController{tenantCallService: calls}, groups
 }

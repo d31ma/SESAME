@@ -97,36 +97,17 @@ func (test *AdministratorRecentSignInTest) TestAdministratorInsideTheWindowMayRo
 }
 
 func (test *AdministratorRecentSignInTest) federation(engine *EngineService, elapsed time.Duration) *FederationController {
-	return &FederationController{
-		engineService:         engine,
-		engineSettingsService: engine.engineSettingsService,
-		tenantCallService:     test.calls(engine, elapsed),
-	}
+	return SesameTestSetup{}.Federation(engine, elapsed)
 }
 
 func (test *AdministratorRecentSignInTest) saml(engine *EngineService, elapsed time.Duration) *SamlController {
-	return &SamlController{
-		engineService:         engine,
-		engineSettingsService: engine.engineSettingsService,
-		tenantCallService:     test.calls(engine, elapsed),
-	}
+	return SesameTestSetup{}.Saml(engine, elapsed)
 }
 
 func (test *AdministratorRecentSignInTest) scim(engine *EngineService, elapsed time.Duration) *ScimController {
-	return &ScimController{
-		engineService:     engine,
-		tenantCallService: test.calls(engine, elapsed),
-	}
+	return SesameTestSetup{}.Scim(engine, elapsed)
 }
 
-func (test *AdministratorRecentSignInTest) calls(engine *EngineService, elapsed time.Duration) *TenantCallService {
-	return &TenantCallService{
-		callerService:        &CallerService{engineService: engine},
-		engineService:        engine,
-		administratorService: &AdministratorService{engineService: engine},
-		recentSignInService:  &RecentSignInService{clockShift: elapsed},
-	}
-}
 
 func (test *AdministratorRecentSignInTest) staleAge() time.Duration {
 	return 11 * time.Minute

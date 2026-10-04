@@ -130,18 +130,7 @@ func (test *SamlControllerTest) TestProviderDisableStopsNewLogins() {
 }
 
 func (test *SamlControllerTest) controller() *SamlController {
-	settings := &EngineSettingsService{}
-	engine := &EngineService{engineSettingsService: settings}
-	return &SamlController{
-		engineService:         engine,
-		engineSettingsService: settings,
-		tenantCallService: &TenantCallService{
-			callerService:        &CallerService{engineService: engine},
-			engineService:        engine,
-			administratorService: &AdministratorService{engineService: engine},
-			recentSignInService:  &RecentSignInService{},
-		},
-	}
+	return SesameTestSetup{}.Saml(SesameTestSetup{}.Engine(), 0)
 }
 
 func (test *SamlControllerTest) entityID() string {

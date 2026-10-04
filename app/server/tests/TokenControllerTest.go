@@ -19,5 +19,5 @@ func (test *TokenControllerTest) TestJwksPublishesOnePublicSigningKey() {
 }
 
 func (test *TokenControllerTest) controller() *TokenController {
-	return &TokenController{engineService: &EngineService{engineSettingsService: &EngineSettingsService{}}}
+	return SesameTestSetup{}.Token(SesameTestSetup{}.Engine())
 }
