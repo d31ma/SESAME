@@ -15,7 +15,7 @@ type SesameErrorHandler struct{}
 func (handler *SesameErrorHandler) Answer(failure error) *http.Response {
 	code := handler.code(failure)
 	status := handler.status(code)
-	return handler.response(status, handler.problem(status, code))
+	return handler.response(handler.headers(status, code), status, handler.problem(status, code))
 }
 
 func (handler *SesameErrorHandler) code(failure error) string {
@@ -41,23 +41,34 @@ func (handler *SesameErrorHandler) problem(status int, code string) Problem {
 	return Problem{Code: code}
 }
 
-func (handler *SesameErrorHandler) response(status int, problem Problem) *http.Response {
+func (handler *SesameErrorHandler) response(headers http.Header, status int, problem Problem) *http.Response {
 	body, _ := json.Marshal(problem)
 	return &http.Response{
 		StatusCode:    status,
-		Header:        handler.headers(status),
+		Header:        headers,
 		Body:          io.NopCloser(bytes.NewReader(body)),
 		ContentLength: int64(len(body)),
 	}
 }
 
-func (handler *SesameErrorHandler) headers(status int) http.Header {
+func (handler *SesameErrorHandler) headers(status int, code string) http.Header {
 	headers := http.Header{}
 	headers.Set("Content-Type", "application/json")
 	if status == http.StatusServiceUnavailable {
 		headers.Set("Retry-After", handler.retryAfterSeconds())
 	}
+	if code == handler.bearerRefusalCode() {
+		headers.Set("WWW-Authenticate", handler.bearerChallenge())
+	}
 	return headers
+}
+
+func (handler *SesameErrorHandler) bearerRefusalCode() string {
+	return "provisioning_denied"
+}
+
+func (handler *SesameErrorHandler) bearerChallenge() string {
+	return "Bearer"
 }
 
 func (handler *SesameErrorHandler) retryAfterSeconds() string {
@@ -94,12 +105,12 @@ func (handler *SesameErrorHandler) badRequestCodes() []string {
 }
 
 func (handler *SesameErrorHandler) unauthorizedCodes() []string {
-	return []string{"session_rejected", "session_inactive", "actor_session_invalid"}
+	return []string{"session_rejected", "session_inactive", "actor_session_invalid", handler.bearerRefusalCode()}
 }
 
 func (handler *SesameErrorHandler) forbiddenCodes() []string {
 	return []string{
-		"tenant_mismatch", "actor_tenant_mismatch", "access_denied", "provisioning_denied", "provisioning_forbidden",
+		"tenant_mismatch", "actor_tenant_mismatch", "access_denied", "provisioning_forbidden",
 		"reauthentication_required",
 		"client_disabled", "consent_required", "subject_not_linked", "saml_subject_not_linked",
 	}

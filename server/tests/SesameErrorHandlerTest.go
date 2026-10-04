@@ -75,6 +75,22 @@ func (test *SesameErrorHandlerTest) TestActorOfAnotherTenantAnswersForbidden() {
 	Assert.Equals(http.StatusForbidden, test.answer(test.engineError("actor_tenant_mismatch")).StatusCode)
 }
 
+func (test *SesameErrorHandlerTest) TestRefusedProvisioningTokenAnswersUnauthorizedWithABearerChallenge() {
+	response := test.answer(test.engineError("provisioning_denied"))
+
+	Assert.Equals(http.StatusUnauthorized, response.StatusCode)
+	Assert.Equals("Bearer", response.Header.Get("WWW-Authenticate"))
+	Assert.Equals("provisioning_denied", test.code(response))
+}
+
+func (test *SesameErrorHandlerTest) TestRejectedSessionCarriesNoBearerChallenge() {
+	Assert.Equals("", test.answer(&host.SessionRejectedError{}).Header.Get("WWW-Authenticate"))
+}
+
+func (test *SesameErrorHandlerTest) TestProvisioningClientWithoutTheGrantAnswersForbidden() {
+	Assert.Equals(http.StatusForbidden, test.answer(test.engineError("provisioning_forbidden")).StatusCode)
+}
+
 func (test *SesameErrorHandlerTest) TestMalformedActorIsAHostFault() {
 	response := test.answer(test.engineError("invalid_actor"))
 
