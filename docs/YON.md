@@ -4,7 +4,7 @@ SESAME's `app/` directory is a Tachyon Yon project, passed to `ty` as the
 project root (`ty serve app`). `ty` serves SESAME's HTTP API, and every
 request starts the `sesame` engine for the length of that request. This guide
 covers running it, configuring it, the reverse proxy it requires, the route
-convention, signing in, errors, the command line and tests.
+convention, its layers, signing in, errors, the command line and tests.
 
 This is a developer preview. Read the throughput limits below before you put
 traffic on it. [ADR 0007](adr/0007-sesame-ships-a-yon-host-project.md)
@@ -243,6 +243,21 @@ controller's). `go test ./test/contract` compares that record with the
 `@PostRoute` and `@GetRoute` annotations in `app/server/controllers`, so a new
 route, a new engine operation, a route with no guard or two guards, or a
 changed guard fails the build until the manifest describes it.
+
+## Layers
+
+`app/server/` follows Tachyon's role folders, one layer each:
+
+| Folder | Holds |
+| --- | --- |
+| `controllers/` | The SDK-facing endpoints. A route binds its typed input, names its engine operation, makes one service call and returns. Also the identity provider and the error handler. |
+| `services/` | Every decision: the administrator role, tenant isolation, the recent sign-in policy and its table of privileged operations, passkey ownership, lookup forms, redirect allowlists, and the mapping of the caller's session onto engine parameters. |
+| `helpers/` | Infrastructure with state that only services call: `EngineHelper` (the request's engine, its wait and `503`, and the actor) and `EngineSettingsHelper` (the `sesame` settings). |
+| `utils/` | Stateless static functions any layer may call, such as `ProtocolErrorUtils` and `HeaderUtils`. |
+| `stores/` | Nothing yet, on purpose. The `sesame` engine is SESAME's only FYLO store: one writer per FYLO root, with every security write in its hash-chained ledger. `ty`'s managed FYLO datasource has no transactions, so a Yon store would be a second writer outside the ledger. This waits for Samuel's decision. |
+
+[ADR 0007](adr/0007-sesame-ships-a-yon-host-project.md#layers) names the
+classes in each layer.
 
 ## Sign in
 

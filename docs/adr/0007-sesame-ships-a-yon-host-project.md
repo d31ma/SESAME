@@ -74,8 +74,54 @@ Yon project lives beside it:
   so `go install github.com/d31ma/sesame/cmd/sesame@<version>` and
   `GOWORK=off go build ./cmd/sesame` keep working. Nothing in the engine's
   `cmd/` or production `internal/` code depends on `app/server/`.
-- Controllers, services, models and roles follow Tachyon's role folders.
-  `app/server/errors/` stays empty for the reason in "Tachyon gaps" below.
+- Controllers, services, helpers, utilities, models and roles follow
+  Tachyon's role folders (see "Layers" below). `app/server/errors/` stays
+  empty for the reason in "Tachyon gaps" below.
+
+### Layers
+
+By Samuel's direction (2026-10-04), `app/server/` is layered as
+`controllers`, `services`, `helpers`, `utils` and `stores`. Dependencies
+point down: a controller needs services, a service needs services and
+helpers, a helper needs helpers, and any layer may call a utility. Nothing
+needs a controller (Tachyon ADR 0069).
+
+- `controllers/` holds the SDK-facing endpoints only. A route binds its typed
+  input, names the engine operation it exposes and where the answer goes (an
+  `EngineCall`), makes one service call and returns. The operation name stays
+  in the controller because it is the route's public contract:
+  `operations.json` records it under `http_coverage`, and `test/contract`
+  checks that each route names its operation. The folder also holds
+  `SesameIdentityProvider`, which builds `IdentityService` by hand (gap 1),
+  and `SesameErrorHandler`, the one table from error code to status.
+- `services/` holds every decision: the administrator role
+  (`AdministratorService`), tenant isolation (`TenantCallService` and the
+  record lookups `PrincipalTenantService`, `OidcClientTenantService` and
+  `RefreshFamilyTenantService`), the recent sign-in policy and its one table
+  of privileged operations (`RecentSignInService`), passkey ownership
+  (`PasskeyService`), the principal lookup forms (`PrincipalLookupService`),
+  the redirect and consumer allowlists (`FederatedLoginService`), the mapping
+  of the caller's session onto self-service parameters (`AuthenticatorService`,
+  `AuthorizeService`, `SessionService`, `OidcInteractionService`,
+  `OidcDeviceService`), SCIM bearer tokens (`ScimProvisioningService`), the
+  standards contract checks (`StandardsDispatchService`,
+  `StandardsAnswerService`, `StandardsEndpointService`), the identity check
+  (`IdentityService`), and the engine call behind every public route
+  (`PublicCallService`).
+- `helpers/` holds infrastructure with state that only services call:
+  `EngineHelper` (the invocation's engine: lazy start, bounded wait, `503`,
+  actor binding) and `EngineSettingsHelper` (reads and validates the `sesame`
+  settings).
+- `utils/` holds stateless static functions: `ProtocolErrorUtils`,
+  `StandardsContractUtils`, `HeaderUtils`, `InteractionCookieUtils` and
+  `AuthorizeQuestionUtils`.
+- `stores/` is intentionally empty, pending Samuel's decision. The `sesame`
+  engine is SESAME's only FYLO store: one writer per FYLO root, and every
+  security write is appended to the hash-chained ledger inside the engine's
+  own transaction. `ty`'s managed FYLO datasource has no transactions
+  (`@AllOrNothing` is refused on FYLO), and a `ty`-owned long-lived engine is
+  "not now" in TACHYON, so a Yon `@Store` would be a second writer outside the
+  ledger.
 
 ### Listener ownership (amends ADR 0003)
 
@@ -88,15 +134,15 @@ FYLO root at a time.
 
 ### One engine per invocation, serialized, then 503
 
-`EngineService` starts the engine the first time an invocation calls it and
+`EngineHelper` starts the engine the first time an invocation calls it and
 reuses it for the rest of that invocation. The engine stops when the
 invocation's process exits, because its stdin closes; no child outlives the
-handler. When another engine owns the deployment, `EngineService` tries again
+handler. When another engine owns the deployment, `EngineHelper` tries again
 every 50 ms until `sesame.waitmilliseconds` (default 5000, at most 20000,
 always under the 30 second deadline) has passed, and then fails with
 `host.EngineBusyError`. An engine that has not finished starting when the wait
 ends is stopped and answered the same way: the SDK's `StartWhenAvailable`
-always wraps the context error when its context ends, and `EngineService` maps
+always wraps the context error when its context ends, and `EngineHelper` maps
 `context.DeadlineExceeded` from its own wait to `EngineBusyError`. The answer
 is `503` with `Retry-After: 1` and `{"code":"engine_busy"}`. Nothing ran, so
 the client may retry.
@@ -168,10 +214,10 @@ alone is therefore never the only check: a caller that reaches a controller
 without it, through `ty handler invoke`, is refused the same way.
 `PrincipalTenantService` delegates to `TenantCallService` for principals
 addressed only by id. Self-service routes bind the caller's own session
-instead of asking for the role (`CallAsCaller`, `LoadAsCaller`, or the
-caller resolved in the controller). Cross-tenant administration is not available over HTTP.
+instead of asking for the role (`CallAsCaller` and `LoadAsCaller`, through the
+service that maps the caller onto the operation). Cross-tenant administration is not available over HTTP.
 
-An `EngineCall` marked `Privileged` (credential and privilege changes:
+A privileged operation (credential and privilege changes:
 `authenticator/set-password-for-principal`,
 `authenticator/passkey-remove-for-principal`, `grant/create`,
 `group/member-add`, `principal/suspend`, `oidc-client/register`,
@@ -179,7 +225,10 @@ An `EngineCall` marked `Privileged` (credential and privilege changes:
 self-service authenticator changes, and the federation, SAML and SCIM
 credential routes listed in docs/yon/federation.md) also needs a session
 issued within the last 10 minutes (`RecentSignInService`,
-`403 reauthentication_required`). Revocations and other changes that only
+`403 reauthentication_required`). `RecentSignInService` lists these
+operations in one table; `PasskeyService` also marks the ownership read
+before a passkey removal `Privileged`, so a stale session is refused before
+anything is read. Revocations and other changes that only
 reduce access do not. The residual risk is recorded in
 the threat model: a session stolen within its first 10 minutes passes, and no
 route asks for the current password, because the engine has no
@@ -253,12 +302,11 @@ of its engine requests, so the hash-chained security ledger records
 
 - **Where the actor comes from.** Only `CallerService.Resolve`, after SESAME
   has verified the `Sesame-Session` credential with `session.verify`, binds the
-  caller to the invocation's `EngineService` (`ActAs`). No body, query or
+  caller to the invocation's `EngineHelper` (`ActAs`). No body, query or
   header field names an actor: a body that adds `actor` is refused with `400`
   as an undeclared field. Every caller-aware service (`TenantCallService`, and
-  `PrincipalTenantService`, which delegates to it) and every controller that
-  resolves the caller itself therefore attributes all of its later engine
-  calls, without passing the actor by hand. The former `TenantRecordService`
+  every service that delegates to it) therefore attributes all of its later
+  engine calls, without passing the actor by hand. The former `TenantRecordService`
   and `CallerCallService` were merged into `TenantCallService`.
 - **What stays `operator:machine`.** Public routes (`authn/*`,
   `session/verify`, OIDC protocol endpoints, discovery, JWKS, SCIM with its
@@ -270,7 +318,7 @@ of its engine requests, so the hash-chained security ledger records
   `standards.dispatch` never carries an actor: the Go client drops it there.
 - **Fail closed.** The Go client sends `actor` only to an engine whose
   `system.version` lists it in `request_fields`. When a caller is bound and the
-  engine does not list it, `EngineService` refuses the call
+  engine does not list it, `EngineHelper` refuses the call
   (`sesame.IncompatibleEngineError`, `500`) rather than record the write as
   `operator:machine`.
 - **Isolation by the engine.** The actor never grants access; the
@@ -287,7 +335,7 @@ of its engine requests, so the hash-chained security ledger records
   `fylo sql ... --root <deployment>/fylo-root`.
 - **One invocation, one caller.** A `ty` invocation serves one request, so the
   bound caller lives exactly as long as that request. A test that drives
-  several requests through one `EngineService` rebinds the caller each time it
+  several requests through one `EngineHelper` rebinds the caller each time it
   resolves one, and must close the engine before the next invocation opens
   the deployment.
 
@@ -297,8 +345,8 @@ Each gap has a workaround in this repository. They are collected, with
 proposed fixes, in a draft Tachyon feature request that has not been filed.
 
 1. An `@IdentityProvider` gets no injected fields: both `@NeedsAll` and
-   per-field `@Needs` arrive nil under `ty serve`. The provider builds its
-   services itself.
+   per-field `@Needs` arrive nil under `ty serve`. The provider builds
+   `IdentityService` and the services and helpers it needs itself.
 2. The `@IdentityProvider` unit does not compose `app/server/errors/`, so an error
    type there is undefined in the identity check. Host errors live in
    `app/server/packages/host`.
@@ -373,6 +421,14 @@ proposed fixes, in a draft Tachyon feature request that has not been filed.
     directory that holds `fylo` and `chex`) runs that `ty` instead, which
     fails with `TY1002`. Operators start `ty` by its absolute path or put a
     directory holding only `fylo` and `chex` on `PATH`.
+26. A helper that a caller builds by hand and that services also receive by
+    injection must be managed by a class marker (`TY2015`, "uses explicit
+    caller construction"). `@NeedsAll` refuses `EngineHelper`'s state fields
+    (its lazily started client, wait result and bound actor), a field list on
+    `@NeedsAll` is refused (`TY1308`), and a field `@Needs` does not count. The
+    older class form `@Needs(EngineSettingsHelper)` is accepted, so
+    `EngineHelper` uses it; `SesameIdentityProvider` must build it by hand
+    because of gap 1.
 
 ## Test seams
 
