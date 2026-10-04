@@ -18,6 +18,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -65,6 +66,9 @@ type Info struct {
 	ProtocolVersion string `json:"protocol_version"`
 	// Operations is every operation this engine routes, sorted.
 	Operations []string `json:"operations"`
+	// RequestFields lists the optional request envelope fields this engine
+	// accepts, such as "actor". Older engines omit it.
+	RequestFields []string `json:"request_fields,omitempty"`
 }
 
 // ProtocolVersion is the machine protocol this client speaks.
@@ -96,6 +100,8 @@ type Client struct {
 	stdout  *bufio.Scanner
 	done    chan error
 	closed  bool
+
+	acceptsActor bool
 }
 
 // Start launches a SESAME subprocess in persistent machine mode.
@@ -267,6 +273,7 @@ func (c *Client) checkCompatibility(ctx context.Context) error {
 			EngineVersion:         version.Version,
 		}
 	}
+	c.acceptsActor = slices.Contains(version.RequestFields, actorRequestField)
 	return nil
 }
 
@@ -1646,6 +1653,7 @@ func (c *Client) Request(ctx context.Context, operation string, parameters, resu
 		RequestID:       requestID,
 		Operation:       operation,
 		Parameters:      parameters,
+		Actor:           c.attribution(ctx, operation),
 	}
 	encoded, err := json.Marshal(frame)
 	if err != nil {
@@ -1834,6 +1842,14 @@ type request struct {
 	RequestID       string `json:"request_id"`
 	Operation       string `json:"operation"`
 	Parameters      any    `json:"parameters"`
+	Actor           *Actor `json:"actor,omitempty"`
+}
+
+func (c *Client) attribution(ctx context.Context, operation string) *Actor {
+	if !c.acceptsActor || operation == standardsOperation {
+		return nil
+	}
+	return actorFrom(ctx)
 }
 
 type response struct {

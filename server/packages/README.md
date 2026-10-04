@@ -41,6 +41,35 @@ root. Do not create another client or application replica against that root.
 SESAME does not open a network listener; the host application owns HTTP, TLS,
 routing, and middleware.
 
+## Audit attribution
+
+Without an actor, every write is recorded as `operator:machine`. When the host
+acts for a signed-in principal, verify the session first and attribute the
+request to it:
+
+```go
+session, err := client.SessionVerify(ctx, sessionID, secret)
+if err != nil {
+    return err
+}
+acting := sesame.WithActor(ctx, sesame.Actor{
+    TenantID:    session.TenantID,
+    PrincipalID: session.PrincipalID,
+    SessionID:   session.ID,
+})
+_, err = client.PrincipalSuspend(acting, principalID)
+```
+
+The ledger then records `principal:<tenant>/<principal>/<session>`. Take the
+actor only from a session you have just verified, never from request input.
+The client sends it only when the engine lists `"actor"` in
+`system.version` `request_fields` (`Info.RequestFields`), and never on
+`standards.dispatch`. The engine refuses a mismatch with `invalid_actor`,
+`actor_session_invalid`, or `actor_tenant_mismatch` (a write into another
+tenant); none is retryable and the client retries nothing. The actor never
+grants access. See
+[Actor attribution](../../api/machine/v1/README.md#actor-attribution).
+
 ## Installing
 
 ```bash

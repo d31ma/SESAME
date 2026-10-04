@@ -10,4 +10,6 @@ const (
 	codeSessionNotFound      = "session_not_found"
 	codeSessionInactive      = "session_inactive"
 	codeGroupMemberExists    = "group_member_exists"
+	codeActorTenantMismatch  = "actor_tenant_mismatch"
+	codeActorSessionInvalid  = "actor_session_invalid"
 )
