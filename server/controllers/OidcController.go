@@ -55,7 +55,7 @@ func (controller *OidcController) PostConsentGrant(
 func (controller *OidcController) PostConsentGet(
 	request *http.Request,
 	// @FromBody
-	body OidcConsentRequest,
+	body OidcClientReference,
 ) (OidcConsent, error) {
 	var result OidcConsent
 	err := controller.tenantCallService.CallAsCaller(request, controller.consentFor("oidc.consent_get", body.ClientID, &result))
@@ -67,7 +67,7 @@ func (controller *OidcController) PostConsentGet(
 func (controller *OidcController) PostConsentWithdraw(
 	request *http.Request,
 	// @FromBody
-	body OidcConsentRequest,
+	body OidcClientReference,
 ) (OidcConsentWithdrawn, error) {
 	var result OidcConsentWithdrawn
 	err := controller.tenantCallService.CallAsCaller(request, controller.consentFor("oidc.consent_withdraw", body.ClientID, &result))
@@ -161,8 +161,8 @@ func (controller *OidcController) PostRefreshFamilyRevoke(
 	request *http.Request,
 	// @FromBody
 	body OidcRefreshFamilyRevokeRequest,
-) (OidcRefreshFamilyRevoked, error) {
-	var result OidcRefreshFamilyRevoked
+) (RevokeOutcome, error) {
+	var result RevokeOutcome
 	revoke := EngineCall{Operation: "oidc.refresh_family_revoke", Parameters: body, Result: &result}
 	err := controller.tenantCallService.CallOwned(request, controller.familyLookup(body.FamilyID, &OidcRefreshFamily{}), revoke)
 	return result, err

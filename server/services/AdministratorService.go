@@ -35,8 +35,8 @@ func (service *AdministratorService) administrator(roles []string, failure error
 	return &host.AdministratorRequiredError{}
 }
 
-func (service *AdministratorService) question(caller Caller) AdministratorQuestion {
-	return AdministratorQuestion{
+func (service *AdministratorService) question(caller Caller) AuthorizeSessionQuestion {
+	return AuthorizeSessionQuestion{
 		TenantID:      caller.TenantID,
 		PrincipalID:   caller.PrincipalID,
 		Action:        service.action(),

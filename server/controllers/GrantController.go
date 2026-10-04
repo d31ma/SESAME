@@ -28,8 +28,8 @@ func (controller *GrantController) PostRevoke(
 	request *http.Request,
 	// @FromBody
 	body GrantRevokeRequest,
-) (GrantRevocation, error) {
-	var result GrantRevocation
+) (RevokeOutcome, error) {
+	var result RevokeOutcome
 	err := controller.tenantCallService.CallAsAdministrator(request, EngineCall{
 		Operation:  "grant.revoke",
 		Parameters: body,

@@ -63,8 +63,8 @@ func (test *OidcControllerTest) TestAThirdPartyClientNeedsTheCallersConsent() {
 	_, refusedErr := controller.PostInteractionComplete(signedIn, cookie)
 	consent, grantErr := controller.PostConsentGrant(signedIn, OidcConsentGrantRequest{ClientID: registered.Client.ID, Scopes: []string{"openid"}})
 	completed, completeErr := controller.PostInteractionComplete(signedIn, cookie)
-	stored, storedErr := controller.PostConsentGet(signedIn, OidcConsentRequest{ClientID: registered.Client.ID})
-	withdrawn, withdrawErr := controller.PostConsentWithdraw(signedIn, OidcConsentRequest{ClientID: registered.Client.ID})
+	stored, storedErr := controller.PostConsentGet(signedIn, OidcClientReference{ClientID: registered.Client.ID})
+	withdrawn, withdrawErr := controller.PostConsentWithdraw(signedIn, OidcClientReference{ClientID: registered.Client.ID})
 
 	Assert.Equals("consent_required", test.protocolCode(refusedErr))
 	Assert.IsTrue(grantErr == nil)
@@ -89,9 +89,9 @@ func (test *OidcControllerTest) TestConsentActsOnlyForTheCallersOwnPrincipal() {
 	_, grantErr := controller.PostConsentGrant(test.request(setup.Credential(owner)),
 		OidcConsentGrantRequest{ClientID: registered.Client.ID, Scopes: []string{"openid"}})
 
-	_, otherErr := controller.PostConsentGet(test.request(setup.Credential(other)), OidcConsentRequest{ClientID: registered.Client.ID})
-	_, withdrawErr := controller.PostConsentWithdraw(test.request(setup.Credential(other)), OidcConsentRequest{ClientID: registered.Client.ID})
-	kept, keptErr := controller.PostConsentGet(test.request(setup.Credential(owner)), OidcConsentRequest{ClientID: registered.Client.ID})
+	_, otherErr := controller.PostConsentGet(test.request(setup.Credential(other)), OidcClientReference{ClientID: registered.Client.ID})
+	_, withdrawErr := controller.PostConsentWithdraw(test.request(setup.Credential(other)), OidcClientReference{ClientID: registered.Client.ID})
+	kept, keptErr := controller.PostConsentGet(test.request(setup.Credential(owner)), OidcClientReference{ClientID: registered.Client.ID})
 
 	Assert.IsTrue(grantErr == nil)
 	Assert.Equals("consent_not_found", test.protocolCode(otherErr))

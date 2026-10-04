@@ -24,8 +24,8 @@ func (controller *SessionController) PostRevoke(
 	request *http.Request,
 	// @FromBody
 	body SessionRevokeReason,
-) (SessionRevocation, error) {
-	var result SessionRevocation
+) (RevokeOutcome, error) {
+	var result RevokeOutcome
 	err := controller.tenantCallService.CallAsCaller(request, func(caller Caller) EngineCall {
 		order := SessionRevokeRequest{SessionID: caller.SessionID, Reason: body.Reason}
 		return EngineCall{Operation: controller.revokeOperation(), Parameters: order, Result: &result}
@@ -39,8 +39,8 @@ func (controller *SessionController) PostRevokeByID(
 	request *http.Request,
 	// @FromBody
 	body SessionRevokeRequest,
-) (SessionRevocation, error) {
-	var result SessionRevocation
+) (RevokeOutcome, error) {
+	var result RevokeOutcome
 	err := controller.tenantCallService.CallAsAdministrator(request, EngineCall{
 		Operation:  controller.revokeOperation(),
 		Parameters: body,

@@ -54,8 +54,8 @@ func (controller *OidcClientController) PostDisable(
 	request *http.Request,
 	// @FromBody
 	body OidcClientDisableRequest,
-) (OidcClientDisabled, error) {
-	var result OidcClientDisabled
+) (DisableOutcome, error) {
+	var result DisableOutcome
 	err := controller.tenantCallService.CallOwned(request, controller.lookup(body.ClientID, &OidcClient{}), EngineCall{
 		Operation:  "oidc_client.disable",
 		Parameters: body,
