@@ -22,7 +22,8 @@ controllers that answer HTTP requests and, once Tachyon binds arguments for
 `ty handler invoke`, the command line.
 
 The Yon Go runtime fixes several facts that shape this decision. They were
-verified on `ty` 26.36.01 (`bf098bfc`):
+verified on `ty` 26.36.01 (`bf098bfc`) and still hold on `a7ccbfff`, the
+build SESAME is gated against:
 
 - `ty` starts one operating-system process for each request, each identity
   check and each worker tick. No user code outlives its invocation. The
@@ -230,7 +231,7 @@ check (`500`) as plain text, and `ty`'s request checks answer `400` as
 'Sesame-Session=<session_id>:<session_secret>'` runs one controller in the
 same scrubbed environment. Binding the body, headers and path values needs
 Tachyon's argument-binding fix (`d070022f`, not merged upstream yet); the
-`bf098bfc` build passes none of them.
+`a7ccbfff` build passes none of them.
 
 It skips the server's identity check and the route guard. SESAME does not
 depend on them: a signed-in route still needs the `Sesame-Session` header
@@ -310,7 +311,7 @@ proposed fixes, in a draft Tachyon feature request that has not been filed.
 5. `ty test` units receive neither `YON_APPLICATION_JSON` nor variables from
    the parent environment except `PATH` and `TMPDIR`. The test setup finds
    `sesame` and `fylo` on `PATH` and writes the snapshot itself.
-6. `ty handler invoke` does not bind arguments in `bf098bfc`. The fix
+6. `ty handler invoke` does not bind arguments in `a7ccbfff`. The fix
    (`d070022f`) is ready but not merged upstream.
 7. `ty serve` kept serving the previous identity provider after a source change
    until it restarted.

@@ -83,7 +83,7 @@ copied into the deployment or inherited by FYLO. Export `SESAME_DEPLOYMENT` or
 pass `--deployment` for later commands as usual.
 
 Serve it over HTTP with the Yon host. It needs `ty` 26.36.01 built from
-Tachyon commit `bf098bfc`, an unreleased build (see
+Tachyon commit `a7ccbfff`, an unreleased build (see
 [docs/YON.md](docs/YON.md#what-you-need)). Tell it where the engine and the
 deployment are (absolute paths, in `app/.env`; `app/` is the Yon project root),
 then start `ty` on `app`:

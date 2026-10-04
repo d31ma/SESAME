@@ -169,7 +169,7 @@ and releases use UTC-derived CalVer in `YY.WW.DD` form.
   argument-binding fix ([docs/YON.md](docs/YON.md#continuous-integration)).
 - The website names the HTTP API and the Go package instead of ten SDKs.
 - `tenant.bootstrap` and `admin.bootstrap` stay command-line only.
-- Developed and gated against Tachyon `ty` 26.36.01 at commit `bf098bfc` (an
+- Developed and gated against Tachyon `ty` 26.36.01 at commit `a7ccbfff` (an
   unreleased build). Running the routes from the command line with
   `ty handler invoke` needs Tachyon's argument-binding fix (`d070022f`), which
   is not merged upstream yet. It skips the route guard but not SESAME's own

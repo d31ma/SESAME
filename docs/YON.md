@@ -12,7 +12,7 @@ records why it works this way.
 
 ## What you need
 
-- `ty` 26.36.01 built from Tachyon commit `bf098bfc`. This is an unreleased
+- `ty` 26.36.01 built from Tachyon commit `a7ccbfff`. This is an unreleased
   development build: it carries Tachyon ADR 0095 (native Go code under a
   project's `server/packages/`), which no published Tachyon release has yet.
   SESAME is developed and gated against exactly this build; see
@@ -333,7 +333,7 @@ the [reverse proxy](#reverse-proxy-required).
 
 `ty handler invoke` runs one controller in the same environment as the server,
 without the server. It needs a `ty` with the argument-binding fix (commit
-`d070022f`, see [What you need](#what-you-need)); with `bf098bfc` the
+`d070022f`, see [What you need](#what-you-need)); with `a7ccbfff` the
 controller receives no body. It prints the answer as a Handler Protocol
 envelope: `status`, `headers`, and the body in `body.data`.
 
@@ -441,7 +441,7 @@ GitHub Actions does not run the Yon tests yet. `ty test app --coverage` and
 code under a project's `server/packages/`) and the `ty handler invoke`
 argument-binding fix, and no published Tachyon release carries both. Until one
 does, the release gate runs them locally with the pinned development build
-`bf098bfc`, and CI runs everything else: the engine tests, the Go package
+`a7ccbfff`, and CI runs everything else: the engine tests, the Go package
 tests in `app/server/packages` and the `test/contract` checks that tie
 `api/machine/v1/operations.json` to the routes in `app/server/controllers`.
 
