@@ -89,8 +89,8 @@ unknown session answers `404 {"code":"session_not_found"}`.
 
 ### Self-service authenticator routes
 
-The body of a self-service route has no `principal_id`. The controller takes
-the principal from the caller's session, so a caller can only ever change its
+The body of a self-service route has no `principal_id`. The host takes the
+principal from the caller's session, so a caller can only ever change its
 own authenticators. A body that adds `principal_id` is refused by `ty` with
 `400` before the route runs. Routes without a body (`recovery-codes-issue`,
 `passkey-register-begin`, `passkey-list`) ignore any body they receive.
