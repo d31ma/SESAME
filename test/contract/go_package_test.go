@@ -9,7 +9,7 @@ import (
 
 const (
 	goPackageLanguage  = "Go"
-	goPackageDirectory = "server/packages"
+	goPackageDirectory = "app/server/packages"
 )
 
 var retiredClientMarkers = []string{"clients/", "sesame-clients.tar.gz"}

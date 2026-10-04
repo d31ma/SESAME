@@ -22,7 +22,7 @@ const (
 	administratorRole     = "Administrator"
 	accessNamesDescribed  = "public, signed_in, administrator"
 	controllersDirectory  = "controllers"
-	serverDirectory       = "server"
+	serverDirectory       = "app/server"
 	controllerFileMode    = 0o600
 	controllerDirectories = 0o700
 )
@@ -32,7 +32,7 @@ type declaredAccessTable map[string][]string
 func loadDeclaredAccess(t *testing.T, root string) declaredAccessTable {
 	t.Helper()
 
-	source := parseControllers(t, filepath.Join(root, serverDirectory, controllersDirectory))
+	source := parseControllers(t, filepath.Join(root, filepath.FromSlash(serverDirectory), controllersDirectory))
 	table := declaredAccessTable{}
 	for receiver, methods := range source.methods {
 		prefix, isController := source.prefixes[receiver]
@@ -52,7 +52,7 @@ func loadDeclaredAccess(t *testing.T, root string) declaredAccessTable {
 		}
 	}
 	if len(table) == 0 {
-		t.Fatal("no Yon routes were found in server/controllers")
+		t.Fatal("no Yon routes were found in app/server/controllers")
 	}
 	return table
 }
@@ -242,7 +242,7 @@ func TestRouteAccessProblemsNameEveryDisagreement(t *testing.T) {
 func writeController(t *testing.T, root string, name string, content string) {
 	t.Helper()
 
-	directory := filepath.Join(root, serverDirectory, controllersDirectory)
+	directory := filepath.Join(root, filepath.FromSlash(serverDirectory), controllersDirectory)
 	if err := os.MkdirAll(directory, controllerDirectories); err != nil {
 		t.Fatalf("create %s: %v", directory, err)
 	}

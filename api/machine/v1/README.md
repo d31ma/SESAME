@@ -580,7 +580,7 @@ the Yon host reaches each operation over HTTP — `routed` (with its routes),
 asserted three ways by `test/contract` — against the engine's own dispatch
 table (parsed from the processor, so the manifest cannot claim an operation
 the engine does not route), against this document (so no operation ships
-undocumented), and against the route annotations in `server/controllers` (so
+undocumented), and against the route annotations in `app/server/controllers` (so
 a route cannot appear or disappear, and a new operation cannot ship, without
 recording how it is reached). Each `routed` or `standard_endpoint` entry also
 records, under `access`, the guard every one of its routes declares

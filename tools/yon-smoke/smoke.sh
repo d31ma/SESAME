@@ -115,12 +115,12 @@ set_passwords() {
 prepare_project() {
   local workspace=$1 binary=$2 root=$3
   local -r wait_milliseconds=2000
-  local project="$workspace/project"
+  local project="$workspace/project" application="$root/app"
   mkdir "$project"
-  cp -R "$root/server" "$root/package.json" "$project/"
+  cp -R "$application/server" "$application/package.json" "$project/"
   jq --arg binary "$binary" --arg deployment "$workspace/deployment" --argjson wait "$wait_milliseconds" \
     '.sesame = ((.sesame // {}) + {binary: $binary, deployment: $deployment, waitmilliseconds: $wait})' \
-    "$root/server/application.json" >"$project/server/application.json"
+    "$application/server/application.json" >"$project/server/application.json"
   pass "setup: project copy in the temporary directory, sesame.waitmilliseconds=$wait_milliseconds"
 }
 

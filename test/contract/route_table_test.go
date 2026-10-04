@@ -18,7 +18,7 @@ type routeTable map[string]map[string]struct{}
 func loadRouteTable(t *testing.T, root string) routeTable {
 	t.Helper()
 
-	source := parseControllers(t, filepath.Join(root, "server", "controllers"))
+	source := parseControllers(t, filepath.Join(root, filepath.FromSlash(serverDirectory), controllersDirectory))
 	table := routeTable{}
 	for receiver, methods := range source.methods {
 		prefix, isController := source.prefixes[receiver]
@@ -34,7 +34,7 @@ func loadRouteTable(t *testing.T, root string) routeTable {
 		}
 	}
 	if len(table) == 0 {
-		t.Fatal("no Yon routes were found in server/controllers")
+		t.Fatal("no Yon routes were found in app/server/controllers")
 	}
 	return table
 }

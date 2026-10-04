@@ -43,7 +43,7 @@ your Go host     →  Go package      ↗
 SESAME ships the host too: the repository root is a Tachyon Yon project whose
 controllers serve the engine's operations over HTTP
 ([docs/YON.md](docs/YON.md)). A Go application can instead drive the engine
-itself through the [Go package](server/packages/README.md).
+itself through the [Go package](app/server/packages/README.md).
 
 The engine's side of that split is enforced rather than documented: a test
 inspects the linked dependency graph of the shipped binary and fails the build
@@ -85,13 +85,13 @@ pass `--deployment` for later commands as usual.
 Serve it over HTTP with the Yon host. It needs `ty` 26.36.01 built from
 Tachyon commit `bf098bfc`, an unreleased build (see
 [docs/YON.md](docs/YON.md#what-you-need)). Tell it where the engine and the
-deployment are (absolute paths, in `.env` at the repository root), then start
-`ty`:
+deployment are (absolute paths, in `app/.env`; `app/` is the Yon project root),
+then start `ty` on `app`:
 
 ```bash
-echo "YON_SESAME_BINARY=$(command -v sesame)" >> .env
-echo "YON_SESAME_DEPLOYMENT=$(cd "$SESAME_DEPLOYMENT" && pwd)" >> .env
-ty serve
+echo "YON_SESAME_BINARY=$(command -v sesame)" >> app/.env
+echo "YON_SESAME_DEPLOYMENT=$(cd "$SESAME_DEPLOYMENT" && pwd)" >> app/.env
+ty serve app
 ```
 
 A signed-in principal asks about itself with the session that
@@ -172,7 +172,7 @@ values and apply the returned instructions.
 | Surface | For | Start here |
 | --- | --- | --- |
 | HTTP through the Yon host | any language | [docs/YON.md](docs/YON.md) |
-| Go package | Go hosts that start the engine themselves | [`server/packages`](server/packages/README.md) — `go get github.com/d31ma/sesame/server/packages@<commit>` |
+| Go package | Go hosts that start the engine themselves | [`app/server/packages`](app/server/packages/README.md) — `go get github.com/d31ma/sesame/app/server/packages@<commit>` |
 | Machine protocol | anything that spawns `sesame exec --loop` | [api/machine/v1](api/machine/v1/README.md) |
 
 The Yon host routes each operation family as
@@ -265,8 +265,9 @@ internal/
   platform/                 deployment, CLI, logging, and build metadata
 api/machine/v1/             the canonical operation manifest and reference
 api/standards/v1/           the framework-neutral public-route contract
-server/                     the Yon host: controllers, services, models, roles, tests
-server/packages/            the Go package (engine transport) and host errors
+app/                        the Yon project root (package.json, .env.example), passed to ty
+app/server/                 the Yon host: controllers, services, models, roles, tests
+app/server/packages/        the Go package (engine transport) and host errors
 test/                       contract, adversarial, and real-FYLO evidence
 docs/                       ADRs, RFCs, operations, and security guidance
 examples/hostserver/        the host side of the interaction contract

@@ -64,7 +64,7 @@ jobs:
 
   go-package:
     name: Go package contract corpus
-    # The Go package in server/packages is the Yon host's engine transport and
+    # The Go package in app/server/packages is the Yon host's engine transport and
     # the public package for Go hosts. Its scenario runs against a real
     # compiled engine, so a protocol divergence fails here rather than in a mock.
     # The Yon host's own tests (ty bundle, ty test --coverage) run in the local
@@ -81,7 +81,7 @@ jobs:
           cache: false
 
       - name: Run the Go package tests
-        working-directory: server/packages
+        working-directory: app/server/packages
         run: go test -count=1 ./...
 
   quality:
@@ -98,11 +98,11 @@ jobs:
           cache: false
 
       - name: Check formatting
-        # Yon handler files under server/ have no package clause, so gofmt
+        # Yon handler files under app/server/ have no package clause, so gofmt
         # cannot parse them; ty checks those. A parse error elsewhere fails.
         shell: bash
         run: |
-          unformatted="$(gofmt -l cmd internal test tools examples server/packages 2>&1)"
+          unformatted="$(gofmt -l cmd internal test tools examples app/server/packages 2>&1)"
           test -z "$unformatted" || { echo "$unformatted"; exit 1; }
 
       - name: Run race detector

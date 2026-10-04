@@ -2,12 +2,12 @@
   "protocol_version": "1",
   "comment": [
     "The canonical set of machine operations, and how each one is reached over",
-    "HTTP through the Yon host in server/ (docs/YON.md, ADR 0007).",
+    "HTTP through the Yon host in app/server/ (docs/YON.md, ADR 0007).",
     "",
     "This file is asserted by test/contract against the engine's own dispatch",
     "table (parsed from the processor, so the manifest cannot claim an operation",
     "the engine does not route), against the protocol README (so no operation",
-    "ships undocumented), and against the Yon controllers in server/controllers",
+    "ships undocumented), and against the Yon controllers in app/server/controllers",
     "(so a route cannot appear, move or disappear without saying so here).",
     "",
     "http_coverage gives every operation exactly one category:",
@@ -25,7 +25,7 @@
     "one fails the contract, so changing who may call a route changes this file.",
     "",
     "Every operation is also reachable without HTTP through the machine protocol",
-    "(`sesame exec --loop`, api/machine/v1) and the Go package in server/packages."
+    "(`sesame exec --loop`, api/machine/v1) and the Go package in app/server/packages."
   ],
   "operations": [
     "admin.bootstrap",
