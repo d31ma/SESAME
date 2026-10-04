@@ -18,6 +18,12 @@
     "  command_line_only: never routed; it needs local operator access;",
     "  not_routed_for_security: never routed; its result is host-only material.",
     "",
+    "Each routed and standard_endpoint entry records, under access, the guard",
+    "every one of its routes declares: public, signed_in or administrator. A",
+    "method-level annotation wins over the controller-level one (Tachyon ADR",
+    "0068). A route with no guard, two guards, or a guard other than the recorded",
+    "one fails the contract, so changing who may call a route changes this file.",
+    "",
     "Every operation is also reachable without HTTP through the machine protocol",
     "(`sesame exec --loop`, api/machine/v1) and the Go package in server/packages."
   ],
@@ -118,111 +124,168 @@
       "routes": [
         "POST /api/v1/authenticator/passkey-list",
         "POST /api/v1/authenticator/passkey-list-for-principal"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/authenticator/passkey-list": "signed_in",
+        "POST /api/v1/authenticator/passkey-list-for-principal": "administrator"
+      }
     },
     "authenticator.passkey_register_begin": {
       "category": "routed",
       "routes": [
         "POST /api/v1/authenticator/passkey-register-begin"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/authenticator/passkey-register-begin": "signed_in"
+      }
     },
     "authenticator.passkey_register_finish": {
       "category": "routed",
       "routes": [
         "POST /api/v1/authenticator/passkey-register-finish"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/authenticator/passkey-register-finish": "signed_in"
+      }
     },
     "authenticator.passkey_remove": {
       "category": "routed",
       "routes": [
         "POST /api/v1/authenticator/passkey-remove",
         "POST /api/v1/authenticator/passkey-remove-for-principal"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/authenticator/passkey-remove": "signed_in",
+        "POST /api/v1/authenticator/passkey-remove-for-principal": "administrator"
+      }
     },
     "authenticator.recovery_codes_issue": {
       "category": "routed",
       "routes": [
         "POST /api/v1/authenticator/recovery-codes-issue"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/authenticator/recovery-codes-issue": "signed_in"
+      }
     },
     "authenticator.set_password": {
       "category": "routed",
       "routes": [
         "POST /api/v1/authenticator/set-password",
         "POST /api/v1/authenticator/set-password-for-principal"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/authenticator/set-password": "signed_in",
+        "POST /api/v1/authenticator/set-password-for-principal": "administrator"
+      }
     },
     "authenticator.totp_activate": {
       "category": "routed",
       "routes": [
         "POST /api/v1/authenticator/totp-activate"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/authenticator/totp-activate": "signed_in"
+      }
     },
     "authenticator.totp_enroll": {
       "category": "routed",
       "routes": [
         "POST /api/v1/authenticator/totp-enroll"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/authenticator/totp-enroll": "signed_in"
+      }
     },
     "authn.begin": {
       "category": "routed",
       "routes": [
         "POST /api/v1/authn/begin"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/authn/begin": "public"
+      }
     },
     "authn.complete": {
       "category": "routed",
       "routes": [
         "POST /api/v1/authn/complete"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/authn/complete": "public"
+      }
     },
     "authn.passkey_options": {
       "category": "routed",
       "routes": [
         "POST /api/v1/authn/passkey-options"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/authn/passkey-options": "public"
+      }
     },
     "authn.verify_passkey": {
       "category": "routed",
       "routes": [
         "POST /api/v1/authn/verify-passkey"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/authn/verify-passkey": "public"
+      }
     },
     "authn.verify_password": {
       "category": "routed",
       "routes": [
         "POST /api/v1/authn/verify-password"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/authn/verify-password": "public"
+      }
     },
     "authn.verify_recovery_code": {
       "category": "routed",
       "routes": [
         "POST /api/v1/authn/verify-recovery-code"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/authn/verify-recovery-code": "public"
+      }
     },
     "authn.verify_totp": {
       "category": "routed",
       "routes": [
         "POST /api/v1/authn/verify-totp"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/authn/verify-totp": "public"
+      }
     },
     "authorize.decide": {
       "category": "routed",
       "routes": [
         "POST /api/v1/authorize/decide"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/authorize/decide": "signed_in"
+      }
     },
     "authorize.decide_batch": {
       "category": "routed",
       "routes": [
         "POST /api/v1/authorize/decide-batch"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/authorize/decide-batch": "signed_in"
+      }
     },
     "federation.login_complete": {
       "category": "routed",
       "routes": [
         "POST /api/v1/federation/login-complete"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/federation/login-complete": "public"
+      }
     },
     "federation.login_exchange": {
       "category": "not_routed_for_security",
@@ -232,350 +295,522 @@
       "category": "routed",
       "routes": [
         "POST /api/v1/federation/login-start"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/federation/login-start": "public"
+      }
     },
     "federation.provider_configure": {
       "category": "routed",
       "routes": [
         "POST /api/v1/federation/provider-configure"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/federation/provider-configure": "administrator"
+      }
     },
     "federation.provider_disable": {
       "category": "routed",
       "routes": [
         "POST /api/v1/federation/provider-disable"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/federation/provider-disable": "administrator"
+      }
     },
     "federation.provider_get": {
       "category": "routed",
       "routes": [
         "POST /api/v1/federation/provider-get"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/federation/provider-get": "administrator"
+      }
     },
     "federation.provider_register": {
       "category": "routed",
       "routes": [
         "POST /api/v1/federation/provider-register"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/federation/provider-register": "administrator"
+      }
     },
     "grant.create": {
       "category": "routed",
       "routes": [
         "POST /api/v1/grant/create"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/grant/create": "administrator"
+      }
     },
     "grant.revoke": {
       "category": "routed",
       "routes": [
         "POST /api/v1/grant/revoke"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/grant/revoke": "administrator"
+      }
     },
     "group.create": {
       "category": "routed",
       "routes": [
         "POST /api/v1/group/create"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/group/create": "administrator"
+      }
     },
     "group.member_add": {
       "category": "routed",
       "routes": [
         "POST /api/v1/group/member-add"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/group/member-add": "administrator"
+      }
     },
     "group.member_remove": {
       "category": "routed",
       "routes": [
         "POST /api/v1/group/member-remove"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/group/member-remove": "administrator"
+      }
     },
     "oidc.authorize": {
       "category": "standard_endpoint",
       "endpoint": "oidc.authorization",
       "routes": [
         "GET /oidc/authorize"
-      ]
+      ],
+      "access": {
+        "GET /oidc/authorize": "public"
+      }
     },
     "oidc.consent_get": {
       "category": "routed",
       "routes": [
         "POST /api/v1/oidc/consent-get"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/oidc/consent-get": "signed_in"
+      }
     },
     "oidc.consent_grant": {
       "category": "routed",
       "routes": [
         "POST /api/v1/oidc/consent-grant"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/oidc/consent-grant": "signed_in"
+      }
     },
     "oidc.consent_withdraw": {
       "category": "routed",
       "routes": [
         "POST /api/v1/oidc/consent-withdraw"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/oidc/consent-withdraw": "signed_in"
+      }
     },
     "oidc.device_approve": {
       "category": "routed",
       "routes": [
         "POST /api/v1/oidc/device-approve"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/oidc/device-approve": "signed_in"
+      }
     },
     "oidc.device_authorize": {
       "category": "routed",
       "routes": [
         "POST /api/v1/oidc/device-authorize"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/oidc/device-authorize": "public"
+      }
     },
     "oidc.device_deny": {
       "category": "routed",
       "routes": [
         "POST /api/v1/oidc/device-deny"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/oidc/device-deny": "signed_in"
+      }
     },
     "oidc.device_lookup": {
       "category": "routed",
       "routes": [
         "POST /api/v1/oidc/device-lookup"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/oidc/device-lookup": "signed_in"
+      }
     },
     "oidc.discovery": {
       "category": "standard_endpoint",
       "endpoint": "oidc.discovery",
       "routes": [
         "GET /oidc/openid-configuration"
-      ]
+      ],
+      "access": {
+        "GET /oidc/openid-configuration": "public"
+      }
     },
     "oidc.dpop_verify": {
       "category": "routed",
       "routes": [
         "POST /api/v1/oidc/dpop-verify"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/oidc/dpop-verify": "public"
+      }
     },
     "oidc.interaction_complete": {
       "category": "routed",
       "routes": [
         "POST /api/v1/oidc/interaction-complete"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/oidc/interaction-complete": "signed_in"
+      }
     },
     "oidc.interaction_get": {
       "category": "routed",
       "routes": [
         "POST /api/v1/oidc/interaction-get"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/oidc/interaction-get": "signed_in"
+      }
     },
     "oidc.introspect": {
       "category": "standard_endpoint",
       "endpoint": "oidc.introspection",
       "routes": [
         "POST /oidc/introspect"
-      ]
+      ],
+      "access": {
+        "POST /oidc/introspect": "public"
+      }
     },
     "oidc.logout": {
       "category": "standard_endpoint",
       "endpoint": "oidc.logout",
       "routes": [
         "GET /oidc/logout"
-      ]
+      ],
+      "access": {
+        "GET /oidc/logout": "public"
+      }
     },
     "oidc.pushed_authorize": {
       "category": "routed",
       "routes": [
         "POST /api/v1/oidc/pushed-authorize"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/oidc/pushed-authorize": "public"
+      }
     },
     "oidc.refresh_family_get": {
       "category": "routed",
       "routes": [
         "POST /api/v1/oidc/refresh-family-get"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/oidc/refresh-family-get": "administrator"
+      }
     },
     "oidc.refresh_family_revoke": {
       "category": "routed",
       "routes": [
         "POST /api/v1/oidc/refresh-family-revoke"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/oidc/refresh-family-revoke": "administrator"
+      }
     },
     "oidc.revoke": {
       "category": "standard_endpoint",
       "endpoint": "oidc.revocation",
       "routes": [
         "POST /oidc/revoke"
-      ]
+      ],
+      "access": {
+        "POST /oidc/revoke": "public"
+      }
     },
     "oidc.token": {
       "category": "standard_endpoint",
       "endpoint": "oidc.token",
       "routes": [
         "POST /oidc/token"
-      ]
+      ],
+      "access": {
+        "POST /oidc/token": "public"
+      }
     },
     "oidc_client.disable": {
       "category": "routed",
       "routes": [
         "POST /api/v1/oidc-client/disable"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/oidc-client/disable": "administrator"
+      }
     },
     "oidc_client.get": {
       "category": "routed",
       "routes": [
         "POST /api/v1/oidc-client/get"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/oidc-client/get": "administrator"
+      }
     },
     "oidc_client.register": {
       "category": "routed",
       "routes": [
         "POST /api/v1/oidc-client/register"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/oidc-client/register": "administrator"
+      }
     },
     "oidc_client.rotate_secret": {
       "category": "routed",
       "routes": [
         "POST /api/v1/oidc-client/rotate-secret"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/oidc-client/rotate-secret": "administrator"
+      }
     },
     "principal.create": {
       "category": "routed",
       "routes": [
         "POST /api/v1/principal/create"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/principal/create": "administrator"
+      }
     },
     "principal.get": {
       "category": "routed",
       "routes": [
         "POST /api/v1/principal/get"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/principal/get": "administrator"
+      }
     },
     "principal.suspend": {
       "category": "routed",
       "routes": [
         "POST /api/v1/principal/suspend"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/principal/suspend": "administrator"
+      }
     },
     "role.create": {
       "category": "routed",
       "routes": [
         "POST /api/v1/role/create"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/role/create": "administrator"
+      }
     },
     "saml.login_complete": {
       "category": "routed",
       "routes": [
         "POST /api/v1/saml/login-complete"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/saml/login-complete": "public"
+      }
     },
     "saml.login_start": {
       "category": "routed",
       "routes": [
         "POST /api/v1/saml/login-start"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/saml/login-start": "public"
+      }
     },
     "saml.provider_disable": {
       "category": "routed",
       "routes": [
         "POST /api/v1/saml/provider-disable"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/saml/provider-disable": "administrator"
+      }
     },
     "saml.provider_get": {
       "category": "routed",
       "routes": [
         "POST /api/v1/saml/provider-get"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/saml/provider-get": "administrator"
+      }
     },
     "saml.provider_register": {
       "category": "routed",
       "routes": [
         "POST /api/v1/saml/provider-register"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/saml/provider-register": "administrator"
+      }
     },
     "scim.client_disable": {
       "category": "routed",
       "routes": [
         "POST /api/v1/scim/client-disable"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/scim/client-disable": "administrator"
+      }
     },
     "scim.client_register": {
       "category": "routed",
       "routes": [
         "POST /api/v1/scim/client-register"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/scim/client-register": "administrator"
+      }
     },
     "scim.client_rotate_token": {
       "category": "routed",
       "routes": [
         "POST /api/v1/scim/client-rotate-token"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/scim/client-rotate-token": "administrator"
+      }
     },
     "scim.group_create": {
       "category": "routed",
       "routes": [
         "POST /api/v1/scim/group-create"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/scim/group-create": "public"
+      }
     },
     "scim.group_deprovision": {
       "category": "routed",
       "routes": [
         "POST /api/v1/scim/group-deprovision"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/scim/group-deprovision": "public"
+      }
     },
     "scim.group_get": {
       "category": "routed",
       "routes": [
         "POST /api/v1/scim/group-get"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/scim/group-get": "public"
+      }
     },
     "scim.group_list": {
       "category": "routed",
       "routes": [
         "POST /api/v1/scim/group-list"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/scim/group-list": "public"
+      }
     },
     "scim.group_patch": {
       "category": "routed",
       "routes": [
         "POST /api/v1/scim/group-patch"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/scim/group-patch": "public"
+      }
     },
     "scim.user_create": {
       "category": "routed",
       "routes": [
         "POST /api/v1/scim/user-create"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/scim/user-create": "public"
+      }
     },
     "scim.user_deprovision": {
       "category": "routed",
       "routes": [
         "POST /api/v1/scim/user-deprovision"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/scim/user-deprovision": "public"
+      }
     },
     "scim.user_get": {
       "category": "routed",
       "routes": [
         "POST /api/v1/scim/user-get"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/scim/user-get": "public"
+      }
     },
     "scim.user_list": {
       "category": "routed",
       "routes": [
         "POST /api/v1/scim/user-list"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/scim/user-list": "public"
+      }
     },
     "scim.user_patch": {
       "category": "routed",
       "routes": [
         "POST /api/v1/scim/user-patch"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/scim/user-patch": "public"
+      }
     },
     "session.revoke": {
       "category": "routed",
       "routes": [
         "POST /api/v1/session/revoke",
         "POST /api/v1/session/revoke-by-id"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/session/revoke": "signed_in",
+        "POST /api/v1/session/revoke-by-id": "administrator"
+      }
     },
     "session.verify": {
       "category": "routed",
       "routes": [
         "POST /api/v1/session/verify"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/session/verify": "public"
+      }
     },
     "standards.dispatch": {
       "category": "standard_endpoint",
@@ -587,31 +822,52 @@
         "POST /oidc/introspect",
         "POST /oidc/revoke",
         "POST /oidc/token"
-      ]
+      ],
+      "access": {
+        "GET /oidc/authorize": "public",
+        "GET /oidc/jwks": "public",
+        "GET /oidc/logout": "public",
+        "GET /oidc/openid-configuration": "public",
+        "POST /oidc/introspect": "public",
+        "POST /oidc/revoke": "public",
+        "POST /oidc/token": "public"
+      }
     },
     "system.metrics": {
       "category": "routed",
       "routes": [
         "POST /api/v1/system/metrics"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/system/metrics": "administrator"
+      }
     },
     "system.ping": {
       "category": "routed",
       "routes": [
         "POST /api/v1/system/ping"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/system/ping": "public"
+      }
     },
     "system.readiness": {
       "category": "routed",
       "routes": [
         "POST /api/v1/system/readiness"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/system/readiness": "public"
+      }
     },
     "system.version": {
       "category": "routed",
       "routes": [
         "POST /api/v1/system/version"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/system/version": "public"
+      }
     },
     "tenant.bootstrap": {
       "category": "command_line_only",
@@ -621,13 +877,19 @@
       "category": "routed",
       "routes": [
         "POST /api/v1/tenant/get"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/tenant/get": "administrator"
+      }
     },
     "token.jwks": {
       "category": "routed",
       "routes": [
         "POST /api/v1/token/jwks"
-      ]
+      ],
+      "access": {
+        "POST /api/v1/token/jwks": "public"
+      }
     }
   }
 }

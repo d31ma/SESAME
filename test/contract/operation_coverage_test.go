@@ -9,10 +9,11 @@ const (
 )
 
 type operationCoverage struct {
-	Category string   `json:"category"`
-	Endpoint string   `json:"endpoint"`
-	Routes   []string `json:"routes"`
-	Reason   string   `json:"reason"`
+	Category string            `json:"category"`
+	Endpoint string            `json:"endpoint"`
+	Routes   []string          `json:"routes"`
+	Access   map[string]string `json:"access"`
+	Reason   string            `json:"reason"`
 }
 
 func (coverage operationCoverage) hasKnownCategory() bool {

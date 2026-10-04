@@ -15,8 +15,9 @@ const yonHandlerPackageClause = "package main\n"
 var controllerPrefixAnnotation = regexp.MustCompile(`^// @RequestRoute\("([^"]*)"\)`)
 
 type controllerSource struct {
-	prefixes map[string]string
-	methods  map[string]map[string]*ast.FuncDecl
+	prefixes    map[string]string
+	annotations map[string]*ast.CommentGroup
+	methods     map[string]map[string]*ast.FuncDecl
 }
 
 func parseControllers(t *testing.T, directory string) controllerSource {
@@ -26,7 +27,11 @@ func parseControllers(t *testing.T, directory string) controllerSource {
 	if err != nil || len(names) == 0 {
 		t.Fatalf("list the Yon controllers in %s: %v", directory, err)
 	}
-	source := controllerSource{prefixes: map[string]string{}, methods: map[string]map[string]*ast.FuncDecl{}}
+	source := controllerSource{
+		prefixes:    map[string]string{},
+		annotations: map[string]*ast.CommentGroup{},
+		methods:     map[string]map[string]*ast.FuncDecl{},
+	}
 	for _, name := range names {
 		content, err := os.ReadFile(name)
 		if err != nil {
@@ -58,6 +63,7 @@ func (source controllerSource) addPrefix(declaration *ast.GenDecl) {
 		if !isType {
 			continue
 		}
+		source.annotations[typeSpecification.Name.Name] = declaration.Doc
 		if prefix, found := annotation(declaration.Doc, controllerPrefixAnnotation); found {
 			source.prefixes[typeSpecification.Name.Name] = prefix[1]
 		}
