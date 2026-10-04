@@ -32,8 +32,11 @@ and releases use UTC-derived CalVer in `YY.WW.DD` form.
   - Dart: `dart:io` `HttpClient` against the Yon routes, or `Process.start`
     with `sesame exec --loop`.
   Over HTTP the caller signs in with `Sesame-Session: <session_id>:<session_secret>`
-  instead of naming identities the engine trusts, and errors arrive as an HTTP
-  status with `{"code":"<code>"}`. A host that spawns the engine itself should
+  instead of naming identities the engine trusts, and SESAME's errors arrive as
+  an HTTP status with `{"code":"<code>"}` (the route guard's `401`/`403` are
+  plain text, and `ty`'s own `400`/`405` use Tachyon's
+  `{"error","field","part"}` / `{"allow","error"}` shapes; see
+  [docs/YON.md](docs/YON.md#errors)). A host that spawns the engine itself should
   send `system.version` first and refuse a `protocol_version` other than `1`,
   as the old SDKs did.
 - **The Go SDK moved.** Its import path is now
@@ -63,18 +66,28 @@ and releases use UTC-derived CalVer in `YY.WW.DD` form.
   `ty serve` serves SESAME's operations as `POST /api/v1/<family>/<operation>`
   routes. Each request starts one engine; when another request's engine owns
   the deployment it waits up to `sesame.waitmilliseconds` and then answers
-  `503 engine_busy` with `Retry-After: 1`. Developer preview: a few requests
-  per second. The `sesame` engine still opens no port; `ty` owns the listener.
+  `503 engine_busy` with `Retry-After: 1` on public routes. On signed-in and
+  administrator routes the identity check meets the busy engine first, and
+  `ty` answers a plain-text `500` ("Tachyon could not check who is signed
+  in.") without `Retry-After`, because a Tachyon identity provider cannot
+  choose its status. Developer preview: a few requests per second, and a
+  TLS-terminating, rate-limiting reverse proxy in front of `ty` is required
+  ([docs/YON.md](docs/YON.md#reverse-proxy-required)). The `sesame` engine
+  still opens no port; `ty` owns the listener.
 - Sign-in over HTTP with the `Sesame-Session` header (the session id and
   secret `authn.complete` issues). The `Administrator` role is granted only
   when SESAME allows `sesame:administer` on `sesame:tenant` in the session's
-  tenant; every tenant-bound route refuses another tenant with
-  `403 tenant_mismatch` before the operation runs. Errors answer
-  `{"code":"<code>"}` through one code-to-status table; engine messages never
-  reach the client.
-- System routes: `system/{ping,version,readiness}` (public) and
-  `system/metrics` (administrator); `tenant/get` (administrator of that
-  tenant).
+  tenant, and every administrative call decides it again inside the route's
+  own invocation (`403 administrator_required`). Every tenant-bound route
+  refuses another tenant with `403 tenant_mismatch` before the operation runs.
+  SESAME's errors answer `{"code":"<code>"}` through one code-to-status table;
+  engine messages never reach the client. The route guard's `401` and `403`
+  come from `ty` as plain text.
+- System routes: `system/{ping,version,readiness}` (public; `version` answers
+  only `name`, `version` and `protocol_version`), `system/build` (the full
+  version answer) and `system/metrics` (administrator; it counts only the
+  engine that answers, which lives for one request); `tenant/get`
+  (administrator of that tenant).
 - Directory routes ([docs/yon/directory.md](docs/yon/directory.md)):
   `principal/{create,get,suspend}`, `role/create`, `grant/{create,revoke}`,
   `group/{create,member-add,member-remove}` for tenant administrators, and
@@ -122,7 +135,12 @@ and releases use UTC-derived CalVer in `YY.WW.DD` form.
   engine call of a signed-in request.
 - `test/contract` ties `operations.json` to the `@PostRoute`/`@GetRoute`
   annotations in `server/controllers`: a new engine operation or route without
-  an `http_coverage` entry fails the build.
+  an `http_coverage` entry fails the build. Each entry also records the
+  route's access (`public`, `signed_in` or `administrator`), and the check
+  fails when a controller's effective access annotation differs, so changing
+  who may call a route changes the manifest in the same commit.
+- `sesame authn set-password` is documented as the way to give the bootstrap
+  administrator its first password ([docs/YON.md](docs/YON.md)).
 
 ### Changed
 
@@ -137,7 +155,58 @@ and releases use UTC-derived CalVer in `YY.WW.DD` form.
 - Developed and gated against Tachyon `ty` 26.36.01 at commit `bf098bfc` (an
   unreleased build). Running the routes from the command line with
   `ty handler invoke` needs Tachyon's argument-binding fix (`d070022f`), which
-  is not merged upstream yet.
+  is not merged upstream yet. It skips the route guard but not SESAME's own
+  checks; it puts secrets on the command line and echoes a malformed
+  `--header`, so docs/YON.md recommends it only on single-user hosts.
+- The example host (`examples/hostserver`) names its interaction cookie
+  `__Secure-sesame_interaction`, and its clearing cookies keep `Secure`.
+
+### Security
+
+Fixes from the security review of the Yon host, before any release:
+
+- **Cross-tenant principal read.** `principal/get` let a tenant administrator
+  read a principal of another tenant by naming its own `tenant_id` with the
+  other principal's id. The host now refuses a `principal_id` named together
+  with `tenant_id` or an identifier field (`400 invalid_request`) and checks the
+  loaded principal's tenant; the engine's `principal.get` accepts exactly one
+  lookup form.
+- **Login redirect chosen by an anonymous caller.** `saml/login-start` and
+  `federation/login-start` accept only a `consumer_url` / `redirect_uri`
+  listed exactly in the new `sesame.samlconsumerurls` /
+  `sesame.federationredirecturis` settings (absolute `https`, no fragment).
+  Both are empty by default, so both routes refuse with
+  `400 redirect_not_allowed` until configured; an invalid entry makes every
+  engine request answer `500`. **Operators using federated login over HTTP
+  must list their callback URLs before upgrading.**
+- **Caller-chosen session lifetime.** `authn/complete` no longer accepts
+  `lifetime_seconds` (`400`); HTTP sessions get the engine default (12 hours).
+- **Privileged changes from an old session.** Administrator credential and
+  privilege changes (`authenticator/set-password-for-principal`,
+  `authenticator/passkey-remove-for-principal`, `grant/create`,
+  `group/member-add`, `principal/suspend`, `oidc-client/rotate-secret`,
+  federation and SAML provider registration and configuration, SCIM client
+  registration and token rotation) need a session issued within 10 minutes
+  (`403 reauthentication_required`), as self-service authenticator changes
+  already did. Revocations do not.
+- **Interaction secret ignored.** `oidc/interaction-get` now needs the
+  interaction cookie's secret; the engine's `oidc.interaction_get` takes an
+  optional `interaction_secret`, and a wrong one answers
+  `interaction_not_found`.
+- **Role decided only by the route guard.** Administrative routes decide the
+  `Administrator` role again inside the route's invocation, so a caller that
+  skips the guard (`ty handler invoke`) gets `403 administrator_required`.
+- **Build details for anyone.** Public `system/version` answers only `name`,
+  `version` and `protocol_version`; commit, build time, Go version, platform
+  and operation list moved to administrator-only `POST /api/v1/system/build`.
+- **Interaction cookie prefix.** The cookie is now
+  `__Secure-sesame_interaction`; a browser holding the old cookie must restart
+  the authorization flow.
+- Documented, not changed: unauthenticated callers can exhaust the single
+  engine, so docs/YON.md now requires a rate-limiting reverse proxy; recent
+  sign-in is not proof of the current credential; wildcard roles matching
+  `sesame:administer` on `sesame:tenant` confer HTTP tenant administration
+  (docs/THREAT_MODEL.md, "The Yon Host").
 
 ### Fixed
 
@@ -151,6 +220,10 @@ and releases use UTC-derived CalVer in `YY.WW.DD` form.
   `sesame` process. The engine now leads its own process group, and the client
   ends and reaps the whole group before returning (Unix; Windows still ends only
   the engine process).
+- Go tests no longer depend on the caller's `FYLO_BINARY`, `FYLO_ROOT`,
+  `SESAME_DEPLOYMENT`, `SESAME_BINARY` or related variables; previously an
+  exported `SESAME_DEPLOYMENT` let the black-box lifecycle test run
+  `sesame init` into it.
 
 ## [26.33.02] - 2026-08-11
 
