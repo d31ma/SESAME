@@ -96,11 +96,12 @@ and keeps the interaction secret out of the body. The secret is
 bearer-equivalent, so it travels only in a cookie:
 
 ```text
-Set-Cookie: sesame_interaction=<interaction_id>:<interaction_secret>; Path=/api/v1/oidc; Max-Age=900; HttpOnly; Secure; SameSite=Lax
+Set-Cookie: __Secure-sesame_interaction=<interaction_id>:<interaction_secret>; Path=/api/v1/oidc; Max-Age=900; HttpOnly; Secure; SameSite=Lax
 ```
 
 `HttpOnly` keeps it away from browser JavaScript, `Secure` keeps it off plain
-HTTP, and the path sends it only to the interaction routes below. The
+HTTP, the `__Secure-` prefix makes the browser refuse the cookie unless it was
+set over HTTPS with `Secure` (no `Domain` is set), and the path sends it only to the interaction routes below. The
 interaction and the cookie both last 15 minutes. The browser that started the
 interaction then signs in with the `authn` routes and calls
 `POST /api/v1/oidc/interaction-complete`; the answer names the redirect URI and
@@ -145,11 +146,11 @@ name another principal, session or tenant.
 | --- | --- | --- | --- |
 | `POST /api/v1/oidc-client/register` | `oidc_client.register` | an administrator | the body's `tenant_id` must be the caller's tenant |
 | `POST /api/v1/oidc-client/get` | `oidc_client.get` | an administrator | the client is loaded, then refused unless it is in the caller's tenant |
-| `POST /api/v1/oidc-client/rotate-secret` | `oidc_client.rotate_secret` | an administrator | as `get`; nothing is rotated otherwise |
+| `POST /api/v1/oidc-client/rotate-secret` | `oidc_client.rotate_secret` | an administrator, signed in within 10 minutes (older: `403 {"code":"reauthentication_required"}`) | as `get`; nothing is rotated otherwise |
 | `POST /api/v1/oidc-client/disable` | `oidc_client.disable` | an administrator | as `get`; nothing is disabled otherwise |
 | `POST /api/v1/oidc/refresh-family-get` | `oidc.refresh_family_get` | an administrator | the family is loaded, then refused unless it is in the caller's tenant |
 | `POST /api/v1/oidc/refresh-family-revoke` | `oidc.refresh_family_revoke` | an administrator | as `refresh-family-get`; nothing is revoked otherwise |
-| `POST /api/v1/oidc/interaction-get` | `oidc.interaction_get` | any signed-in principal | the interaction comes from the `sesame_interaction` cookie, and is refused unless it is in the caller's tenant |
+| `POST /api/v1/oidc/interaction-get` | `oidc.interaction_get` | any signed-in principal | interaction id and secret from the `__Secure-sesame_interaction` cookie; a wrong or missing secret answers `404 {"code":"interaction_not_found"}` like an unknown interaction; refused unless it is in the caller's tenant |
 | `POST /api/v1/oidc/interaction-complete` | `oidc.interaction_complete` | any signed-in principal | interaction id and secret from the cookie; the caller's own session completes it |
 | `POST /api/v1/oidc/consent-grant` | `oidc.consent_grant` | any signed-in principal | the caller's own session states the consent; body: `client_id`, `scopes` |
 | `POST /api/v1/oidc/consent-get` | `oidc.consent_get` | any signed-in principal | the caller's own principal; body: `client_id` |

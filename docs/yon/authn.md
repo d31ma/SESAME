@@ -24,10 +24,10 @@ names the field path or the model, never the submitted value.
 | `POST /api/v1/authn/verify-recovery-code` | `authn.verify_recovery_code` | anyone holding the transaction ID | that transaction |
 | `POST /api/v1/authn/passkey-options` | `authn.passkey_options` | anyone holding the transaction ID | that transaction |
 | `POST /api/v1/authn/verify-passkey` | `authn.verify_passkey` | anyone holding the transaction ID | that transaction |
-| `POST /api/v1/authn/complete` | `authn.complete` | anyone holding the transaction ID | that transaction |
+| `POST /api/v1/authn/complete` | `authn.complete` | anyone holding the transaction ID | that transaction; the body is `{"transaction_id"}` only, so the session gets the engine's default lifetime (12 hours) and a body naming `lifetime_seconds` is refused with `400` |
 | `POST /api/v1/session/verify` | `session.verify` | anyone holding the session ID and secret | that session |
 | `POST /api/v1/session/revoke` | `session.revoke` | a signed-in caller | the caller's current session only |
-| `POST /api/v1/session/revoke-by-id` | `session.revoke` of any session | an administrator | the caller is sent as the request's actor; SESAME refuses a live session of another tenant with `403 {"code":"actor_tenant_mismatch"}` and revokes nothing |
+| `POST /api/v1/session/revoke-by-id` | `session.revoke` of any session | an administrator (any session age: revoking only reduces access) | the caller is sent as the request's actor; SESAME refuses a live session of another tenant with `403 {"code":"actor_tenant_mismatch"}` and revokes nothing |
 | `POST /api/v1/authenticator/set-password` | `authenticator.set_password` | a signed-in caller | the caller only |
 | `POST /api/v1/authenticator/totp-enroll` | `authenticator.totp_enroll` | a signed-in caller | the caller only |
 | `POST /api/v1/authenticator/totp-activate` | `authenticator.totp_activate` | a signed-in caller | the caller only |
@@ -36,9 +36,9 @@ names the field path or the model, never the submitted value.
 | `POST /api/v1/authenticator/passkey-register-finish` | `authenticator.passkey_register_finish` | a signed-in caller | the caller only |
 | `POST /api/v1/authenticator/passkey-list` | `authenticator.passkey_list` | a signed-in caller | the caller only |
 | `POST /api/v1/authenticator/passkey-remove` | `authenticator.passkey_remove` | a signed-in caller | a passkey of the caller only |
-| `POST /api/v1/authenticator/set-password-for-principal` | `authenticator.set_password` | an administrator | a principal in the administrator's tenant |
+| `POST /api/v1/authenticator/set-password-for-principal` | `authenticator.set_password` | an administrator, signed in within 10 minutes | a principal in the administrator's tenant |
 | `POST /api/v1/authenticator/passkey-list-for-principal` | `authenticator.passkey_list` | an administrator | a principal in the administrator's tenant |
-| `POST /api/v1/authenticator/passkey-remove-for-principal` | `authenticator.passkey_remove` | an administrator | a passkey of a principal in the administrator's tenant |
+| `POST /api/v1/authenticator/passkey-remove-for-principal` | `authenticator.passkey_remove` | an administrator, signed in within 10 minutes | a passkey of a principal in the administrator's tenant |
 | `POST /api/v1/token/jwks` | `token.jwks` | anyone | the public signing key set |
 
 ### Login steps are public
@@ -119,7 +119,9 @@ one they answer `500 {"code":"internal_error"}` (the engine reports
 An operation that a principal may run on itself and an administrator may run
 on someone else has two routes: the self-service route above, and a
 `-for-principal` route whose body names the target with `principal_id`. The
-`-for-principal` routes need the `Administrator` role (`403` otherwise). The
+`-for-principal` routes need the `Administrator` role (`403` otherwise; the
+host decides the role again inside the call, so a caller that skips the route
+guard gets `403 {"code":"administrator_required"}`). The
 host loads the named principal first and answers
 `403 {"code":"tenant_mismatch"}` when it belongs to another tenant, so an
 administrator never reaches another tenant.
@@ -132,9 +134,12 @@ administrator never reaches another tenant.
   removes the passkey only when it belongs to that principal; otherwise
   `404 {"code":"passkey_not_found"}`. It is the lost-device response.
 
-The administrator routes do not apply the recent sign-in rule: the
-administrator's session is already held to the `Administrator` role, decided
-by the engine for every request.
+`set-password-for-principal` and `passkey-remove-for-principal` apply the same
+recent sign-in rule as the self-service changes: an administrator session
+issued more than 10 minutes ago answers
+`403 {"code":"reauthentication_required"}` and nothing changes, so a stolen,
+older administrator session cannot take over another principal's sign-in.
+`passkey-list-for-principal` works with any administrator session.
 
 ## Not routed
 

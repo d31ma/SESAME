@@ -15,14 +15,14 @@ is refused with `400` before SESAME runs.
 | Route | Operation | Who may call | Tenant isolation |
 | --- | --- | --- | --- |
 | `POST /api/v1/principal/create` | `principal.create` | an administrator | the body's `tenant_id` must be the caller's tenant |
-| `POST /api/v1/principal/get` | `principal.get` by `principal_id` | an administrator | the principal is loaded, then refused unless it is in the caller's tenant |
+| `POST /api/v1/principal/get` | `principal.get` by `principal_id` alone | an administrator | the principal is loaded, then refused unless it is in the caller's tenant; a `principal_id` named with `tenant_id` or an identifier field is refused with `400 {"code":"invalid_request"}` before SESAME runs |
 | `POST /api/v1/principal/get` | `principal.get` by `tenant_id`, `identifier_namespace`, `identifier_value` | an administrator | the body's `tenant_id` must be the caller's tenant, checked before the lookup |
-| `POST /api/v1/principal/suspend` | `principal.suspend` | an administrator | the principal is loaded, then refused unless it is in the caller's tenant; nothing is suspended otherwise |
+| `POST /api/v1/principal/suspend` | `principal.suspend` | an administrator, signed in within 10 minutes | the principal is loaded, then refused unless it is in the caller's tenant; nothing is suspended otherwise |
 | `POST /api/v1/role/create` | `role.create` | an administrator | the body's `tenant_id` must be the caller's tenant |
-| `POST /api/v1/grant/create` | `grant.create` | an administrator | the body's `tenant_id` must be the caller's tenant; SESAME then refuses a role, principal or group of another tenant (`role_not_found`, `principal_not_found`, `group_not_found`) |
+| `POST /api/v1/grant/create` | `grant.create` | an administrator, signed in within 10 minutes | the body's `tenant_id` must be the caller's tenant; SESAME then refuses a role, principal or group of another tenant (`role_not_found`, `principal_not_found`, `group_not_found`) |
 | `POST /api/v1/grant/revoke` | `grant.revoke` | an administrator | the caller is sent as the request's actor; SESAME refuses a grant of another tenant with `403 {"code":"actor_tenant_mismatch"}` and revokes nothing |
 | `POST /api/v1/group/create` | `group.create` | an administrator | the body's `tenant_id` must be the caller's tenant |
-| `POST /api/v1/group/member-add` | `group.member_add` | an administrator | the principal must be in the caller's tenant; SESAME then refuses a group of another tenant (`403 {"code":"actor_tenant_mismatch"}`) |
+| `POST /api/v1/group/member-add` | `group.member_add` | an administrator, signed in within 10 minutes | the principal must be in the caller's tenant; SESAME then refuses a group of another tenant (`403 {"code":"actor_tenant_mismatch"}`) |
 | `POST /api/v1/group/member-remove` | `group.member_remove` | an administrator | as `member-add` |
 | `POST /api/v1/authorize/decide` | `authorize.decide` | any signed-in principal, about itself | the caller's own session supplies the tenant, the principal and the session |
 | `POST /api/v1/authorize/decide-batch` | `authorize.decide_batch` | any signed-in principal, about itself | as `decide`, for every question in the batch |
@@ -32,7 +32,15 @@ is refused with `400` before SESAME runs.
 A refusal for another tenant answers `403 {"code":"tenant_mismatch"}`. An
 anonymous caller, or a session that is unknown, expired or revoked, gets `401`.
 A signed-in principal that is not an administrator gets `403` on the
-administrator routes.
+administrator routes. Every administrator route also decides the
+`Administrator` role again inside its own call, so a caller that reaches the
+controller without the route guard (for example through `ty handler invoke`)
+is still refused with `403 {"code":"administrator_required"}`. Routes marked
+"signed in within 10 minutes" change credentials or privileges: a session
+issued longer ago is refused with `403 {"code":"reauthentication_required"}`
+and nothing changes; sign in again and retry. Revoking a grant and removing a
+group member only reduce access, so an older administrator session may still
+do them.
 
 ## Why each route is guarded this way
 
