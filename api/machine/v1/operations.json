@@ -863,10 +863,12 @@
     "system.version": {
       "category": "routed",
       "routes": [
-        "POST /api/v1/system/version"
+        "POST /api/v1/system/version",
+        "POST /api/v1/system/build"
       ],
       "access": {
-        "POST /api/v1/system/version": "public"
+        "POST /api/v1/system/version": "public",
+        "POST /api/v1/system/build": "administrator"
       }
     },
     "tenant.bootstrap": {

@@ -1,7 +1,10 @@
 import (
+	"encoding/json"
 	"errors"
+	"maps"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 
 	"github.com/d31ma/sesame/server/packages/host"
 )
@@ -22,17 +25,45 @@ func (test *SystemControllerTest) TestPingAnswersOk() {
 	Assert.Equals("ok", ping.Status)
 }
 
-func (test *SystemControllerTest) TestVersionNamesTheProtocolAndOperations() {
+func (test *SystemControllerTest) TestVersionAnswersOnlyWhatAClientNeeds() {
 	setup := SesameTestSetup{}.Provision()
 	defer setup.Remove()
 	controller := test.controller()
 
 	version, err := controller.PostVersion()
+	encoded, _ := json.Marshal(version)
 
 	Assert.IsTrue(err == nil)
 	Assert.Equals("sesame", version.Name)
 	Assert.Equals("1", version.ProtocolVersion)
-	Assert.IsTrue(len(version.Operations) > 0)
+	Assert.IsTrue(version.Version != "")
+	Assert.Equals([]string{"name", "protocol_version", "version"}, test.fieldNames(encoded))
+}
+
+func (test *SystemControllerTest) TestBuildDescribesTheEngineToAnAdministrator() {
+	setup := SesameTestSetup{}.Provision()
+	defer setup.Remove()
+	administrator := setup.SignIn("acme", true)
+
+	build, err := test.controller().PostBuild(test.request(setup.Credential(administrator)))
+
+	Assert.IsTrue(err == nil)
+	Assert.Equals("sesame", build.Name)
+	Assert.Equals("1", build.ProtocolVersion)
+	Assert.IsTrue(build.GoVersion != "")
+	Assert.IsTrue(len(build.Operations) > 0)
+}
+
+func (test *SystemControllerTest) TestBuildRefusesAMemberEvenWithoutTheRouteGuard() {
+	setup := SesameTestSetup{}.Provision()
+	defer setup.Remove()
+	member := setup.SignInMember("acme", "member")
+
+	build, err := test.controller().PostBuild(test.request(setup.Credential(member)))
+
+	var refused *host.AdministratorRequiredError
+	Assert.IsTrue(errors.As(err, &refused))
+	Assert.Equals("", build.GoVersion)
 }
 
 func (test *SystemControllerTest) TestReadinessReportsStorageReady() {
@@ -71,6 +102,14 @@ func (test *SystemControllerTest) TestMetricsRefuseAMemberEvenWithoutTheRouteGua
 	var refused *host.AdministratorRequiredError
 	Assert.IsTrue(errors.As(err, &refused))
 	Assert.Equals(0, len(metrics.RequestsTotal))
+}
+
+func (test *SystemControllerTest) fieldNames(encoded []byte) []string {
+	fields := map[string]any{}
+	_ = json.Unmarshal(encoded, &fields)
+	names := slices.Collect(maps.Keys(fields))
+	slices.Sort(names)
+	return names
 }
 
 func (test *SystemControllerTest) request(credential string) *http.Request {

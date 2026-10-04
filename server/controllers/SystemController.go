@@ -19,7 +19,19 @@ func (controller *SystemController) PostPing() (SystemPing, error) {
 // @Public
 func (controller *SystemController) PostVersion() (SystemVersion, error) {
 	var result SystemVersion
-	err := controller.engineService.Call("system.version", struct{}{}, &result)
+	err := controller.engineService.Call(controller.versionOperation(), struct{}{}, &result)
+	return result, err
+}
+
+// @PostRoute("/build")
+// @Allow(Administrator)
+func (controller *SystemController) PostBuild(request *http.Request) (SystemBuild, error) {
+	var result SystemBuild
+	err := controller.tenantCallService.CallAsAdministrator(request, EngineCall{
+		Operation:  controller.versionOperation(),
+		Parameters: struct{}{},
+		Result:     &result,
+	})
 	return result, err
 }
 
@@ -41,4 +53,8 @@ func (controller *SystemController) PostMetrics(request *http.Request) (SystemMe
 		Result:     &result,
 	})
 	return result, err
+}
+
+func (controller *SystemController) versionOperation() string {
+	return "system.version"
 }
