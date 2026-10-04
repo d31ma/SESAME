@@ -2,6 +2,8 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"strconv"
+	"strings"
 
 	"github.com/d31ma/sesame/server/packages/sesame"
 )
@@ -23,20 +25,20 @@ func (test *StandardsAnswerServiceTest) TestAnswerServesAValidResponseAsItIs() {
 func (test *StandardsAnswerServiceTest) TestAnswerRefusesAHeaderOutsideTheAllowlist() {
 	response, _ := test.service().Answer(test.response(http.StatusOK, map[string]string{"set-cookie": "a=b"}), nil)
 
-	test.assertUnavailable(response)
+	Assert.Equals(test.unavailable(), test.outcome(response))
 }
 
 func (test *StandardsAnswerServiceTest) TestAnswerRefusesALineBreakInAHeaderValue() {
 	response, _ := test.service().Answer(test.response(http.StatusSeeOther,
 		map[string]string{"location": "https://rp.example/\r\nSet-Cookie: a=b"}), nil)
 
-	test.assertUnavailable(response)
+	Assert.Equals(test.unavailable(), test.outcome(response))
 }
 
 func (test *StandardsAnswerServiceTest) TestAnswerRefusesAStatusOutsideTheContract() {
 	response, _ := test.service().Answer(test.response(700, nil), nil)
 
-	test.assertUnavailable(response)
+	Assert.Equals(test.unavailable(), test.outcome(response))
 }
 
 func (test *StandardsAnswerServiceTest) TestAnswerRefusesAnUnsupportedContractVersion() {
@@ -45,13 +47,13 @@ func (test *StandardsAnswerServiceTest) TestAnswerRefusesAnUnsupportedContractVe
 
 	response, _ := test.service().Answer(unsupported, nil)
 
-	test.assertUnavailable(response)
+	Assert.Equals(test.unavailable(), test.outcome(response))
 }
 
 func (test *StandardsAnswerServiceTest) TestAnswerRefusesAnInteractionOutsideTheAuthorizationEndpoint() {
 	response, _ := test.service().Answer(test.interaction("interaction"), nil)
 
-	test.assertUnavailable(response)
+	Assert.Equals(test.unavailable(), test.outcome(response))
 }
 
 func (test *StandardsAnswerServiceTest) TestAuthorizeRefusesAnUnknownActionKind() {
@@ -59,7 +61,7 @@ func (test *StandardsAnswerServiceTest) TestAuthorizeRefusesAnUnknownActionKind(
 
 	Assert.IsTrue(err == nil)
 	Assert.Equals(0, len(response.Cookies()))
-	test.assertUnavailable(response)
+	Assert.Equals(test.unavailable(), test.outcome(response))
 }
 
 func (test *StandardsAnswerServiceTest) TestAuthorizeServesAnOrdinaryRefusalWithoutACookie() {
@@ -73,14 +75,17 @@ func (test *StandardsAnswerServiceTest) TestAuthorizeServesAnOrdinaryRefusalWith
 	Assert.Equals(`{"error":"invalid_request"}`, test.text(response))
 }
 
-func (test *StandardsAnswerServiceTest) assertUnavailable(response *http.Response) {
+func (test *StandardsAnswerServiceTest) outcome(response *http.Response) string {
 	problem := StandardsProblem{}
 	_ = json.Unmarshal([]byte(test.text(response)), &problem)
-	Assert.Equals(http.StatusServiceUnavailable, response.StatusCode)
-	Assert.Equals("server_error", problem.Error)
-	Assert.Equals("no-store", response.Header.Get("Cache-Control"))
-	Assert.Equals("", response.Header.Get("Location"))
-	Assert.Equals("", response.Header.Get("Set-Cookie"))
+	return strings.Join([]string{
+		strconv.Itoa(response.StatusCode), problem.Error, response.Header.Get("Cache-Control"),
+		response.Header.Get("Location"), response.Header.Get("Set-Cookie"),
+	}, "|")
+}
+
+func (test *StandardsAnswerServiceTest) unavailable() string {
+	return "503|server_error|no-store||"
 }
 
 func (test *StandardsAnswerServiceTest) response(status int, headers map[string]string) sesame.StandardsResponse {
