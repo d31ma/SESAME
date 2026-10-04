@@ -204,6 +204,13 @@ and releases use UTC-derived CalVer in `YY.WW.DD` form.
 
 Fixes from the security review of the Yon host, before any release:
 
+- **Public call allowlist.** The Yon host's public call path
+  (`PublicCallService`) sends only the 17 operations SESAME's public routes
+  reach; any other operation is refused before the engine runs with
+  `500 internal_error` (host code `operation_not_public`). A contract test keeps
+  the list equal to the public routes in `api/machine/v1/operations.json`, less
+  those reached through another named guard (SCIM bearer, federated-login
+  redirect allowlist, `standards.dispatch`).
 - **Cross-tenant principal read.** `principal/get` let a tenant administrator
   read a principal of another tenant by naming its own `tenant_id` with the
   other principal's id. The host now refuses a `principal_id` named together

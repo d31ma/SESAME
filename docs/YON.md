@@ -309,7 +309,7 @@ JSON `{"code":"<code>"}` through one code-to-status table:
 | `404` | A named record does not exist (`principal_not_found`, ...). |
 | `409` | A conflict (`identifier_conflict`, `stale_policy_version`, ...). |
 | `503` | `engine_busy`, with `Retry-After: 1`: another request held the deployment, or the engine did not start, for the whole wait. Nothing ran; retry. |
-| `500` | `internal_error`, including a missing or invalid configuration. The cause is in the server log, never in the answer. |
+| `500` | `internal_error`, including a missing or invalid configuration and an operation the host's public call path does not allow (the host's `operation_not_public`, a host programming error; the engine is not called). The cause is in the server log, never in the answer. |
 
 **`ty`'s route guard** answers before any SESAME code runs, as
 `text/plain`: `401 Sign in to call this route.` and
