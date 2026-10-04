@@ -183,11 +183,11 @@ func (test *OidcControllerTest) TestAMalformedInteractionCookieAnswersLikeAnUnkn
 	setup := SesameTestSetup{}.Provision()
 	defer setup.Remove()
 	session := setup.SignIn("acme", true)
-	engine := test.engine()
+	engine := setup.Engine()
 	registered := test.register(engine, session.TenantID, "first_party")
 	identifier, secret, _ := strings.Cut(test.authorize(engine, registered), ":")
 	controller := test.controller(engine)
-	signedIn := test.request(setup.Credential(session))
+	signedIn := setup.SignedIn(session)
 	malformed := []string{"", "garbage", identifier + "%3A" + secret, identifier[1:] + ":" + secret}
 
 	unknown := test.interactionAnswers(controller, signedIn, []string{test.unknownInteraction(secret)})
