@@ -214,6 +214,9 @@ func (d *startupDiagnostics) wrap(err error) error {
 	if diagnostic == "" {
 		return err
 	}
+	if strings.Contains(diagnostic, deploymentLockedCode) {
+		return fmt.Errorf("%w: %w: %s", ErrDeploymentLocked, err, diagnostic)
+	}
 	return fmt.Errorf("%w: %s", err, diagnostic)
 }
 
