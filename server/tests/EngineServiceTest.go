@@ -16,7 +16,7 @@ func (test *EngineServiceTest) TestCallReturnsTheEngineResult() {
 	defer setup.Remove()
 
 	var readiness SystemReadiness
-	err := test.engine().Call("system.readiness", struct{}{}, &readiness)
+	err := setup.Engine().Call("system.readiness", struct{}{}, &readiness)
 
 	Assert.IsTrue(err == nil)
 	Assert.Equals("ok", readiness.Status)
@@ -26,7 +26,7 @@ func (test *EngineServiceTest) TestCallReturnsProtocolErrorsUnchanged() {
 	setup := SesameTestSetup{}.Provision()
 	defer setup.Remove()
 
-	err := test.engine().Call("system.unknown", struct{}{}, &SystemPing{})
+	err := setup.Engine().Call("system.unknown", struct{}{}, &SystemPing{})
 
 	var protocolError *sesame.ProtocolError
 	Assert.IsTrue(errors.As(err, &protocolError))
@@ -41,7 +41,7 @@ func (test *EngineServiceTest) TestCallAnswersBusyWhenAnotherEngineHoldsTheDeplo
 	setup.UseWait(300)
 
 	started := time.Now()
-	err := test.engine().Call("system.ping", struct{}{}, &SystemPing{})
+	err := setup.Engine().Call("system.ping", struct{}{}, &SystemPing{})
 	waited := time.Since(started)
 
 	var busy *host.EngineBusyError
@@ -55,7 +55,7 @@ func (test *EngineServiceTest) TestCallAnswersBusyWhenTheEngineCannotStartWithin
 	defer setup.Remove()
 	setup.UseWait(1)
 
-	err := test.engine().Call("system.ping", struct{}{}, &SystemPing{})
+	err := setup.Engine().Call("system.ping", struct{}{}, &SystemPing{})
 
 	var busy *host.EngineBusyError
 	Assert.IsTrue(errors.As(err, &busy))
@@ -67,7 +67,7 @@ func (test *EngineServiceTest) TestCallWaitsForTheDeploymentToBeReleased() {
 	holder := setup.Open()
 	go setup.CloseLater(holder, 200*time.Millisecond)
 
-	err := test.engine().Call("system.ping", struct{}{}, &SystemPing{})
+	err := setup.Engine().Call("system.ping", struct{}{}, &SystemPing{})
 
 	Assert.IsTrue(err == nil)
 }
@@ -75,7 +75,7 @@ func (test *EngineServiceTest) TestCallWaitsForTheDeploymentToBeReleased() {
 func (test *EngineServiceTest) TestCallUsesOneEnginePerInvocation() {
 	setup := SesameTestSetup{}.Provision()
 	defer setup.Remove()
-	engine := test.engine()
+	engine := setup.Engine()
 	firstErr := engine.Call("system.ping", struct{}{}, &SystemPing{})
 
 	var metrics SystemMetrics
@@ -91,7 +91,7 @@ func (test *EngineServiceTest) TestCallUsesTheDefaultWaitWhenNoneIsSet() {
 	defer setup.Remove()
 	setup.UseSettings(map[string]any{"binary": setup.binary, "deployment": setup.deployment})
 
-	err := test.engine().Call("system.ping", struct{}{}, &SystemPing{})
+	err := setup.Engine().Call("system.ping", struct{}{}, &SystemPing{})
 
 	Assert.IsTrue(err == nil)
 }
@@ -139,7 +139,7 @@ func (test *EngineServiceTest) TestCallRefusesWithoutTheApplicationSnapshot() {
 	setup := SesameTestSetup{}.Provision()
 	setup.Remove()
 
-	err := test.engine().Call("system.ping", struct{}{}, &SystemPing{})
+	err := setup.Engine().Call("system.ping", struct{}{}, &SystemPing{})
 
 	var notConfigured *host.EngineNotConfiguredError
 	Assert.IsTrue(errors.As(err, &notConfigured))
@@ -147,11 +147,7 @@ func (test *EngineServiceTest) TestCallRefusesWithoutTheApplicationSnapshot() {
 
 func (test *EngineServiceTest) refuses(setup *SesameTestSetup, settings map[string]any) bool {
 	setup.UseSettings(settings)
-	err := test.engine().Call("system.ping", struct{}{}, &SystemPing{})
+	err := setup.Engine().Call("system.ping", struct{}{}, &SystemPing{})
 	var notConfigured *host.EngineNotConfiguredError
 	return errors.As(err, &notConfigured)
-}
-
-func (test *EngineServiceTest) engine() *EngineService {
-	return &EngineService{engineSettingsService: &EngineSettingsService{}}
 }

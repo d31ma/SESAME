@@ -7,7 +7,6 @@ import (
 	"errors"
 	"math/big"
 	"net/http"
-	"net/http/httptest"
 	"time"
 
 	"github.com/d31ma/sesame/server/packages/host"
@@ -25,7 +24,7 @@ func (test *SamlControllerTest) TestProviderRegisterReturnsTheProvider() {
 	session := setup.SignIn("acme", true)
 	controller := test.controller()
 
-	provider, err := controller.PostProviderRegister(test.request(setup, session), test.registerRequest(session.TenantID, test.signer()))
+	provider, err := controller.PostProviderRegister(setup.SignedIn(session), test.registerRequest(session.TenantID, test.signer()))
 
 	Assert.IsTrue(err == nil)
 	Assert.Equals(session.TenantID, provider.TenantID)
@@ -41,7 +40,7 @@ func (test *SamlControllerTest) TestProviderRegisterRefusesAnotherTenant() {
 	other := setup.SignIn("globex", true)
 	controller := test.controller()
 
-	_, err := controller.PostProviderRegister(test.request(setup, session), test.registerRequest(other.TenantID, test.signer()))
+	_, err := controller.PostProviderRegister(setup.SignedIn(session), test.registerRequest(other.TenantID, test.signer()))
 
 	var mismatch *host.TenantMismatchError
 	Assert.IsTrue(errors.As(err, &mismatch))
@@ -53,9 +52,9 @@ func (test *SamlControllerTest) TestProviderRegisterRejectsAnAnonymousCaller() {
 	session := setup.SignIn("acme", true)
 	controller := test.controller()
 
-	_, err := controller.PostProviderRegister(test.anonymous(), test.registerRequest(session.TenantID, test.signer()))
+	_, err := controller.PostProviderRegister(setup.Anonymous(), test.registerRequest(session.TenantID, test.signer()))
 
-	Assert.Equals(http.StatusUnauthorized, test.status(err))
+	Assert.Equals(http.StatusUnauthorized, setup.Status(err))
 }
 
 func (test *SamlControllerTest) TestProviderRegisterRefusesAnUnreadableCertificate() {
@@ -66,9 +65,9 @@ func (test *SamlControllerTest) TestProviderRegisterRefusesAnUnreadableCertifica
 	request := test.registerRequest(session.TenantID, test.signer())
 	request.Certificates = []string{"not a certificate"}
 
-	_, err := controller.PostProviderRegister(test.request(setup, session), request)
+	_, err := controller.PostProviderRegister(setup.SignedIn(session), request)
 
-	Assert.Equals(http.StatusBadRequest, test.status(err))
+	Assert.Equals(http.StatusBadRequest, setup.Status(err))
 }
 
 func (test *SamlControllerTest) TestProviderGetReturnsTheProvider() {
@@ -78,7 +77,7 @@ func (test *SamlControllerTest) TestProviderGetReturnsTheProvider() {
 	controller := test.controller()
 	providerID := test.registered(controller, setup, session, test.signer())
 
-	provider, err := controller.PostProviderGet(test.request(setup, session), ProviderRequest{
+	provider, err := controller.PostProviderGet(setup.SignedIn(session), ProviderRequest{
 		TenantID:   session.TenantID,
 		ProviderID: providerID,
 	})
@@ -96,16 +95,16 @@ func (test *SamlControllerTest) TestProviderOfAnotherTenantIsNotFoundInTheCaller
 	controller := test.controller()
 	providerID := test.registered(controller, setup, other, test.signer())
 
-	_, err := controller.PostProviderDisable(test.request(setup, session), ProviderDisableRequest{
+	_, err := controller.PostProviderDisable(setup.SignedIn(session), ProviderDisableRequest{
 		TenantID:   session.TenantID,
 		ProviderID: providerID,
 	})
-	provider, getErr := controller.PostProviderGet(test.request(setup, other), ProviderRequest{
+	provider, getErr := controller.PostProviderGet(setup.SignedIn(other), ProviderRequest{
 		TenantID:   other.TenantID,
 		ProviderID: providerID,
 	})
 
-	Assert.Equals(http.StatusNotFound, test.status(err))
+	Assert.Equals(http.StatusNotFound, setup.Status(err))
 	Assert.IsTrue(getErr == nil)
 	Assert.IsTrue(!provider.Disabled)
 }
@@ -117,7 +116,7 @@ func (test *SamlControllerTest) TestProviderDisableStopsNewLogins() {
 	controller := test.controller()
 	providerID := test.registered(controller, setup, session, test.signer())
 
-	outcome, err := controller.PostProviderDisable(test.request(setup, session), ProviderDisableRequest{
+	outcome, err := controller.PostProviderDisable(setup.SignedIn(session), ProviderDisableRequest{
 		TenantID:   session.TenantID,
 		ProviderID: providerID,
 		Reason:     "certificate compromised",
@@ -127,7 +126,7 @@ func (test *SamlControllerTest) TestProviderDisableStopsNewLogins() {
 	Assert.IsTrue(err == nil)
 	Assert.IsTrue(outcome.Disabled)
 	Assert.Equals(providerID, outcome.ProviderID)
-	Assert.Equals(http.StatusNotFound, test.status(startErr))
+	Assert.Equals(http.StatusNotFound, setup.Status(startErr))
 }
 
 func (test *SamlControllerTest) controller() *SamlController {
@@ -143,16 +142,6 @@ func (test *SamlControllerTest) controller() *SamlController {
 			recentSignInService:  &RecentSignInService{},
 		},
 	}
-}
-
-func (test *SamlControllerTest) request(setup *SesameTestSetup, session sesame.IssuedSession) *http.Request {
-	request := test.anonymous()
-	request.Header.Set("Sesame-Session", setup.Credential(session))
-	return request
-}
-
-func (test *SamlControllerTest) anonymous() *http.Request {
-	return httptest.NewRequest(http.MethodPost, "/", nil)
 }
 
 func (test *SamlControllerTest) entityID() string {
@@ -185,8 +174,8 @@ func (test *SamlControllerTest) registered(
 	session sesame.IssuedSession,
 	signer *rsa.PrivateKey,
 ) string {
-	provider, err := controller.PostProviderRegister(test.request(setup, session), test.registerRequest(session.TenantID, signer))
-	test.check(err)
+	provider, err := controller.PostProviderRegister(setup.SignedIn(session), test.registerRequest(session.TenantID, signer))
+	setup.Check(err)
 	return provider.ProviderID
 }
 
@@ -196,7 +185,7 @@ func (test *SamlControllerTest) startRequest(tenantID string, providerID string)
 
 func (test *SamlControllerTest) signer() *rsa.PrivateKey {
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
-	test.check(err)
+	SesameTestSetup{}.Check(err)
 	return key
 }
 
@@ -208,18 +197,8 @@ func (test *SamlControllerTest) certificate(key *rsa.PrivateKey) string {
 		NotAfter:     time.Now().Add(time.Hour),
 	}
 	der, err := x509.CreateCertificate(rand.Reader, &template, &template, &key.PublicKey, key)
-	test.check(err)
+	SesameTestSetup{}.Check(err)
 	return string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der}))
-}
-
-func (test *SamlControllerTest) status(err error) int {
-	return (&SesameErrorHandler{}).Answer(err).StatusCode
-}
-
-func (test *SamlControllerTest) check(err error) {
-	if err != nil {
-		panic(err)
-	}
 }
 
 func (test *SamlControllerTest) provision() *SesameTestSetup {

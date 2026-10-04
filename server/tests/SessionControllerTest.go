@@ -1,5 +1,4 @@
 import (
-	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -24,7 +23,7 @@ func (test *SessionControllerTest) TestVerifyDescribesTheSessionWithoutItsSecret
 	Assert.Equals(issued.PrincipalID, session.PrincipalID)
 	Assert.Equals(issued.TenantID, session.TenantID)
 	Assert.Equals("active", session.Status)
-	Assert.IsTrue(!strings.Contains(test.json(session), issued.Secret))
+	Assert.IsTrue(!strings.Contains(setup.Encoded(session), issued.Secret))
 }
 
 func (test *SessionControllerTest) TestVerifyAnswersAWrongSecretLikeAnUnknownSession() {
@@ -37,7 +36,7 @@ func (test *SessionControllerTest) TestVerifyAnswersAWrongSecretLikeAnUnknownSes
 	_, wrongErr := controller.PostVerify(SessionCredential{SessionID: issued.SessionID, SessionSecret: wrong})
 	_, unknownErr := controller.PostVerify(SessionCredential{SessionID: "ses_00000000000000000000000000000000", SessionSecret: wrong})
 
-	Assert.Equals(http.StatusNotFound, test.status(wrongErr))
+	Assert.Equals(http.StatusNotFound, setup.Status(wrongErr))
 	Assert.Equals(test.answer(unknownErr), test.answer(wrongErr))
 	Assert.IsTrue(!strings.Contains(test.answer(wrongErr), wrong))
 }
@@ -50,7 +49,7 @@ func (test *SessionControllerTest) TestVerifyRefusesARevokedSession() {
 
 	_, err := test.controller().PostVerify(SessionCredential{SessionID: issued.SessionID, SessionSecret: issued.Secret})
 
-	Assert.Equals(http.StatusUnauthorized, test.status(err))
+	Assert.Equals(http.StatusUnauthorized, setup.Status(err))
 	Assert.Equals(`{"code":"session_inactive"}`, test.answer(err))
 }
 
@@ -61,7 +60,7 @@ func (test *SessionControllerTest) TestVerifyRefusesAMalformedSessionID() {
 
 	_, err := test.controller().PostVerify(SessionCredential{SessionID: "x", SessionSecret: secret})
 
-	Assert.Equals(http.StatusBadRequest, test.status(err))
+	Assert.Equals(http.StatusBadRequest, setup.Status(err))
 	Assert.IsTrue(!strings.Contains(test.answer(err), secret))
 }
 
@@ -74,14 +73,14 @@ func (test *SessionControllerTest) TestRevokeEndsOnlyTheCallersSession() {
 	revoking := test.controller()
 	checking := test.controller()
 
-	revocation, err := revoking.PostRevoke(test.request(setup.Credential(issued)), SessionRevokeReason{Reason: "signed_out"})
+	revocation, err := revoking.PostRevoke(setup.SignedIn(issued), SessionRevokeReason{Reason: "signed_out"})
 	test.finish(revoking)
 	_, revokedErr := checking.PostVerify(SessionCredential{SessionID: issued.SessionID, SessionSecret: issued.Secret})
 	still, otherErr := checking.PostVerify(SessionCredential{SessionID: other.SessionID, SessionSecret: other.Secret})
 
 	Assert.IsTrue(err == nil)
 	Assert.IsTrue(revocation.Revoked)
-	Assert.Equals(http.StatusUnauthorized, test.status(revokedErr))
+	Assert.Equals(http.StatusUnauthorized, setup.Status(revokedErr))
 	Assert.IsTrue(otherErr == nil)
 	Assert.Equals("active", still.Status)
 }
@@ -92,7 +91,7 @@ func (test *SessionControllerTest) TestRevokeRefusesAnAnonymousCaller() {
 
 	revocation, err := test.controller().PostRevoke(httptest.NewRequest(http.MethodPost, "/", nil), SessionRevokeReason{})
 
-	Assert.Equals(http.StatusUnauthorized, test.status(err))
+	Assert.Equals(http.StatusUnauthorized, setup.Status(err))
 	Assert.Equals(`{"code":"session_rejected"}`, test.answer(err))
 	Assert.IsTrue(!revocation.Revoked)
 }
@@ -103,9 +102,9 @@ func (test *SessionControllerTest) TestRevokeRefusesAnAlreadyRevokedCredential()
 	issued := setup.SignIn("acme", false)
 	setup.Revoke(issued)
 
-	_, err := test.controller().PostRevoke(test.request(setup.Credential(issued)), SessionRevokeReason{})
+	_, err := test.controller().PostRevoke(setup.SignedIn(issued), SessionRevokeReason{})
 
-	Assert.Equals(http.StatusUnauthorized, test.status(err))
+	Assert.Equals(http.StatusUnauthorized, setup.Status(err))
 }
 
 func (test *SessionControllerTest) TestRevokeByIDEndsASessionOfTheCallersTenant() {
@@ -116,7 +115,7 @@ func (test *SessionControllerTest) TestRevokeByIDEndsASessionOfTheCallersTenant(
 	revoking := test.controller()
 	checking := test.controller()
 
-	revocation, err := revoking.PostRevokeByID(test.request(setup.Credential(administrator)), SessionRevokeRequest{SessionID: member.SessionID, Reason: "compromised"})
+	revocation, err := revoking.PostRevokeByID(setup.SignedIn(administrator), SessionRevokeRequest{SessionID: member.SessionID, Reason: "compromised"})
 	test.finish(revoking)
 	_, revokedErr := checking.PostVerify(SessionCredential{SessionID: member.SessionID, SessionSecret: member.Secret})
 
@@ -131,9 +130,9 @@ func (test *SessionControllerTest) TestRevokeByIDDoesNotNeedARecentSignIn() {
 	administrator := setup.SignIn("acme", true)
 	member := setup.SignInMember("acme", "member")
 	engine := &EngineService{engineSettingsService: &EngineSettingsService{}}
-	revoking := &SessionController{engineService: engine, tenantCallService: test.tenantCallsAfter(engine, 11*time.Minute)}
+	revoking := &SessionController{engineService: engine, tenantCallService: setup.TenantCallsAfter(engine, 11*time.Minute)}
 
-	revocation, err := revoking.PostRevokeByID(test.request(setup.Credential(administrator)), SessionRevokeRequest{SessionID: member.SessionID, Reason: "compromised"})
+	revocation, err := revoking.PostRevokeByID(setup.SignedIn(administrator), SessionRevokeRequest{SessionID: member.SessionID, Reason: "compromised"})
 
 	Assert.IsTrue(err == nil)
 	Assert.IsTrue(revocation.Revoked)
@@ -147,11 +146,11 @@ func (test *SessionControllerTest) TestRevokeByIDRefusesASessionOfAnotherTenant(
 	revoking := test.controller()
 	checking := test.controller()
 
-	revocation, err := revoking.PostRevokeByID(test.request(setup.Credential(administrator)), SessionRevokeRequest{SessionID: other.SessionID})
+	revocation, err := revoking.PostRevokeByID(setup.SignedIn(administrator), SessionRevokeRequest{SessionID: other.SessionID})
 	test.finish(revoking)
 	still, otherErr := checking.PostVerify(SessionCredential{SessionID: other.SessionID, SessionSecret: other.Secret})
 
-	Assert.Equals(http.StatusForbidden, test.status(err))
+	Assert.Equals(http.StatusForbidden, setup.Status(err))
 	Assert.Equals(`{"code":"actor_tenant_mismatch"}`, test.answer(err))
 	Assert.IsTrue(!revocation.Revoked)
 	Assert.IsTrue(otherErr == nil)
@@ -165,7 +164,7 @@ func (test *SessionControllerTest) TestRevokeByIDAnswersARevokedSessionOfAnother
 	other := setup.SignInMember("globex", "member")
 	setup.Revoke(other)
 
-	revocation, err := test.controller().PostRevokeByID(test.request(setup.Credential(administrator)), SessionRevokeRequest{SessionID: other.SessionID})
+	revocation, err := test.controller().PostRevokeByID(setup.SignedIn(administrator), SessionRevokeRequest{SessionID: other.SessionID})
 
 	Assert.Equals(`{"code":"actor_tenant_mismatch"}`, test.answer(err))
 	Assert.IsTrue(!revocation.Revoked)
@@ -176,9 +175,9 @@ func (test *SessionControllerTest) TestRevokeByIDAnswersNotFoundForAnUnknownSess
 	defer setup.Remove()
 	administrator := setup.SignIn("acme", true)
 
-	_, err := test.controller().PostRevokeByID(test.request(setup.Credential(administrator)), SessionRevokeRequest{SessionID: "ses_00000000000000000000000000000000"})
+	_, err := test.controller().PostRevokeByID(setup.SignedIn(administrator), SessionRevokeRequest{SessionID: "ses_00000000000000000000000000000000"})
 
-	Assert.Equals(http.StatusNotFound, test.status(err))
+	Assert.Equals(http.StatusNotFound, setup.Status(err))
 }
 
 func (test *SessionControllerTest) TestRevokeByIDRefusesAnAnonymousCaller() {
@@ -192,24 +191,9 @@ func (test *SessionControllerTest) TestRevokeByIDRefusesAnAnonymousCaller() {
 	Assert.IsTrue(!revocation.Revoked)
 }
 
-func (test *SessionControllerTest) request(credential string) *http.Request {
-	request := httptest.NewRequest(http.MethodPost, "/", nil)
-	request.Header.Set("Sesame-Session", credential)
-	return request
-}
-
-func (test *SessionControllerTest) status(err error) int {
-	return (&SesameErrorHandler{}).Answer(err).StatusCode
-}
-
 func (test *SessionControllerTest) answer(err error) string {
 	body, _ := io.ReadAll((&SesameErrorHandler{}).Answer(err).Body)
 	return string(body)
-}
-
-func (test *SessionControllerTest) json(value any) string {
-	encoded, _ := json.Marshal(value)
-	return string(encoded)
 }
 
 func (test *SessionControllerTest) finish(controller *SessionController) {
@@ -220,18 +204,5 @@ func (test *SessionControllerTest) finish(controller *SessionController) {
 
 func (test *SessionControllerTest) controller() *SessionController {
 	engine := &EngineService{engineSettingsService: &EngineSettingsService{}}
-	return &SessionController{engineService: engine, tenantCallService: test.tenantCalls(engine)}
-}
-
-func (test *SessionControllerTest) tenantCalls(engine *EngineService) *TenantCallService {
-	return test.tenantCallsAfter(engine, 0)
-}
-
-func (test *SessionControllerTest) tenantCallsAfter(engine *EngineService, elapsed time.Duration) *TenantCallService {
-	return &TenantCallService{
-		callerService:        &CallerService{engineService: engine},
-		engineService:        engine,
-		administratorService: &AdministratorService{engineService: engine},
-		recentSignInService:  &RecentSignInService{clockShift: elapsed},
-	}
+	return &SessionController{engineService: engine, tenantCallService: SesameTestSetup{}.TenantCalls(engine)}
 }

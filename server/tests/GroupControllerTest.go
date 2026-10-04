@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/d31ma/sesame/server/packages/host"
-	"github.com/d31ma/sesame/server/packages/sesame"
 )
 
 // @Test(SesameTestSetup, {"partition":"tests"})
@@ -18,7 +17,7 @@ func (test *GroupControllerTest) TestCreateDefinesAGroupInTheCallersTenant() {
 	defer setup.Remove()
 	administrator := setup.SignIn("acme", true)
 
-	group, err := test.controller().PostCreate(test.request(setup.Credential(administrator)), test.creation(administrator.TenantID))
+	group, err := test.controller().PostCreate(setup.SignedIn(administrator), test.creation(administrator.TenantID))
 
 	Assert.IsTrue(err == nil)
 	Assert.IsTrue(group.GroupID != "")
@@ -32,7 +31,7 @@ func (test *GroupControllerTest) TestCreateRefusesAnotherTenant() {
 	administrator := setup.SignIn("acme", true)
 	other := setup.SignIn("globex", true)
 
-	group, err := test.controller().PostCreate(test.request(setup.Credential(administrator)), test.creation(other.TenantID))
+	group, err := test.controller().PostCreate(setup.SignedIn(administrator), test.creation(other.TenantID))
 
 	var mismatch *host.TenantMismatchError
 	Assert.IsTrue(errors.As(err, &mismatch))
@@ -44,13 +43,13 @@ func (test *GroupControllerTest) TestCreateRefusesATakenName() {
 	defer setup.Remove()
 	administrator := setup.SignIn("acme", true)
 	controller := test.controller()
-	request := test.request(setup.Credential(administrator))
+	request := setup.SignedIn(administrator)
 	_, first := controller.PostCreate(request, test.creation(administrator.TenantID))
 
 	_, err := controller.PostCreate(request, test.creation(administrator.TenantID))
 
 	Assert.IsTrue(first == nil)
-	Assert.Equals("group_exists", test.code(err))
+	Assert.Equals("group_exists", setup.ProtocolCode(err))
 }
 
 func (test *GroupControllerTest) TestMemberAddAndRemoveChangeMembership() {
@@ -59,7 +58,7 @@ func (test *GroupControllerTest) TestMemberAddAndRemoveChangeMembership() {
 	administrator := setup.SignIn("acme", true)
 	member := setup.SignInMember("acme", "member")
 	controller := test.controller()
-	request := test.request(setup.Credential(administrator))
+	request := setup.SignedIn(administrator)
 	group, _ := controller.PostCreate(request, test.creation(administrator.TenantID))
 	membership := GroupMemberRequest{GroupID: group.GroupID, PrincipalID: member.PrincipalID}
 
@@ -71,7 +70,7 @@ func (test *GroupControllerTest) TestMemberAddAndRemoveChangeMembership() {
 	Assert.IsTrue(added.Member)
 	Assert.IsTrue(removeFailure == nil)
 	Assert.IsTrue(!removed.Member)
-	Assert.Equals("group_member_not_found", test.code(repeated))
+	Assert.Equals("group_member_not_found", setup.ProtocolCode(repeated))
 }
 
 func (test *GroupControllerTest) TestMemberAddNeedsARecentSignInAndMemberRemoveDoesNot() {
@@ -80,10 +79,10 @@ func (test *GroupControllerTest) TestMemberAddNeedsARecentSignInAndMemberRemoveD
 	administrator := setup.SignIn("acme", true)
 	member := setup.SignInMember("acme", "member")
 	other := setup.SignInMember("acme", "other")
-	engine := test.engine()
+	engine := setup.Engine()
 	fresh := test.controllerWith(engine, 0)
 	stale := test.controllerWith(engine, 11*time.Minute)
-	request := test.request(setup.Credential(administrator))
+	request := setup.SignedIn(administrator)
 	group, _ := fresh.PostCreate(request, test.creation(administrator.TenantID))
 	_, _ = fresh.PostMemberAdd(request, GroupMemberRequest{GroupID: group.GroupID, PrincipalID: other.PrincipalID})
 
@@ -91,11 +90,11 @@ func (test *GroupControllerTest) TestMemberAddNeedsARecentSignInAndMemberRemoveD
 	removed, removeErr := stale.PostMemberRemove(request, GroupMemberRequest{GroupID: group.GroupID, PrincipalID: other.PrincipalID})
 	_, notMember := fresh.PostMemberRemove(request, GroupMemberRequest{GroupID: group.GroupID, PrincipalID: member.PrincipalID})
 
-	Assert.IsTrue(test.reauthenticationRequired(err))
+	Assert.IsTrue(setup.ReauthenticationRequired(err))
 	Assert.IsTrue(!added.Member)
 	Assert.IsTrue(removeErr == nil)
 	Assert.IsTrue(!removed.Member)
-	Assert.Equals("group_member_not_found", test.code(notMember))
+	Assert.Equals("group_member_not_found", setup.ProtocolCode(notMember))
 }
 
 func (test *GroupControllerTest) TestMemberAddRefusesARepeatedMember() {
@@ -104,7 +103,7 @@ func (test *GroupControllerTest) TestMemberAddRefusesARepeatedMember() {
 	administrator := setup.SignIn("acme", true)
 	member := setup.SignInMember("acme", "member")
 	controller := test.controller()
-	request := test.request(setup.Credential(administrator))
+	request := setup.SignedIn(administrator)
 	group, _ := controller.PostCreate(request, test.creation(administrator.TenantID))
 	membership := GroupMemberRequest{GroupID: group.GroupID, PrincipalID: member.PrincipalID}
 	_, first := controller.PostMemberAdd(request, membership)
@@ -112,7 +111,7 @@ func (test *GroupControllerTest) TestMemberAddRefusesARepeatedMember() {
 	_, err := controller.PostMemberAdd(request, membership)
 
 	Assert.IsTrue(first == nil)
-	Assert.Equals("group_member_exists", test.code(err))
+	Assert.Equals("group_member_exists", setup.ProtocolCode(err))
 }
 
 func (test *GroupControllerTest) TestMemberAddRefusesAPrincipalOfAnotherTenant() {
@@ -121,7 +120,7 @@ func (test *GroupControllerTest) TestMemberAddRefusesAPrincipalOfAnotherTenant()
 	administrator := setup.SignIn("acme", true)
 	other := setup.SignIn("globex", true)
 	controller := test.controller()
-	request := test.request(setup.Credential(administrator))
+	request := setup.SignedIn(administrator)
 	group, _ := controller.PostCreate(request, test.creation(administrator.TenantID))
 
 	membership, err := controller.PostMemberAdd(request, GroupMemberRequest{GroupID: group.GroupID, PrincipalID: other.PrincipalID})
@@ -138,11 +137,11 @@ func (test *GroupControllerTest) TestMemberAddRefusesAGroupOfAnotherTenant() {
 	other := setup.SignIn("globex", true)
 	member := setup.SignInMember("acme", "member")
 	controller := test.controller()
-	foreign, _ := controller.PostCreate(test.request(setup.Credential(other)), test.creation(other.TenantID))
+	foreign, _ := controller.PostCreate(setup.SignedIn(other), test.creation(other.TenantID))
 
-	membership, err := controller.PostMemberAdd(test.request(setup.Credential(administrator)), GroupMemberRequest{GroupID: foreign.GroupID, PrincipalID: member.PrincipalID})
+	membership, err := controller.PostMemberAdd(setup.SignedIn(administrator), GroupMemberRequest{GroupID: foreign.GroupID, PrincipalID: member.PrincipalID})
 
-	Assert.Equals("actor_tenant_mismatch", test.code(err))
+	Assert.Equals("actor_tenant_mismatch", setup.ProtocolCode(err))
 	Assert.IsTrue(!membership.Member)
 }
 
@@ -152,17 +151,17 @@ func (test *GroupControllerTest) TestMemberRemoveRefusesAPrincipalOfAnotherTenan
 	administrator := setup.SignIn("acme", true)
 	other := setup.SignIn("globex", true)
 	controller := test.controller()
-	foreign, _ := controller.PostCreate(test.request(setup.Credential(other)), test.creation(other.TenantID))
+	foreign, _ := controller.PostCreate(setup.SignedIn(other), test.creation(other.TenantID))
 	membership := GroupMemberRequest{GroupID: foreign.GroupID, PrincipalID: other.PrincipalID}
-	_, joined := controller.PostMemberAdd(test.request(setup.Credential(other)), membership)
+	_, joined := controller.PostMemberAdd(setup.SignedIn(other), membership)
 
-	_, err := controller.PostMemberRemove(test.request(setup.Credential(administrator)), membership)
-	_, stillMember := controller.PostMemberAdd(test.request(setup.Credential(other)), membership)
+	_, err := controller.PostMemberRemove(setup.SignedIn(administrator), membership)
+	_, stillMember := controller.PostMemberAdd(setup.SignedIn(other), membership)
 
 	var mismatch *host.TenantMismatchError
 	Assert.IsTrue(joined == nil)
 	Assert.IsTrue(errors.As(err, &mismatch))
-	Assert.Equals("group_member_exists", test.code(stillMember))
+	Assert.Equals("group_member_exists", setup.ProtocolCode(stillMember))
 }
 
 func (test *GroupControllerTest) TestMemberAddRejectsAnAnonymousCaller() {
@@ -180,48 +179,14 @@ func (test *GroupControllerTest) creation(tenantID string) GroupCreateRequest {
 	return GroupCreateRequest{TenantID: tenantID, Name: "editors"}
 }
 
-func (test *GroupControllerTest) code(err error) string {
-	protocolError := &sesame.ProtocolError{}
-	errors.As(err, &protocolError)
-	return protocolError.Code
-}
-
-func (test *GroupControllerTest) request(credential string) *http.Request {
-	request := httptest.NewRequest(http.MethodPost, "/", nil)
-	request.Header.Set("Sesame-Session", credential)
-	return request
-}
-
 func (test *GroupControllerTest) controller() *GroupController {
-	return test.controllerWith(test.engine(), 0)
-}
-
-func (test *GroupControllerTest) engine() *EngineService {
-	return &EngineService{engineSettingsService: &EngineSettingsService{}}
+	return test.controllerWith(SesameTestSetup{}.Engine(), 0)
 }
 
 func (test *GroupControllerTest) controllerWith(engine *EngineService, elapsed time.Duration) *GroupController {
-	calls := test.tenantCallsAfter(engine, elapsed)
+	calls := SesameTestSetup{}.TenantCallsAfter(engine, elapsed)
 	return &GroupController{
 		tenantCallService:      calls,
 		principalTenantService: &PrincipalTenantService{tenantCallService: calls},
 	}
-}
-
-func (test *GroupControllerTest) tenantCalls(engine *EngineService) *TenantCallService {
-	return test.tenantCallsAfter(engine, 0)
-}
-
-func (test *GroupControllerTest) tenantCallsAfter(engine *EngineService, elapsed time.Duration) *TenantCallService {
-	return &TenantCallService{
-		callerService:        &CallerService{engineService: engine},
-		engineService:        engine,
-		administratorService: &AdministratorService{engineService: engine},
-		recentSignInService:  &RecentSignInService{clockShift: elapsed},
-	}
-}
-
-func (test *GroupControllerTest) reauthenticationRequired(err error) bool {
-	var required *host.ReauthenticationRequiredError
-	return errors.As(err, &required)
 }

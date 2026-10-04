@@ -11,7 +11,6 @@ import (
 	"io"
 	"math/big"
 	"net/http"
-	"net/http/httptest"
 	"net/url"
 	"strings"
 	"time"
@@ -34,7 +33,7 @@ func (test *SamlLoginTest) TestLoginStartAnswersOnlyWhatABrowserNeeds() {
 	login, err := controller.PostLoginStart(test.startRequest(session.TenantID, providerID))
 
 	Assert.IsTrue(err == nil)
-	Assert.Equals(5, len(test.fields(login)))
+	Assert.Equals(5, len(setup.Fields(login)))
 	Assert.Equals(test.signOnURL(), login.Destination)
 	Assert.IsTrue(strings.HasPrefix(login.RedirectURL, test.signOnURL()+"?"))
 	Assert.Equals(login.LoginID, test.relayState(login))
@@ -72,7 +71,7 @@ func (test *SamlLoginTest) TestLoginCompleteRefusesAReplayedResponse() {
 	replayed, err := controller.PostLoginComplete(request)
 
 	Assert.IsTrue(firstErr == nil)
-	Assert.Equals(http.StatusNotFound, test.status(err))
+	Assert.Equals(http.StatusNotFound, setup.Status(err))
 	Assert.Equals("", replayed.Session.SessionSecret)
 }
 
@@ -90,7 +89,7 @@ func (test *SamlLoginTest) TestLoginCompleteRefusesAnAssertionReplayedIntoANewLo
 	_, err := controller.PostLoginComplete(test.completeRequest(session.TenantID, second, signer, test.assertion(second)))
 
 	Assert.IsTrue(firstErr == nil)
-	Assert.Equals(http.StatusBadRequest, test.status(err))
+	Assert.Equals(http.StatusBadRequest, setup.Status(err))
 	Assert.Equals("saml_assertion_rejected", test.answeredCode(err))
 }
 
@@ -106,7 +105,7 @@ func (test *SamlLoginTest) TestLoginCompleteRejectsAnAssertionForAnotherAudience
 
 	_, err := controller.PostLoginComplete(test.completeRequest(session.TenantID, login, signer, assertion))
 
-	Assert.Equals(http.StatusBadRequest, test.status(err))
+	Assert.Equals(http.StatusBadRequest, setup.Status(err))
 	Assert.Equals("saml_assertion_rejected", test.answeredCode(err))
 }
 
@@ -138,7 +137,7 @@ func (test *SamlLoginTest) TestLoginCompleteSpendsTheLoginOnARejection() {
 	_, err := controller.PostLoginComplete(test.completeRequest(session.TenantID, login, signer, test.assertion(login)))
 
 	Assert.Equals("saml_assertion_rejected", test.answeredCode(forgedErr))
-	Assert.Equals(http.StatusNotFound, test.status(err))
+	Assert.Equals(http.StatusNotFound, setup.Status(err))
 }
 
 func (test *SamlLoginTest) TestLoginCompleteDoesNotFindAnotherTenantsLogin() {
@@ -153,7 +152,7 @@ func (test *SamlLoginTest) TestLoginCompleteDoesNotFindAnotherTenantsLogin() {
 
 	_, err := controller.PostLoginComplete(test.completeRequest(other.TenantID, login, signer, test.assertion(login)))
 
-	Assert.Equals(http.StatusNotFound, test.status(err))
+	Assert.Equals(http.StatusNotFound, setup.Status(err))
 	Assert.Equals("saml_login_not_found", test.answeredCode(err))
 }
 
@@ -170,16 +169,6 @@ func (test *SamlLoginTest) controller() *SamlController {
 			recentSignInService:  &RecentSignInService{},
 		},
 	}
-}
-
-func (test *SamlLoginTest) request(setup *SesameTestSetup, session sesame.IssuedSession) *http.Request {
-	request := test.anonymous()
-	request.Header.Set("Sesame-Session", setup.Credential(session))
-	return request
-}
-
-func (test *SamlLoginTest) anonymous() *http.Request {
-	return httptest.NewRequest(http.MethodPost, "/", nil)
 }
 
 func (test *SamlLoginTest) entityID() string {
@@ -216,8 +205,8 @@ func (test *SamlLoginTest) registered(
 	session sesame.IssuedSession,
 	signer *rsa.PrivateKey,
 ) string {
-	provider, err := controller.PostProviderRegister(test.request(setup, session), test.registerRequest(session.TenantID, signer))
-	test.check(err)
+	provider, err := controller.PostProviderRegister(setup.SignedIn(session), test.registerRequest(session.TenantID, signer))
+	setup.Check(err)
 	return provider.ProviderID
 }
 
@@ -240,7 +229,7 @@ func (test *SamlLoginTest) completeRequest(
 
 func (test *SamlLoginTest) signer() *rsa.PrivateKey {
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
-	test.check(err)
+	SesameTestSetup{}.Check(err)
 	return key
 }
 
@@ -252,7 +241,7 @@ func (test *SamlLoginTest) certificate(key *rsa.PrivateKey) string {
 		NotAfter:     time.Now().Add(time.Hour),
 	}
 	der, err := x509.CreateCertificate(rand.Reader, &template, &template, &key.PublicKey, key)
-	test.check(err)
+	SesameTestSetup{}.Check(err)
 	return string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der}))
 }
 
@@ -293,7 +282,7 @@ func (test *SamlLoginTest) signed(signer *rsa.PrivateKey, assertion string) stri
 		`</ds:Reference></ds:SignedInfo>`
 	signedInfoDigest := sha256.Sum256([]byte(signedInfo))
 	signature, err := rsa.SignPKCS1v15(rand.Reader, signer, crypto.SHA256, signedInfoDigest[:])
-	test.check(err)
+	SesameTestSetup{}.Check(err)
 	element := `<ds:Signature xmlns:ds="http://www.w3.org/2000/09/xmldsig#">` + signedInfo +
 		`<ds:SignatureValue>` + base64.StdEncoding.EncodeToString(signature) + `</ds:SignatureValue></ds:Signature>`
 	return strings.Replace(assertion, `</saml:Issuer>`, `</saml:Issuer>`+element, 1)
@@ -307,34 +296,16 @@ func (test *SamlLoginTest) requestID(login SamlLogin) string {
 
 func (test *SamlLoginTest) relayState(login SamlLogin) string {
 	parsed, err := url.Parse(login.RedirectURL)
-	test.check(err)
+	SesameTestSetup{}.Check(err)
 	return parsed.Query().Get("RelayState")
-}
-
-func (test *SamlLoginTest) fields(value any) map[string]any {
-	encoded, err := json.Marshal(value)
-	test.check(err)
-	fields := map[string]any{}
-	test.check(json.Unmarshal(encoded, &fields))
-	return fields
-}
-
-func (test *SamlLoginTest) status(err error) int {
-	return (&SesameErrorHandler{}).Answer(err).StatusCode
 }
 
 func (test *SamlLoginTest) answeredCode(err error) string {
 	body, readErr := io.ReadAll((&SesameErrorHandler{}).Answer(err).Body)
-	test.check(readErr)
+	SesameTestSetup{}.Check(readErr)
 	problem := Problem{}
-	test.check(json.Unmarshal(body, &problem))
+	SesameTestSetup{}.Check(json.Unmarshal(body, &problem))
 	return problem.Code
-}
-
-func (test *SamlLoginTest) check(err error) {
-	if err != nil {
-		panic(err)
-	}
 }
 
 func (test *SamlLoginTest) provision() *SesameTestSetup {

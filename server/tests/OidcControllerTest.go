@@ -30,10 +30,10 @@ func (test *OidcControllerTest) TestInteractionCompleteIssuesACodeForTheCallersS
 	setup := SesameTestSetup{}.Provision()
 	defer setup.Remove()
 	session := setup.SignIn("acme", true)
-	engine := test.engine()
+	engine := setup.Engine()
 	registered := test.register(engine, session.TenantID, "first_party")
 	cookie := test.authorize(engine, registered)
-	signedIn := test.request(setup.Credential(session))
+	signedIn := setup.SignedIn(session)
 
 	interaction, getErr := test.controller(engine).PostInteractionGet(signedIn, cookie)
 	completed, err := test.controller(engine).PostInteractionComplete(signedIn, cookie)
@@ -47,17 +47,17 @@ func (test *OidcControllerTest) TestInteractionCompleteIssuesACodeForTheCallersS
 	Assert.Equals("https://rp.example/callback", completed.Redirect)
 	Assert.Equals("state-value", completed.State)
 	Assert.Equals("", replayed.Code)
-	Assert.Equals("interaction_closed", test.protocolCode(replayErr))
+	Assert.Equals("interaction_closed", setup.ProtocolCode(replayErr))
 }
 
 func (test *OidcControllerTest) TestAThirdPartyClientNeedsTheCallersConsent() {
 	setup := SesameTestSetup{}.Provision()
 	defer setup.Remove()
 	session := setup.SignInMember("acme", "member")
-	engine := test.engine()
+	engine := setup.Engine()
 	registered := test.register(engine, session.TenantID, "third_party")
 	cookie := test.authorize(engine, registered)
-	signedIn := test.request(setup.Credential(session))
+	signedIn := setup.SignedIn(session)
 	controller := test.controller(engine)
 
 	_, refusedErr := controller.PostInteractionComplete(signedIn, cookie)
@@ -66,7 +66,7 @@ func (test *OidcControllerTest) TestAThirdPartyClientNeedsTheCallersConsent() {
 	stored, storedErr := controller.PostConsentGet(signedIn, OidcClientReference{ClientID: registered.Client.ID})
 	withdrawn, withdrawErr := controller.PostConsentWithdraw(signedIn, OidcClientReference{ClientID: registered.Client.ID})
 
-	Assert.Equals("consent_required", test.protocolCode(refusedErr))
+	Assert.Equals("consent_required", setup.ProtocolCode(refusedErr))
 	Assert.IsTrue(grantErr == nil)
 	Assert.Equals(session.PrincipalID, consent.PrincipalID)
 	Assert.IsTrue(completeErr == nil)
@@ -83,19 +83,19 @@ func (test *OidcControllerTest) TestConsentActsOnlyForTheCallersOwnPrincipal() {
 	defer setup.Remove()
 	owner := setup.SignInMember("acme", "owner")
 	other := setup.SignInMember("acme", "other")
-	engine := test.engine()
+	engine := setup.Engine()
 	registered := test.register(engine, owner.TenantID, "third_party")
 	controller := test.controller(engine)
-	_, grantErr := controller.PostConsentGrant(test.request(setup.Credential(owner)),
+	_, grantErr := controller.PostConsentGrant(setup.SignedIn(owner),
 		OidcConsentGrantRequest{ClientID: registered.Client.ID, Scopes: []string{"openid"}})
 
-	_, otherErr := controller.PostConsentGet(test.request(setup.Credential(other)), OidcClientReference{ClientID: registered.Client.ID})
-	_, withdrawErr := controller.PostConsentWithdraw(test.request(setup.Credential(other)), OidcClientReference{ClientID: registered.Client.ID})
-	kept, keptErr := controller.PostConsentGet(test.request(setup.Credential(owner)), OidcClientReference{ClientID: registered.Client.ID})
+	_, otherErr := controller.PostConsentGet(setup.SignedIn(other), OidcClientReference{ClientID: registered.Client.ID})
+	_, withdrawErr := controller.PostConsentWithdraw(setup.SignedIn(other), OidcClientReference{ClientID: registered.Client.ID})
+	kept, keptErr := controller.PostConsentGet(setup.SignedIn(owner), OidcClientReference{ClientID: registered.Client.ID})
 
 	Assert.IsTrue(grantErr == nil)
-	Assert.Equals("consent_not_found", test.protocolCode(otherErr))
-	Assert.Equals("consent_not_found", test.protocolCode(withdrawErr))
+	Assert.Equals("consent_not_found", setup.ProtocolCode(otherErr))
+	Assert.Equals("consent_not_found", setup.ProtocolCode(withdrawErr))
 	Assert.IsTrue(keptErr == nil)
 	Assert.IsTrue(!kept.Withdrawn)
 	Assert.Equals(owner.PrincipalID, kept.PrincipalID)
@@ -106,14 +106,14 @@ func (test *OidcControllerTest) TestAnotherTenantCannotUseTheInteraction() {
 	defer setup.Remove()
 	session := setup.SignIn("acme", true)
 	intruder := setup.SignIn("globex", true)
-	engine := test.engine()
+	engine := setup.Engine()
 	registered := test.register(engine, session.TenantID, "first_party")
 	cookie := test.authorize(engine, registered)
 	controller := test.controller(engine)
 
-	_, getErr := controller.PostInteractionGet(test.request(setup.Credential(intruder)), cookie)
-	stolen, completeErr := controller.PostInteractionComplete(test.request(setup.Credential(intruder)), cookie)
-	completed, ownerErr := controller.PostInteractionComplete(test.request(setup.Credential(session)), cookie)
+	_, getErr := controller.PostInteractionGet(setup.SignedIn(intruder), cookie)
+	stolen, completeErr := controller.PostInteractionComplete(setup.SignedIn(intruder), cookie)
+	completed, ownerErr := controller.PostInteractionComplete(setup.SignedIn(session), cookie)
 
 	var mismatch *host.TenantMismatchError
 	Assert.IsTrue(errors.As(getErr, &mismatch))
@@ -126,7 +126,7 @@ func (test *OidcControllerTest) TestAnotherTenantCannotUseTheInteraction() {
 func (test *OidcControllerTest) TestSignedInRoutesRejectAnAnonymousCaller() {
 	setup := SesameTestSetup{}.Provision()
 	defer setup.Remove()
-	engine := test.engine()
+	engine := setup.Engine()
 	controller := test.controller(engine)
 	anonymous := httptest.NewRequest(http.MethodPost, "/", nil)
 
@@ -135,20 +135,20 @@ func (test *OidcControllerTest) TestSignedInRoutesRejectAnAnonymousCaller() {
 	_, consentErr := controller.PostConsentGrant(anonymous, OidcConsentGrantRequest{ClientID: "cli_1", Scopes: []string{"openid"}})
 	_, deviceErr := controller.PostDeviceApprove(anonymous, OidcUserCodeRequest{UserCode: "ABCD-EFGH"})
 
-	Assert.IsTrue(test.rejected(completeErr))
-	Assert.IsTrue(test.rejected(getErr))
-	Assert.IsTrue(test.rejected(consentErr))
-	Assert.IsTrue(test.rejected(deviceErr))
+	Assert.IsTrue(setup.SessionRejected(completeErr))
+	Assert.IsTrue(setup.SessionRejected(getErr))
+	Assert.IsTrue(setup.SessionRejected(consentErr))
+	Assert.IsTrue(setup.SessionRejected(deviceErr))
 }
 
 func (test *OidcControllerTest) TestAForgedInteractionCookieIsRefused() {
 	setup := SesameTestSetup{}.Provision()
 	defer setup.Remove()
 	session := setup.SignIn("acme", true)
-	engine := test.engine()
+	engine := setup.Engine()
 	registered := test.register(engine, session.TenantID, "first_party")
 	identifier, _, _ := strings.Cut(test.authorize(engine, registered), ":")
-	signedIn := test.request(setup.Credential(session))
+	signedIn := setup.SignedIn(session)
 
 	forged, forgedErr := test.controller(engine).PostInteractionComplete(signedIn, identifier+":not-the-secret")
 	_, garbageErr := test.controller(engine).PostInteractionComplete(signedIn, "garbage")
@@ -162,11 +162,11 @@ func (test *OidcControllerTest) TestInteractionGetAnswersAWrongOrMissingSecretLi
 	setup := SesameTestSetup{}.Provision()
 	defer setup.Remove()
 	session := setup.SignIn("acme", true)
-	engine := test.engine()
+	engine := setup.Engine()
 	registered := test.register(engine, session.TenantID, "first_party")
 	identifier, _, _ := strings.Cut(test.authorize(engine, registered), ":")
 	controller := test.controller(engine)
-	signedIn := test.request(setup.Credential(session))
+	signedIn := setup.SignedIn(session)
 
 	forged, forgedErr := controller.PostInteractionGet(signedIn, identifier+":not-the-secret")
 	bare, bareErr := controller.PostInteractionGet(signedIn, identifier)
@@ -174,7 +174,7 @@ func (test *OidcControllerTest) TestInteractionGetAnswersAWrongOrMissingSecretLi
 
 	Assert.Equals("", forged.ClientID)
 	Assert.Equals("", bare.ClientID)
-	Assert.Equals("interaction_not_found", test.protocolCode(unknownErr))
+	Assert.Equals("interaction_not_found", setup.ProtocolCode(unknownErr))
 	Assert.Equals(test.answer(unknownErr), test.answer(forgedErr))
 	Assert.Equals(test.answer(unknownErr), test.answer(bareErr))
 }
@@ -183,10 +183,10 @@ func (test *OidcControllerTest) TestADeviceIsApprovedByTheCallerAndRedeemedAtThe
 	setup := SesameTestSetup{}.Provision()
 	defer setup.Remove()
 	session := setup.SignInMember("acme", "member")
-	engine := test.engine()
+	engine := setup.Engine()
 	registered := test.register(engine, session.TenantID, "first_party")
 	controller := test.controller(engine)
-	signedIn := test.request(setup.Credential(session))
+	signedIn := setup.SignedIn(session)
 	started, startErr := controller.PostDeviceAuthorize(OidcDeviceAuthorizeRequest{ClientID: registered.Client.ID, Scopes: []string{"openid"}})
 
 	pending, lookupErr := controller.PostDeviceLookup(signedIn, OidcUserCodeRequest{UserCode: started.UserCode})
@@ -207,19 +207,19 @@ func (test *OidcControllerTest) TestADeviceCodeIsInvisibleToAnotherTenantAndCanB
 	defer setup.Remove()
 	session := setup.SignInMember("acme", "member")
 	intruder := setup.SignInMember("globex", "member")
-	engine := test.engine()
+	engine := setup.Engine()
 	registered := test.register(engine, session.TenantID, "first_party")
 	controller := test.controller(engine)
 	started, _ := controller.PostDeviceAuthorize(OidcDeviceAuthorizeRequest{ClientID: registered.Client.ID, Scopes: []string{"openid"}})
 	code := OidcUserCodeRequest{UserCode: started.UserCode}
 
-	_, lookupErr := controller.PostDeviceLookup(test.request(setup.Credential(intruder)), code)
-	_, approveErr := controller.PostDeviceApprove(test.request(setup.Credential(intruder)), code)
-	denied, denyErr := controller.PostDeviceDeny(test.request(setup.Credential(session)), code)
+	_, lookupErr := controller.PostDeviceLookup(setup.SignedIn(intruder), code)
+	_, approveErr := controller.PostDeviceApprove(setup.SignedIn(intruder), code)
+	denied, denyErr := controller.PostDeviceDeny(setup.SignedIn(session), code)
 	tokens := test.redeemDevice(engine, registered, started.DeviceCode)
 
-	Assert.Equals("user_code_not_found", test.protocolCode(lookupErr))
-	Assert.Equals("user_code_not_found", test.protocolCode(approveErr))
+	Assert.Equals("user_code_not_found", setup.ProtocolCode(lookupErr))
+	Assert.Equals("user_code_not_found", setup.ProtocolCode(approveErr))
 	Assert.IsTrue(denyErr == nil)
 	Assert.IsTrue(denied.Denied)
 	Assert.Equals("access_denied", tokens["error"])
@@ -229,7 +229,7 @@ func (test *OidcControllerTest) TestAPushedRequestStartsTheBrowserInteraction() 
 	setup := SesameTestSetup{}.Provision()
 	defer setup.Remove()
 	session := setup.SignIn("acme", true)
-	engine := test.engine()
+	engine := setup.Engine()
 	registered := test.register(engine, session.TenantID, "first_party")
 	request := test.pushed(registered, registered.Secret)
 
@@ -250,7 +250,7 @@ func (test *OidcControllerTest) TestDpopVerifyAcceptsAFreshProofOnce() {
 	setup := SesameTestSetup{}.Provision()
 	defer setup.Remove()
 	session := setup.SignIn("acme", true)
-	engine := test.engine()
+	engine := setup.Engine()
 	registered := test.register(engine, session.TenantID, "first_party")
 	key, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	token := test.boundToken(engine, session, registered, key)
@@ -264,25 +264,25 @@ func (test *OidcControllerTest) TestDpopVerifyAcceptsAFreshProofOnce() {
 	Assert.IsTrue(verified.Active)
 	Assert.Equals(session.PrincipalID, verified.PrincipalID)
 	Assert.IsTrue(!replayed.Active)
-	Assert.Equals("dpop_proof_replayed", test.protocolCode(replayErr))
+	Assert.Equals("dpop_proof_replayed", setup.ProtocolCode(replayErr))
 }
 
 func (test *OidcControllerTest) TestRefreshFamilyRoutesAnswerAnUnknownFamily() {
 	setup := SesameTestSetup{}.Provision()
 	defer setup.Remove()
 	session := setup.SignIn("acme", true)
-	controller := test.controller(test.engine())
-	signedIn := test.request(setup.Credential(session))
+	controller := test.controller(setup.Engine())
+	signedIn := setup.SignedIn(session)
 	unknown := "rfm_00000000000000000000000000000000"
 
 	_, getErr := controller.PostRefreshFamilyGet(signedIn, OidcRefreshFamilyReference{FamilyID: unknown})
 	revoked, revokeErr := controller.PostRefreshFamilyRevoke(signedIn, OidcRefreshFamilyRevokeRequest{FamilyID: unknown})
 	_, malformedErr := controller.PostRefreshFamilyGet(signedIn, OidcRefreshFamilyReference{FamilyID: "x"})
 
-	Assert.Equals("refresh_family_not_found", test.protocolCode(getErr))
-	Assert.Equals("refresh_family_not_found", test.protocolCode(revokeErr))
+	Assert.Equals("refresh_family_not_found", setup.ProtocolCode(getErr))
+	Assert.Equals("refresh_family_not_found", setup.ProtocolCode(revokeErr))
 	Assert.IsTrue(!revoked.Revoked)
-	Assert.Equals("invalid_request", test.protocolCode(malformedErr))
+	Assert.Equals("invalid_request", setup.ProtocolCode(malformedErr))
 }
 
 func (test *OidcControllerTest) TestARefreshFamilyIsRevokedOnlyByItsTenantsAdministrator() {
@@ -290,12 +290,12 @@ func (test *OidcControllerTest) TestARefreshFamilyIsRevokedOnlyByItsTenantsAdmin
 	defer setup.Remove()
 	session := setup.SignIn("acme", true)
 	intruder := setup.SignIn("globex", true)
-	engine := test.engine()
+	engine := setup.Engine()
 	registered := test.register(engine, session.TenantID, "first_party")
 	refreshToken := test.refreshToken(engine, session, registered)
 	family := OidcRefreshFamilyReference{FamilyID: test.familyID(setup)}
-	owner := test.request(setup.Credential(session))
-	stranger := test.request(setup.Credential(intruder))
+	owner := setup.SignedIn(session)
+	stranger := setup.SignedIn(intruder)
 	controller := test.controller(engine)
 
 	_, strangerGetErr := controller.PostRefreshFamilyGet(stranger, family)
@@ -320,15 +320,15 @@ func (test *OidcControllerTest) TestARefreshFamilyIsRevokedOnlyByItsTenantsAdmin
 
 func (test *OidcControllerTest) refreshToken(engine *EngineService, session sesame.IssuedSession, registered sesame.ClientRegistration) string {
 	cookie := test.authorizeScope(engine, registered, "openid offline_access")
-	completed, err := test.controller(engine).PostInteractionComplete(test.request(test.credential(session)), cookie)
-	test.check(err)
+	completed, err := test.controller(engine).PostInteractionComplete(SesameTestSetup{}.Request(test.credential(session)), cookie)
+	SesameTestSetup{}.Check(err)
 	form := url.Values{}
 	form.Set("grant_type", "authorization_code")
 	form.Set("code", completed.Code)
 	form.Set("redirect_uri", "https://rp.example/callback")
 	form.Set("code_verifier", test.verifier())
 	response, err := test.standards(engine).PostToken(test.clientPost(form, registered))
-	test.check(err)
+	SesameTestSetup{}.Check(err)
 	token, _ := test.object(response)["refresh_token"].(string)
 	return token
 }
@@ -338,7 +338,7 @@ func (test *OidcControllerTest) refresh(engine *EngineService, registered sesame
 	form.Set("grant_type", "refresh_token")
 	form.Set("refresh_token", refreshToken)
 	response, err := test.standards(engine).PostToken(test.clientPost(form, registered))
-	test.check(err)
+	SesameTestSetup{}.Check(err)
 	return test.object(response)
 }
 
@@ -355,7 +355,7 @@ func (test *OidcControllerTest) familyID(setup *SesameTestSetup) string {
 
 func (test *OidcControllerTest) register(engine *EngineService, tenantID string, audience string) sesame.ClientRegistration {
 	registered := sesame.ClientRegistration{}
-	test.check(engine.Call("oidc_client.register", map[string]any{
+	SesameTestSetup{}.Check(engine.Call("oidc_client.register", map[string]any{
 		"tenant_id": tenantID, "name": "Portal", "client_type": "confidential",
 		"redirect_uris": []string{"https://rp.example/callback"}, "scopes": []string{"openid", "offline_access"},
 		"audience": audience,
@@ -377,7 +377,7 @@ func (test *OidcControllerTest) authorizeScope(engine *EngineService, registered
 	query.Set("code_challenge", test.challenge())
 	query.Set("code_challenge_method", "S256")
 	response, err := test.standards(engine).GetAuthorization(httptest.NewRequest(http.MethodGet, "/oidc/authorize?"+query.Encode(), nil))
-	test.check(err)
+	SesameTestSetup{}.Check(err)
 	for _, cookie := range response.Cookies() {
 		return cookie.Value
 	}
@@ -403,8 +403,8 @@ func (test *OidcControllerTest) boundToken(
 	key *ecdsa.PrivateKey,
 ) string {
 	cookie := test.authorize(engine, registered)
-	completed, err := test.controller(engine).PostInteractionComplete(test.request(test.credential(session)), cookie)
-	test.check(err)
+	completed, err := test.controller(engine).PostInteractionComplete(SesameTestSetup{}.Request(test.credential(session)), cookie)
+	SesameTestSetup{}.Check(err)
 	form := url.Values{}
 	form.Set("grant_type", "authorization_code")
 	form.Set("code", completed.Code)
@@ -415,7 +415,7 @@ func (test *OidcControllerTest) boundToken(
 	request.Header.Set("X-Forwarded-Proto", "https")
 	request.Header.Set("DPoP", test.proof(key, http.MethodPost, "https://sesame.test/oidc/token", ""))
 	response, err := test.standards(engine).PostToken(request)
-	test.check(err)
+	SesameTestSetup{}.Check(err)
 	token, _ := test.object(response)["access_token"].(string)
 	return token
 }
@@ -425,7 +425,7 @@ func (test *OidcControllerTest) redeemDevice(engine *EngineService, registered s
 	form.Set("grant_type", "urn:ietf:params:oauth:grant-type:device_code")
 	form.Set("device_code", deviceCode)
 	response, err := test.standards(engine).PostToken(test.clientPost(form, registered))
-	test.check(err)
+	SesameTestSetup{}.Check(err)
 	return test.object(response)
 }
 
@@ -439,7 +439,7 @@ func (test *OidcControllerTest) proof(key *ecdsa.PrivateKey, method string, uri 
 		digest := sha256.Sum256([]byte(accessToken))
 		claims["ath"] = base64.RawURLEncoding.EncodeToString(digest[:])
 	}
-	header := test.segment(map[string]any{
+	header := SesameTestSetup{}.Segment(map[string]any{
 		"typ": "dpop+jwt", "alg": "ES256",
 		"jwk": map[string]string{
 			"kty": "EC", "crv": "P-256",
@@ -447,18 +447,12 @@ func (test *OidcControllerTest) proof(key *ecdsa.PrivateKey, method string, uri 
 			"y": base64.RawURLEncoding.EncodeToString(point[33:]),
 		},
 	})
-	payload := test.segment(claims)
+	payload := SesameTestSetup{}.Segment(claims)
 	digest := sha256.Sum256([]byte(header + "." + payload))
 	r, s, err := ecdsa.Sign(rand.Reader, key, digest[:])
-	test.check(err)
+	SesameTestSetup{}.Check(err)
 	signature := append(r.FillBytes(make([]byte, 32)), s.FillBytes(make([]byte, 32))...)
 	return header + "." + payload + "." + base64.RawURLEncoding.EncodeToString(signature)
-}
-
-func (test *OidcControllerTest) segment(value any) string {
-	encoded, err := json.Marshal(value)
-	test.check(err)
-	return base64.RawURLEncoding.EncodeToString(encoded)
 }
 
 func (test *OidcControllerTest) challenge() string {
@@ -490,41 +484,14 @@ func (test *OidcControllerTest) answer(err error) string {
 	return fmt.Sprint(answer.StatusCode, " ", string(body))
 }
 
-func (test *OidcControllerTest) protocolCode(err error) string {
-	protocolError := &sesame.ProtocolError{}
-	errors.As(err, &protocolError)
-	return protocolError.Code
-}
-
-func (test *OidcControllerTest) rejected(err error) bool {
-	var rejected *host.SessionRejectedError
-	return errors.As(err, &rejected)
-}
-
 func (test *OidcControllerTest) credential(session sesame.IssuedSession) string {
 	return session.SessionID + ":" + session.Secret
-}
-
-func (test *OidcControllerTest) request(credential string) *http.Request {
-	request := httptest.NewRequest(http.MethodPost, "/", nil)
-	request.Header.Set("Sesame-Session", credential)
-	return request
-}
-
-func (test *OidcControllerTest) check(err error) {
-	if err != nil {
-		panic(err)
-	}
-}
-
-func (test *OidcControllerTest) engine() *EngineService {
-	return &EngineService{engineSettingsService: &EngineSettingsService{}}
 }
 
 func (test *OidcControllerTest) controller(engine *EngineService) *OidcController {
 	return &OidcController{
 		engineService:            engine,
-		tenantCallService:        test.tenantCalls(engine),
+		tenantCallService:        SesameTestSetup{}.TenantCalls(engine),
 		interactionCookieService: &InteractionCookieService{},
 	}
 }
@@ -537,14 +504,5 @@ func (test *OidcControllerTest) standards(engine *EngineService) *StandardsContr
 			standardsRefusalService:  refusals,
 			interactionCookieService: &InteractionCookieService{},
 		},
-	}
-}
-
-func (test *OidcControllerTest) tenantCalls(engine *EngineService) *TenantCallService {
-	return &TenantCallService{
-		callerService:        &CallerService{engineService: engine},
-		engineService:        engine,
-		administratorService: &AdministratorService{engineService: engine},
-		recentSignInService:  &RecentSignInService{},
 	}
 }

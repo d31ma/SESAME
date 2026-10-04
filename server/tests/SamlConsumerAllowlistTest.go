@@ -7,13 +7,11 @@ import (
 	"errors"
 	"math/big"
 	"net/http"
-	"net/http/httptest"
 	"slices"
 	"strings"
 	"time"
 
 	"github.com/d31ma/sesame/server/packages/host"
-	"github.com/d31ma/sesame/server/packages/sesame"
 )
 
 // @Test(SesameTestSetup, {"partition":"tests"})
@@ -29,8 +27,8 @@ func (test *SamlConsumerAllowlistTest) TestLoginStartRefusesAnAttackersConsumerU
 
 	login, err := controller.PostLoginStart(test.startRequest("https://attacker.example/steal"))
 
-	Assert.Equals(http.StatusBadRequest, test.status(err))
-	Assert.IsTrue(test.refused(err))
+	Assert.Equals(http.StatusBadRequest, setup.Status(err))
+	Assert.IsTrue(setup.RedirectNotAllowed(err))
 	Assert.Equals("", login.LoginID)
 	Assert.IsTrue(controller.engineService.client == nil)
 }
@@ -56,8 +54,8 @@ func (test *SamlConsumerAllowlistTest) TestLoginStartRefusesEveryConsumerURLWhen
 
 	_, err := controller.PostLoginStart(test.startRequest(test.consumerURL()))
 
-	Assert.Equals(http.StatusBadRequest, test.status(err))
-	Assert.IsTrue(test.refused(err))
+	Assert.Equals(http.StatusBadRequest, setup.Status(err))
+	Assert.IsTrue(setup.RedirectNotAllowed(err))
 	Assert.IsTrue(controller.engineService.client == nil)
 }
 
@@ -67,7 +65,7 @@ func (test *SamlConsumerAllowlistTest) TestLoginStartAcceptsAListedConsumerURL()
 	test.allow(setup, []string{"https://other.example/acs", test.consumerURL()})
 	session := setup.SignIn("acme", true)
 	controller := test.controller()
-	provider, registerErr := controller.PostProviderRegister(test.request(setup, session), test.registerRequest(session.TenantID))
+	provider, registerErr := controller.PostProviderRegister(setup.SignedIn(session), test.registerRequest(session.TenantID))
 	request := test.startRequest(test.consumerURL())
 	request.TenantID = session.TenantID
 	request.ProviderID = provider.ProviderID
@@ -117,12 +115,6 @@ func (test *SamlConsumerAllowlistTest) controller() *SamlController {
 	}
 }
 
-func (test *SamlConsumerAllowlistTest) request(setup *SesameTestSetup, session sesame.IssuedSession) *http.Request {
-	request := httptest.NewRequest(http.MethodPost, "/", nil)
-	request.Header.Set("Sesame-Session", setup.Credential(session))
-	return request
-}
-
 func (test *SamlConsumerAllowlistTest) consumerURL() string {
 	return "https://app.example/saml/acs"
 }
@@ -145,7 +137,7 @@ func (test *SamlConsumerAllowlistTest) registerRequest(tenantID string) SamlProv
 
 func (test *SamlConsumerAllowlistTest) certificate() string {
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
-	test.check(err)
+	SesameTestSetup{}.Check(err)
 	template := x509.Certificate{
 		SerialNumber: big.NewInt(1),
 		Subject:      pkix.Name{CommonName: "idp.example"},
@@ -153,23 +145,8 @@ func (test *SamlConsumerAllowlistTest) certificate() string {
 		NotAfter:     time.Now().Add(time.Hour),
 	}
 	der, err := x509.CreateCertificate(rand.Reader, &template, &template, &key.PublicKey, key)
-	test.check(err)
+	SesameTestSetup{}.Check(err)
 	return string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der}))
-}
-
-func (test *SamlConsumerAllowlistTest) refused(err error) bool {
-	var refusal *host.RedirectNotAllowedError
-	return errors.As(err, &refusal)
-}
-
-func (test *SamlConsumerAllowlistTest) status(err error) int {
-	return (&SesameErrorHandler{}).Answer(err).StatusCode
-}
-
-func (test *SamlConsumerAllowlistTest) check(err error) {
-	if err != nil {
-		panic(err)
-	}
 }
 
 func (test *SamlConsumerAllowlistTest) allRefusedBeforeTheEngine(addresses []string) bool {
@@ -177,7 +154,7 @@ func (test *SamlConsumerAllowlistTest) allRefusedBeforeTheEngine(addresses []str
 	for _, address := range addresses {
 		controller := test.controller()
 		_, err := controller.PostLoginStart(test.startRequest(address))
-		refusals = append(refusals, test.refused(err) && controller.engineService.client == nil)
+		refusals = append(refusals, SesameTestSetup{}.RedirectNotAllowed(err) && controller.engineService.client == nil)
 	}
 	return !slices.Contains(refusals, false)
 }

@@ -25,7 +25,7 @@ type StandardsControllerTest struct {
 func (test *StandardsControllerTest) TestDiscoveryPublishesTheHostRoutesUnderTheIssuer() {
 	setup := SesameTestSetup{}.Provision()
 	defer setup.Remove()
-	engine := test.engine()
+	engine := setup.Engine()
 
 	response, err := test.controller(engine).GetDiscovery(test.get("/oidc/openid-configuration"))
 
@@ -44,7 +44,7 @@ func (test *StandardsControllerTest) TestDiscoveryPublishesTheHostRoutesUnderThe
 func (test *StandardsControllerTest) TestDiscoveryRefusesQueryParameters() {
 	setup := SesameTestSetup{}.Provision()
 	defer setup.Remove()
-	engine := test.engine()
+	engine := setup.Engine()
 
 	response, err := test.controller(engine).GetDiscovery(test.get("/oidc/openid-configuration?x=1"))
 
@@ -56,7 +56,7 @@ func (test *StandardsControllerTest) TestDiscoveryRefusesQueryParameters() {
 func (test *StandardsControllerTest) TestJwksPublishesTheSigningKey() {
 	setup := SesameTestSetup{}.Provision()
 	defer setup.Remove()
-	engine := test.engine()
+	engine := setup.Engine()
 
 	response, err := test.controller(engine).GetJwks(test.get("/oidc/jwks"))
 
@@ -71,7 +71,7 @@ func (test *StandardsControllerTest) TestAuthorizationKeepsTheInteractionSecretI
 	setup := SesameTestSetup{}.Provision()
 	defer setup.Remove()
 	tenantID := setup.SignIn("acme", true).TenantID
-	engine := test.engine()
+	engine := setup.Engine()
 	registered := test.register(engine, tenantID, "first_party")
 
 	response, err := test.controller(engine).GetAuthorization(test.get(test.authorizeTarget(registered, test.challenge("verifier"))))
@@ -98,7 +98,7 @@ func (test *StandardsControllerTest) TestAuthorizationRefusesAnUnregisteredRedir
 	setup := SesameTestSetup{}.Provision()
 	defer setup.Remove()
 	tenantID := setup.SignIn("acme", true).TenantID
-	engine := test.engine()
+	engine := setup.Engine()
 	registered := test.register(engine, tenantID, "first_party")
 	target := strings.Replace(test.authorizeTarget(registered, test.challenge("verifier")),
 		url.QueryEscape(test.redirect()), url.QueryEscape("https://evil.example/callback"), 1)
@@ -116,7 +116,7 @@ func (test *StandardsControllerTest) TestTokenRedeemsACodeOnceAndIsNeverCached()
 	setup := SesameTestSetup{}.Provision()
 	defer setup.Remove()
 	session := setup.SignIn("acme", true)
-	engine := test.engine()
+	engine := setup.Engine()
 	registered := test.register(engine, session.TenantID, "first_party")
 	code := test.code(engine, session, registered)
 	form := test.codeForm(code, "verifier")
@@ -140,7 +140,7 @@ func (test *StandardsControllerTest) TestTokenRefusesADuplicatedParameter() {
 	setup := SesameTestSetup{}.Provision()
 	defer setup.Remove()
 	session := setup.SignIn("acme", true)
-	engine := test.engine()
+	engine := setup.Engine()
 	registered := test.register(engine, session.TenantID, "first_party")
 	code := test.code(engine, session, registered)
 
@@ -155,7 +155,7 @@ func (test *StandardsControllerTest) TestTokenRefusesADuplicatedParameter() {
 func (test *StandardsControllerTest) TestTokenRefusesTwoAuthorizationHeaders() {
 	setup := SesameTestSetup{}.Provision()
 	defer setup.Remove()
-	engine := test.engine()
+	engine := setup.Engine()
 	request := test.post("/oidc/token", "grant_type=authorization_code")
 	request.Header.Add("Authorization", "Basic one")
 	request.Header.Add("Authorization", "Basic two")
@@ -171,7 +171,7 @@ func (test *StandardsControllerTest) TestTokenRefusesTwoAuthorizationHeaders() {
 func (test *StandardsControllerTest) TestTokenRefusesAnOversizedBody() {
 	setup := SesameTestSetup{}.Provision()
 	defer setup.Remove()
-	engine := test.engine()
+	engine := setup.Engine()
 
 	response, err := test.controller(engine).PostToken(test.post("/oidc/token", "scope="+strings.Repeat("a", 128*1024)))
 
@@ -184,7 +184,7 @@ func (test *StandardsControllerTest) TestTokenRefusesAWrongClientSecretWithoutEc
 	setup := SesameTestSetup{}.Provision()
 	defer setup.Remove()
 	session := setup.SignIn("acme", true)
-	engine := test.engine()
+	engine := setup.Engine()
 	registered := test.register(engine, session.TenantID, "first_party")
 	code := test.code(engine, session, registered)
 	request := test.post("/oidc/token", test.codeForm(code, "verifier"))
@@ -202,7 +202,7 @@ func (test *StandardsControllerTest) TestIntrospectionReportsAnActiveTokenToItsC
 	setup := SesameTestSetup{}.Provision()
 	defer setup.Remove()
 	session := setup.SignIn("acme", true)
-	engine := test.engine()
+	engine := setup.Engine()
 	registered := test.register(engine, session.TenantID, "first_party")
 	tokens := test.tokens(engine, session, registered)
 
@@ -221,7 +221,7 @@ func (test *StandardsControllerTest) TestRevocationAcknowledgesWithAnEmptyTypedB
 	setup := SesameTestSetup{}.Provision()
 	defer setup.Remove()
 	session := setup.SignIn("acme", true)
-	engine := test.engine()
+	engine := setup.Engine()
 	registered := test.register(engine, session.TenantID, "first_party")
 	tokens := test.tokens(engine, session, registered)
 
@@ -243,7 +243,7 @@ func (test *StandardsControllerTest) TestLogoutReturnsOnlyToARegisteredAddress()
 	setup := SesameTestSetup{}.Provision()
 	defer setup.Remove()
 	session := setup.SignIn("acme", true)
-	engine := test.engine()
+	engine := setup.Engine()
 	registered := test.register(engine, session.TenantID, "first_party")
 	hint := url.QueryEscape(test.tokens(engine, session, registered)["id_token"].(string))
 
@@ -265,7 +265,7 @@ func (test *StandardsControllerTest) TestDpopBindsTheTokenToThePublicUriTachyonR
 	setup := SesameTestSetup{}.Provision()
 	defer setup.Remove()
 	session := setup.SignIn("acme", true)
-	engine := test.engine()
+	engine := setup.Engine()
 	registered := test.register(engine, session.TenantID, "first_party")
 	code := test.code(engine, session, registered)
 	key, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
@@ -285,7 +285,7 @@ func (test *StandardsControllerTest) TestDpopRefusesAProofForAnotherUri() {
 	setup := SesameTestSetup{}.Provision()
 	defer setup.Remove()
 	session := setup.SignIn("acme", true)
-	engine := test.engine()
+	engine := setup.Engine()
 	registered := test.register(engine, session.TenantID, "first_party")
 	code := test.code(engine, session, registered)
 	key, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
@@ -306,7 +306,7 @@ func (test *StandardsControllerTest) TestBusyEngineIsReportedToTheErrorHandler()
 	holder := setup.Open()
 	defer holder.Close()
 	setup.UseWait(200)
-	engine := test.engine()
+	engine := setup.Engine()
 
 	response, err := test.controller(engine).GetJwks(test.get("/oidc/jwks"))
 
@@ -317,7 +317,7 @@ func (test *StandardsControllerTest) TestBusyEngineIsReportedToTheErrorHandler()
 
 func (test *StandardsControllerTest) register(engine *EngineService, tenantID string, audience string) sesame.ClientRegistration {
 	registered := sesame.ClientRegistration{}
-	test.check(engine.Call("oidc_client.register", map[string]any{
+	SesameTestSetup{}.Check(engine.Call("oidc_client.register", map[string]any{
 		"tenant_id": tenantID, "name": "Portal", "client_type": "confidential",
 		"redirect_uris": []string{test.redirect()}, "scopes": []string{"openid", "offline_access"},
 		"audience": audience, "post_logout_redirect_uris": []string{"https://rp.example/signed-out"},
@@ -331,10 +331,10 @@ func (test *StandardsControllerTest) code(
 	registered sesame.ClientRegistration,
 ) string {
 	response, err := test.controller(engine).GetAuthorization(test.get(test.authorizeTarget(registered, test.challenge("verifier"))))
-	test.check(err)
+	SesameTestSetup{}.Check(err)
 	identifier, secret, _ := strings.Cut(test.interactionCookie(response).Value, ":")
 	completed := sesame.AuthorizationResponse{}
-	test.check(engine.Call("oidc.interaction_complete", map[string]string{
+	SesameTestSetup{}.Check(engine.Call("oidc.interaction_complete", map[string]string{
 		"interaction_id": identifier, "interaction_secret": secret,
 		"session_id": session.SessionID, "session_secret": session.Secret,
 	}, &completed))
@@ -348,7 +348,7 @@ func (test *StandardsControllerTest) tokens(
 ) map[string]any {
 	code := test.code(engine, session, registered)
 	response, err := test.controller(engine).PostToken(test.clientPost("/oidc/token", test.codeForm(code, "verifier"), registered))
-	test.check(err)
+	SesameTestSetup{}.Check(err)
 	return test.object(response)
 }
 
@@ -385,7 +385,7 @@ func (test *StandardsControllerTest) verifier(seed string) string {
 
 func (test *StandardsControllerTest) proof(key *ecdsa.PrivateKey, uri string) string {
 	point, _ := key.PublicKey.Bytes()
-	header := test.segment(map[string]any{
+	header := SesameTestSetup{}.Segment(map[string]any{
 		"typ": "dpop+jwt", "alg": "ES256",
 		"jwk": map[string]string{
 			"kty": "EC", "crv": "P-256",
@@ -393,21 +393,15 @@ func (test *StandardsControllerTest) proof(key *ecdsa.PrivateKey, uri string) st
 			"y": base64.RawURLEncoding.EncodeToString(point[33:]),
 		},
 	})
-	payload := test.segment(map[string]any{
+	payload := SesameTestSetup{}.Segment(map[string]any{
 		"jti": base64.RawURLEncoding.EncodeToString([]byte(time.Now().String())),
 		"htm": http.MethodPost, "htu": uri, "iat": time.Now().Unix(),
 	})
 	digest := sha256.Sum256([]byte(header + "." + payload))
 	r, s, err := ecdsa.Sign(rand.Reader, key, digest[:])
-	test.check(err)
+	SesameTestSetup{}.Check(err)
 	signature := append(r.FillBytes(make([]byte, 32)), s.FillBytes(make([]byte, 32))...)
 	return header + "." + payload + "." + base64.RawURLEncoding.EncodeToString(signature)
-}
-
-func (test *StandardsControllerTest) segment(value any) string {
-	encoded, err := json.Marshal(value)
-	test.check(err)
-	return base64.RawURLEncoding.EncodeToString(encoded)
 }
 
 func (test *StandardsControllerTest) interactionCookie(response *http.Response) *http.Cookie {
@@ -448,16 +442,6 @@ func (test *StandardsControllerTest) object(response *http.Response) map[string]
 	decoded := map[string]any{}
 	_ = json.Unmarshal([]byte(test.text(response)), &decoded)
 	return decoded
-}
-
-func (test *StandardsControllerTest) check(err error) {
-	if err != nil {
-		panic(err)
-	}
-}
-
-func (test *StandardsControllerTest) engine() *EngineService {
-	return &EngineService{engineSettingsService: &EngineSettingsService{}}
 }
 
 func (test *StandardsControllerTest) controller(engine *EngineService) *StandardsController {

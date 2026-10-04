@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/d31ma/sesame/server/packages/host"
-	"github.com/d31ma/sesame/server/packages/sesame"
 )
 
 // @Test(SesameTestSetup, {"partition":"tests"})
@@ -19,7 +18,7 @@ func (test *GrantControllerTest) TestCreateGrantsARoleToAPrincipal() {
 	administrator := setup.SignIn("acme", true)
 	member := setup.SignInMember("acme", "member")
 	grants, roles, _ := test.controllers()
-	request := test.request(setup.Credential(administrator))
+	request := setup.SignedIn(administrator)
 	role, _ := roles.PostCreate(request, test.role(administrator.TenantID))
 
 	grant, err := grants.PostCreate(request, GrantCreateRequest{TenantID: administrator.TenantID, RoleID: role.RoleID, PrincipalID: member.PrincipalID})
@@ -36,17 +35,17 @@ func (test *GrantControllerTest) TestCreateNeedsARecentSignInAndRevokeDoesNot() 
 	defer setup.Remove()
 	administrator := setup.SignIn("acme", true)
 	member := setup.SignInMember("acme", "member")
-	engine := test.engine()
+	engine := setup.Engine()
 	grants, roles, _ := test.controllersWith(engine, 0)
 	stale, _, _ := test.controllersWith(engine, 11*time.Minute)
-	request := test.request(setup.Credential(administrator))
+	request := setup.SignedIn(administrator)
 	role, _ := roles.PostCreate(request, test.role(administrator.TenantID))
 	grant, _ := grants.PostCreate(request, GrantCreateRequest{TenantID: administrator.TenantID, RoleID: role.RoleID, PrincipalID: member.PrincipalID})
 
 	refused, err := stale.PostCreate(request, GrantCreateRequest{TenantID: administrator.TenantID, RoleID: role.RoleID, GroupID: test.group(engine, request, administrator.TenantID)})
 	revocation, revokeErr := stale.PostRevoke(request, GrantRevokeRequest{GrantID: grant.GrantID})
 
-	Assert.IsTrue(test.reauthenticationRequired(err))
+	Assert.IsTrue(setup.ReauthenticationRequired(err))
 	Assert.Equals("", refused.GrantID)
 	Assert.IsTrue(revokeErr == nil)
 	Assert.IsTrue(revocation.Revoked)
@@ -57,7 +56,7 @@ func (test *GrantControllerTest) TestCreateGrantsARoleToAGroup() {
 	defer setup.Remove()
 	administrator := setup.SignIn("acme", true)
 	grants, roles, groups := test.controllers()
-	request := test.request(setup.Credential(administrator))
+	request := setup.SignedIn(administrator)
 	role, _ := roles.PostCreate(request, test.role(administrator.TenantID))
 	group, _ := groups.PostCreate(request, GroupCreateRequest{TenantID: administrator.TenantID, Name: "readers"})
 
@@ -74,9 +73,9 @@ func (test *GrantControllerTest) TestCreateRefusesAnotherTenant() {
 	administrator := setup.SignIn("acme", true)
 	other := setup.SignIn("globex", true)
 	grants, roles, _ := test.controllers()
-	role, _ := roles.PostCreate(test.request(setup.Credential(other)), test.role(other.TenantID))
+	role, _ := roles.PostCreate(setup.SignedIn(other), test.role(other.TenantID))
 
-	grant, err := grants.PostCreate(test.request(setup.Credential(administrator)), GrantCreateRequest{TenantID: other.TenantID, RoleID: role.RoleID, PrincipalID: other.PrincipalID})
+	grant, err := grants.PostCreate(setup.SignedIn(administrator), GrantCreateRequest{TenantID: other.TenantID, RoleID: role.RoleID, PrincipalID: other.PrincipalID})
 
 	var mismatch *host.TenantMismatchError
 	Assert.IsTrue(errors.As(err, &mismatch))
@@ -90,11 +89,11 @@ func (test *GrantControllerTest) TestCreateRefusesARoleOfAnotherTenant() {
 	other := setup.SignIn("globex", true)
 	member := setup.SignInMember("acme", "member")
 	grants, roles, _ := test.controllers()
-	foreign, _ := roles.PostCreate(test.request(setup.Credential(other)), test.role(other.TenantID))
+	foreign, _ := roles.PostCreate(setup.SignedIn(other), test.role(other.TenantID))
 
-	grant, err := grants.PostCreate(test.request(setup.Credential(administrator)), GrantCreateRequest{TenantID: administrator.TenantID, RoleID: foreign.RoleID, PrincipalID: member.PrincipalID})
+	grant, err := grants.PostCreate(setup.SignedIn(administrator), GrantCreateRequest{TenantID: administrator.TenantID, RoleID: foreign.RoleID, PrincipalID: member.PrincipalID})
 
-	Assert.Equals("role_not_found", test.code(err))
+	Assert.Equals("role_not_found", setup.ProtocolCode(err))
 	Assert.Equals("", grant.GrantID)
 }
 
@@ -104,12 +103,12 @@ func (test *GrantControllerTest) TestCreateRefusesAPrincipalOfAnotherTenant() {
 	administrator := setup.SignIn("acme", true)
 	other := setup.SignIn("globex", true)
 	grants, roles, _ := test.controllers()
-	request := test.request(setup.Credential(administrator))
+	request := setup.SignedIn(administrator)
 	role, _ := roles.PostCreate(request, test.role(administrator.TenantID))
 
 	_, err := grants.PostCreate(request, GrantCreateRequest{TenantID: administrator.TenantID, RoleID: role.RoleID, PrincipalID: other.PrincipalID})
 
-	Assert.Equals("principal_not_found", test.code(err))
+	Assert.Equals("principal_not_found", setup.ProtocolCode(err))
 }
 
 func (test *GrantControllerTest) TestCreateRefusesTwoSubjects() {
@@ -118,13 +117,13 @@ func (test *GrantControllerTest) TestCreateRefusesTwoSubjects() {
 	administrator := setup.SignIn("acme", true)
 	member := setup.SignInMember("acme", "member")
 	grants, roles, groups := test.controllers()
-	request := test.request(setup.Credential(administrator))
+	request := setup.SignedIn(administrator)
 	role, _ := roles.PostCreate(request, test.role(administrator.TenantID))
 	group, _ := groups.PostCreate(request, GroupCreateRequest{TenantID: administrator.TenantID, Name: "readers"})
 
 	_, err := grants.PostCreate(request, GrantCreateRequest{TenantID: administrator.TenantID, RoleID: role.RoleID, PrincipalID: member.PrincipalID, GroupID: group.GroupID})
 
-	Assert.Equals("invalid_request", test.code(err))
+	Assert.Equals("invalid_request", setup.ProtocolCode(err))
 }
 
 func (test *GrantControllerTest) TestCreateRefusesARepeatedGrant() {
@@ -133,7 +132,7 @@ func (test *GrantControllerTest) TestCreateRefusesARepeatedGrant() {
 	administrator := setup.SignIn("acme", true)
 	member := setup.SignInMember("acme", "member")
 	grants, roles, _ := test.controllers()
-	request := test.request(setup.Credential(administrator))
+	request := setup.SignedIn(administrator)
 	role, _ := roles.PostCreate(request, test.role(administrator.TenantID))
 	creation := GrantCreateRequest{TenantID: administrator.TenantID, RoleID: role.RoleID, PrincipalID: member.PrincipalID}
 	_, first := grants.PostCreate(request, creation)
@@ -141,7 +140,7 @@ func (test *GrantControllerTest) TestCreateRefusesARepeatedGrant() {
 	_, err := grants.PostCreate(request, creation)
 
 	Assert.IsTrue(first == nil)
-	Assert.Equals("grant_exists", test.code(err))
+	Assert.Equals("grant_exists", setup.ProtocolCode(err))
 }
 
 func (test *GrantControllerTest) TestCreateRejectsAnAnonymousCaller() {
@@ -162,7 +161,7 @@ func (test *GrantControllerTest) TestRevokeRemovesAGrantOfTheCallersTenant() {
 	administrator := setup.SignIn("acme", true)
 	member := setup.SignInMember("acme", "member")
 	grants, roles, _ := test.controllers()
-	request := test.request(setup.Credential(administrator))
+	request := setup.SignedIn(administrator)
 	role, _ := roles.PostCreate(request, test.role(administrator.TenantID))
 	grant, _ := grants.PostCreate(request, GrantCreateRequest{TenantID: administrator.TenantID, RoleID: role.RoleID, PrincipalID: member.PrincipalID})
 
@@ -171,7 +170,7 @@ func (test *GrantControllerTest) TestRevokeRemovesAGrantOfTheCallersTenant() {
 
 	Assert.IsTrue(err == nil)
 	Assert.IsTrue(revocation.Revoked)
-	Assert.Equals(http.StatusNotFound, test.status(repeated))
+	Assert.Equals(http.StatusNotFound, setup.Status(repeated))
 }
 
 func (test *GrantControllerTest) TestRevokeRefusesAGrantOfAnotherTenant() {
@@ -181,15 +180,15 @@ func (test *GrantControllerTest) TestRevokeRefusesAGrantOfAnotherTenant() {
 	other := setup.SignIn("globex", true)
 	member := setup.SignInMember("globex", "member")
 	grants, roles, _ := test.controllers()
-	owner := test.request(setup.Credential(other))
+	owner := setup.SignedIn(other)
 	role, _ := roles.PostCreate(owner, test.role(other.TenantID))
 	grant, _ := grants.PostCreate(owner, GrantCreateRequest{TenantID: other.TenantID, RoleID: role.RoleID, PrincipalID: member.PrincipalID})
 
-	refused, err := grants.PostRevoke(test.request(setup.Credential(administrator)), GrantRevokeRequest{GrantID: grant.GrantID})
+	refused, err := grants.PostRevoke(setup.SignedIn(administrator), GrantRevokeRequest{GrantID: grant.GrantID})
 	revocation, ownerErr := grants.PostRevoke(owner, GrantRevokeRequest{GrantID: grant.GrantID})
 
-	Assert.Equals(http.StatusForbidden, test.status(err))
-	Assert.Equals("actor_tenant_mismatch", test.code(err))
+	Assert.Equals(http.StatusForbidden, setup.Status(err))
+	Assert.Equals("actor_tenant_mismatch", setup.ProtocolCode(err))
 	Assert.IsTrue(!refused.Revoked)
 	Assert.IsTrue(ownerErr == nil)
 	Assert.IsTrue(revocation.Revoked)
@@ -201,9 +200,9 @@ func (test *GrantControllerTest) TestRevokeAnswersNotFoundForAnUnknownGrant() {
 	administrator := setup.SignIn("acme", true)
 	grants, _, _ := test.controllers()
 
-	_, err := grants.PostRevoke(test.request(setup.Credential(administrator)), GrantRevokeRequest{GrantID: "grt_00000000000000000000000000000000"})
+	_, err := grants.PostRevoke(setup.SignedIn(administrator), GrantRevokeRequest{GrantID: "grt_00000000000000000000000000000000"})
 
-	Assert.Equals("grant_not_found", test.code(err))
+	Assert.Equals("grant_not_found", setup.ProtocolCode(err))
 }
 
 func (test *GrantControllerTest) TestRevokeRefusesAMalformedGrant() {
@@ -212,9 +211,9 @@ func (test *GrantControllerTest) TestRevokeRefusesAMalformedGrant() {
 	administrator := setup.SignIn("acme", true)
 	grants, _, _ := test.controllers()
 
-	_, err := grants.PostRevoke(test.request(setup.Credential(administrator)), GrantRevokeRequest{GrantID: "not-a-grant"})
+	_, err := grants.PostRevoke(setup.SignedIn(administrator), GrantRevokeRequest{GrantID: "not-a-grant"})
 
-	Assert.Equals(http.StatusBadRequest, test.status(err))
+	Assert.Equals(http.StatusBadRequest, setup.Status(err))
 }
 
 func (test *GrantControllerTest) TestRevokeRejectsAnAnonymousCaller() {
@@ -229,10 +228,6 @@ func (test *GrantControllerTest) TestRevokeRejectsAnAnonymousCaller() {
 	Assert.IsTrue(!revocation.Revoked)
 }
 
-func (test *GrantControllerTest) status(err error) int {
-	return (&SesameErrorHandler{}).Answer(err).StatusCode
-}
-
 func (test *GrantControllerTest) role(tenantID string) RoleCreateRequest {
 	return RoleCreateRequest{
 		TenantID:    tenantID,
@@ -241,24 +236,8 @@ func (test *GrantControllerTest) role(tenantID string) RoleCreateRequest {
 	}
 }
 
-func (test *GrantControllerTest) code(err error) string {
-	protocolError := &sesame.ProtocolError{}
-	errors.As(err, &protocolError)
-	return protocolError.Code
-}
-
-func (test *GrantControllerTest) request(credential string) *http.Request {
-	request := httptest.NewRequest(http.MethodPost, "/", nil)
-	request.Header.Set("Sesame-Session", credential)
-	return request
-}
-
 func (test *GrantControllerTest) controllers() (*GrantController, *RoleController, *GroupController) {
-	return test.controllersWith(test.engine(), 0)
-}
-
-func (test *GrantControllerTest) engine() *EngineService {
-	return &EngineService{engineSettingsService: &EngineSettingsService{}}
+	return test.controllersWith(SesameTestSetup{}.Engine(), 0)
 }
 
 func (test *GrantControllerTest) group(engine *EngineService, request *http.Request, tenantID string) string {
@@ -271,27 +250,9 @@ func (test *GrantControllerTest) controllersWith(
 	engine *EngineService,
 	elapsed time.Duration,
 ) (*GrantController, *RoleController, *GroupController) {
-	calls := test.tenantCallsAfter(engine, elapsed)
+	calls := SesameTestSetup{}.TenantCallsAfter(engine, elapsed)
 	principals := &PrincipalTenantService{tenantCallService: calls}
 	groups := &GroupController{tenantCallService: calls, principalTenantService: principals}
 	grants := &GrantController{tenantCallService: calls}
 	return grants, &RoleController{tenantCallService: calls}, groups
-}
-
-func (test *GrantControllerTest) tenantCalls(engine *EngineService) *TenantCallService {
-	return test.tenantCallsAfter(engine, 0)
-}
-
-func (test *GrantControllerTest) tenantCallsAfter(engine *EngineService, elapsed time.Duration) *TenantCallService {
-	return &TenantCallService{
-		callerService:        &CallerService{engineService: engine},
-		engineService:        engine,
-		administratorService: &AdministratorService{engineService: engine},
-		recentSignInService:  &RecentSignInService{clockShift: elapsed},
-	}
-}
-
-func (test *GrantControllerTest) reauthenticationRequired(err error) bool {
-	var required *host.ReauthenticationRequiredError
-	return errors.As(err, &required)
 }

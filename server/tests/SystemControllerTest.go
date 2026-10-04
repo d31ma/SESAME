@@ -2,8 +2,6 @@ import (
 	"encoding/json"
 	"errors"
 	"maps"
-	"net/http"
-	"net/http/httptest"
 	"slices"
 
 	"github.com/d31ma/sesame/server/packages/host"
@@ -45,7 +43,7 @@ func (test *SystemControllerTest) TestBuildDescribesTheEngineToAnAdministrator()
 	defer setup.Remove()
 	administrator := setup.SignIn("acme", true)
 
-	build, err := test.controller().PostBuild(test.request(setup.Credential(administrator)))
+	build, err := test.controller().PostBuild(setup.SignedIn(administrator))
 
 	Assert.IsTrue(err == nil)
 	Assert.Equals("sesame", build.Name)
@@ -59,7 +57,7 @@ func (test *SystemControllerTest) TestBuildRefusesAMemberEvenWithoutTheRouteGuar
 	defer setup.Remove()
 	member := setup.SignInMember("acme", "member")
 
-	build, err := test.controller().PostBuild(test.request(setup.Credential(member)))
+	build, err := test.controller().PostBuild(setup.SignedIn(member))
 
 	var refused *host.AdministratorRequiredError
 	Assert.IsTrue(errors.As(err, &refused))
@@ -84,7 +82,7 @@ func (test *SystemControllerTest) TestMetricsCountRequestsOfTheSameEngine() {
 	controller := test.controller()
 	_, pingErr := controller.PostPing()
 
-	metrics, err := controller.PostMetrics(test.request(setup.Credential(administrator)))
+	metrics, err := controller.PostMetrics(setup.SignedIn(administrator))
 
 	Assert.IsTrue(pingErr == nil)
 	Assert.IsTrue(err == nil)
@@ -97,7 +95,7 @@ func (test *SystemControllerTest) TestMetricsRefuseAMemberEvenWithoutTheRouteGua
 	defer setup.Remove()
 	member := setup.SignInMember("acme", "member")
 
-	metrics, err := test.controller().PostMetrics(test.request(setup.Credential(member)))
+	metrics, err := test.controller().PostMetrics(setup.SignedIn(member))
 
 	var refused *host.AdministratorRequiredError
 	Assert.IsTrue(errors.As(err, &refused))
@@ -110,12 +108,6 @@ func (test *SystemControllerTest) fieldNames(encoded []byte) []string {
 	names := slices.Collect(maps.Keys(fields))
 	slices.Sort(names)
 	return names
-}
-
-func (test *SystemControllerTest) request(credential string) *http.Request {
-	request := httptest.NewRequest(http.MethodPost, "/", nil)
-	request.Header.Set("Sesame-Session", credential)
-	return request
 }
 
 func (test *SystemControllerTest) controller() *SystemController {

@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/d31ma/sesame/server/packages/host"
-	"github.com/d31ma/sesame/server/packages/sesame"
 )
 
 // @Test(SesameTestSetup, {"partition":"tests"})
@@ -19,9 +18,9 @@ func (test *OidcClientControllerTest) TestRegisterReturnsTheSecretInThatResponse
 	setup := SesameTestSetup{}.Provision()
 	defer setup.Remove()
 	session := setup.SignIn("acme", true)
-	engine := test.engine()
+	engine := setup.Engine()
 	controller := test.controller(engine)
-	request := test.request(setup.Credential(session))
+	request := setup.SignedIn(session)
 
 	registered, err := controller.PostRegister(request, test.registration(session.TenantID, "confidential"))
 	fetched, fetchErr := controller.PostGet(request, OidcClientReference{ClientID: registered.Client.ClientID})
@@ -33,7 +32,7 @@ func (test *OidcClientControllerTest) TestRegisterReturnsTheSecretInThatResponse
 	Assert.Equals(session.TenantID, registered.Client.TenantID)
 	Assert.IsTrue(fetchErr == nil)
 	Assert.Equals("Portal", fetched.Name)
-	Assert.IsTrue(!strings.Contains(test.encoded(fetched), registered.ClientSecret))
+	Assert.IsTrue(!strings.Contains(setup.Encoded(fetched), registered.ClientSecret))
 	Assert.IsTrue(storedErr == nil)
 	Assert.IsTrue(!strings.Contains(string(stored), registered.ClientSecret))
 }
@@ -42,9 +41,9 @@ func (test *OidcClientControllerTest) TestRegisterGivesAPublicClientNoSecret() {
 	setup := SesameTestSetup{}.Provision()
 	defer setup.Remove()
 	session := setup.SignIn("acme", true)
-	controller := test.controller(test.engine())
+	controller := test.controller(setup.Engine())
 
-	registered, err := controller.PostRegister(test.request(setup.Credential(session)), test.registration(session.TenantID, "public"))
+	registered, err := controller.PostRegister(setup.SignedIn(session), test.registration(session.TenantID, "public"))
 
 	Assert.IsTrue(err == nil)
 	Assert.Equals("", registered.ClientSecret)
@@ -56,9 +55,9 @@ func (test *OidcClientControllerTest) TestRegisterRefusesAnotherTenant() {
 	defer setup.Remove()
 	session := setup.SignIn("acme", true)
 	other := setup.SignIn("globex", true)
-	controller := test.controller(test.engine())
+	controller := test.controller(setup.Engine())
 
-	registered, err := controller.PostRegister(test.request(setup.Credential(session)), test.registration(other.TenantID, "confidential"))
+	registered, err := controller.PostRegister(setup.SignedIn(session), test.registration(other.TenantID, "confidential"))
 
 	var mismatch *host.TenantMismatchError
 	Assert.IsTrue(errors.As(err, &mismatch))
@@ -69,9 +68,9 @@ func (test *OidcClientControllerTest) TestRotateSecretReplacesTheSecretOnce() {
 	setup := SesameTestSetup{}.Provision()
 	defer setup.Remove()
 	session := setup.SignIn("acme", true)
-	engine := test.engine()
+	engine := setup.Engine()
 	controller := test.controller(engine)
-	request := test.request(setup.Credential(session))
+	request := setup.SignedIn(session)
 	registered, _ := controller.PostRegister(request, test.registration(session.TenantID, "confidential"))
 	reference := OidcClientReference{ClientID: registered.Client.ClientID}
 
@@ -81,7 +80,7 @@ func (test *OidcClientControllerTest) TestRotateSecretReplacesTheSecretOnce() {
 	Assert.IsTrue(err == nil)
 	Assert.IsTrue(len(rotated.ClientSecret) > 0)
 	Assert.IsTrue(rotated.ClientSecret != registered.ClientSecret)
-	Assert.IsTrue(!strings.Contains(test.encoded(fetched), rotated.ClientSecret))
+	Assert.IsTrue(!strings.Contains(setup.Encoded(fetched), rotated.ClientSecret))
 	Assert.Equals("client_not_found", test.authenticationCode(engine, registered.Client.ClientID, registered.ClientSecret))
 	Assert.Equals("", test.authenticationCode(engine, registered.Client.ClientID, rotated.ClientSecret))
 }
@@ -90,13 +89,13 @@ func (test *OidcClientControllerTest) TestRotateSecretNeedsARecentSignIn() {
 	setup := SesameTestSetup{}.Provision()
 	defer setup.Remove()
 	session := setup.SignIn("acme", true)
-	engine := test.engine()
-	request := test.request(setup.Credential(session))
+	engine := setup.Engine()
+	request := setup.SignedIn(session)
 	registered, _ := test.controller(engine).PostRegister(request, test.registration(session.TenantID, "confidential"))
 
 	rotated, err := test.controllerAfter(engine, 11*time.Minute).PostRotateSecret(request, OidcClientReference{ClientID: registered.Client.ClientID})
 
-	Assert.IsTrue(test.reauthenticationRequired(err))
+	Assert.IsTrue(setup.ReauthenticationRequired(err))
 	Assert.Equals("", rotated.ClientSecret)
 	Assert.Equals("", test.authenticationCode(engine, registered.Client.ClientID, registered.ClientSecret))
 }
@@ -105,8 +104,8 @@ func (test *OidcClientControllerTest) TestDisableStopsTheClient() {
 	setup := SesameTestSetup{}.Provision()
 	defer setup.Remove()
 	session := setup.SignIn("acme", true)
-	controller := test.controller(test.engine())
-	request := test.request(setup.Credential(session))
+	controller := test.controller(setup.Engine())
+	request := setup.SignedIn(session)
 	registered, _ := controller.PostRegister(request, test.registration(session.TenantID, "confidential"))
 
 	disabled, err := controller.PostDisable(request, OidcClientDisableRequest{ClientID: registered.Client.ClientID, Reason: "retired"})
@@ -122,16 +121,16 @@ func (test *OidcClientControllerTest) TestAnotherTenantsAdministratorCannotReach
 	defer setup.Remove()
 	session := setup.SignIn("acme", true)
 	other := setup.SignIn("globex", true)
-	engine := test.engine()
+	engine := setup.Engine()
 	controller := test.controller(engine)
-	registered, _ := controller.PostRegister(test.request(setup.Credential(session)), test.registration(session.TenantID, "confidential"))
+	registered, _ := controller.PostRegister(setup.SignedIn(session), test.registration(session.TenantID, "confidential"))
 	reference := OidcClientReference{ClientID: registered.Client.ClientID}
-	intruder := test.request(setup.Credential(other))
+	intruder := setup.SignedIn(other)
 
 	fetched, getErr := controller.PostGet(intruder, reference)
 	rotated, rotateErr := controller.PostRotateSecret(intruder, reference)
 	_, disableErr := controller.PostDisable(intruder, OidcClientDisableRequest{ClientID: reference.ClientID})
-	unchanged, _ := controller.PostGet(test.request(setup.Credential(session)), reference)
+	unchanged, _ := controller.PostGet(setup.SignedIn(session), reference)
 
 	Assert.IsTrue(test.mismatch(getErr))
 	Assert.Equals("", fetched.Name)
@@ -146,19 +145,19 @@ func (test *OidcClientControllerTest) TestUnknownClientIsNotFound() {
 	setup := SesameTestSetup{}.Provision()
 	defer setup.Remove()
 	session := setup.SignIn("acme", true)
-	controller := test.controller(test.engine())
+	controller := test.controller(setup.Engine())
 
-	_, err := controller.PostGet(test.request(setup.Credential(session)),
+	_, err := controller.PostGet(setup.SignedIn(session),
 		OidcClientReference{ClientID: "cli_00000000000000000000000000000000"})
 
-	Assert.Equals("client_not_found", test.protocolCode(err))
+	Assert.Equals("client_not_found", setup.ProtocolCode(err))
 }
 
 func (test *OidcClientControllerTest) TestAnonymousCallerIsRejected() {
 	setup := SesameTestSetup{}.Provision()
 	defer setup.Remove()
 	session := setup.SignIn("acme", true)
-	controller := test.controller(test.engine())
+	controller := test.controller(setup.Engine())
 	anonymous := httptest.NewRequest(http.MethodPost, "/", nil)
 
 	_, registerErr := controller.PostRegister(anonymous, test.registration(session.TenantID, "confidential"))
@@ -173,13 +172,7 @@ func (test *OidcClientControllerTest) authenticationCode(engine *EngineService, 
 	err := engine.Call("oidc.introspect", map[string]string{
 		"token": "not-a-token", "client_id": clientID, "client_secret": secret,
 	}, &map[string]any{})
-	return test.protocolCode(err)
-}
-
-func (test *OidcClientControllerTest) protocolCode(err error) string {
-	protocolError := &sesame.ProtocolError{}
-	errors.As(err, &protocolError)
-	return protocolError.Code
+	return SesameTestSetup{}.ProtocolCode(err)
 }
 
 func (test *OidcClientControllerTest) mismatch(err error) bool {
@@ -198,43 +191,10 @@ func (test *OidcClientControllerTest) registration(tenantID string, clientType s
 	}
 }
 
-func (test *OidcClientControllerTest) encoded(value any) string {
-	encoded, _ := json.Marshal(value)
-	return string(encoded)
-}
-
-func (test *OidcClientControllerTest) request(credential string) *http.Request {
-	request := httptest.NewRequest(http.MethodPost, "/", nil)
-	request.Header.Set("Sesame-Session", credential)
-	return request
-}
-
-func (test *OidcClientControllerTest) engine() *EngineService {
-	return &EngineService{engineSettingsService: &EngineSettingsService{}}
-}
-
 func (test *OidcClientControllerTest) controller(engine *EngineService) *OidcClientController {
 	return test.controllerAfter(engine, 0)
 }
 
 func (test *OidcClientControllerTest) controllerAfter(engine *EngineService, elapsed time.Duration) *OidcClientController {
-	return &OidcClientController{tenantCallService: test.tenantCallsAfter(engine, elapsed)}
-}
-
-func (test *OidcClientControllerTest) tenantCalls(engine *EngineService) *TenantCallService {
-	return test.tenantCallsAfter(engine, 0)
-}
-
-func (test *OidcClientControllerTest) tenantCallsAfter(engine *EngineService, elapsed time.Duration) *TenantCallService {
-	return &TenantCallService{
-		callerService:        &CallerService{engineService: engine},
-		engineService:        engine,
-		administratorService: &AdministratorService{engineService: engine},
-		recentSignInService:  &RecentSignInService{clockShift: elapsed},
-	}
-}
-
-func (test *OidcClientControllerTest) reauthenticationRequired(err error) bool {
-	var required *host.ReauthenticationRequiredError
-	return errors.As(err, &required)
+	return &OidcClientController{tenantCallService: SesameTestSetup{}.TenantCallsAfter(engine, elapsed)}
 }

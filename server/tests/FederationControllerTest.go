@@ -3,10 +3,8 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"net/http"
-	"net/http/httptest"
 	"reflect"
 	"strings"
 
@@ -25,13 +23,13 @@ func (test *FederationControllerTest) TestProviderRegisterAnswersTheDiscoveryFet
 	session := setup.SignIn("acme", true)
 	controller := test.controller()
 
-	registration, err := controller.PostProviderRegister(test.request(setup, session), test.registerRequest(session.TenantID))
+	registration, err := controller.PostProviderRegister(setup.SignedIn(session), test.registerRequest(session.TenantID))
 
 	Assert.IsTrue(err == nil)
 	Assert.Equals(test.issuer()+"/.well-known/openid-configuration", registration.Fetch.URL)
 	Assert.Equals("GET", registration.Fetch.Method)
 	Assert.Equals("acme corp", registration.Provider.Name)
-	Assert.IsTrue(!strings.Contains(test.encoded(registration), test.clientSecret()))
+	Assert.IsTrue(!strings.Contains(setup.Encoded(registration), test.clientSecret()))
 }
 
 func (test *FederationControllerTest) TestProviderRegisterRefusesAnotherTenant() {
@@ -41,11 +39,11 @@ func (test *FederationControllerTest) TestProviderRegisterRefusesAnotherTenant()
 	other := setup.SignIn("globex", true)
 	controller := test.controller()
 
-	_, err := controller.PostProviderRegister(test.request(setup, session), test.registerRequest(other.TenantID))
+	_, err := controller.PostProviderRegister(setup.SignedIn(session), test.registerRequest(other.TenantID))
 
 	var mismatch *host.TenantMismatchError
 	Assert.IsTrue(errors.As(err, &mismatch))
-	Assert.Equals(http.StatusForbidden, test.status(err))
+	Assert.Equals(http.StatusForbidden, setup.Status(err))
 }
 
 func (test *FederationControllerTest) TestProviderRegisterRejectsAnAnonymousCaller() {
@@ -54,9 +52,9 @@ func (test *FederationControllerTest) TestProviderRegisterRejectsAnAnonymousCall
 	session := setup.SignIn("acme", true)
 	controller := test.controller()
 
-	_, err := controller.PostProviderRegister(test.anonymous(), test.registerRequest(session.TenantID))
+	_, err := controller.PostProviderRegister(setup.Anonymous(), test.registerRequest(session.TenantID))
 
-	Assert.Equals(http.StatusUnauthorized, test.status(err))
+	Assert.Equals(http.StatusUnauthorized, setup.Status(err))
 }
 
 func (test *FederationControllerTest) TestProviderConfigureAcceptsDocumentsOnTheIssuersOrigin() {
@@ -67,7 +65,7 @@ func (test *FederationControllerTest) TestProviderConfigureAcceptsDocumentsOnThe
 	providerID := test.registered(controller, setup, session)
 	key := test.signingKey()
 
-	metadata, err := controller.PostProviderConfigure(test.request(setup, session), FederationProviderConfigureRequest{
+	metadata, err := controller.PostProviderConfigure(setup.SignedIn(session), FederationProviderConfigureRequest{
 		TenantID:          session.TenantID,
 		ProviderID:        providerID,
 		DiscoveryDocument: test.discovery(test.issuer()),
@@ -87,14 +85,14 @@ func (test *FederationControllerTest) TestProviderConfigureRefusesAnEndpointOffT
 	providerID := test.registered(controller, setup, session)
 	hostile := strings.ReplaceAll(test.discovery(test.issuer()), test.issuer()+"/token", "https://attacker.example/token")
 
-	_, err := controller.PostProviderConfigure(test.request(setup, session), FederationProviderConfigureRequest{
+	_, err := controller.PostProviderConfigure(setup.SignedIn(session), FederationProviderConfigureRequest{
 		TenantID:          session.TenantID,
 		ProviderID:        providerID,
 		DiscoveryDocument: hostile,
 		KeySetDocument:    test.keySet(test.signingKey()),
 	})
 
-	Assert.Equals(http.StatusBadRequest, test.status(err))
+	Assert.Equals(http.StatusBadRequest, setup.Status(err))
 }
 
 func (test *FederationControllerTest) TestProviderGetReportsTheConfigurationWithoutTheSecret() {
@@ -104,7 +102,7 @@ func (test *FederationControllerTest) TestProviderGetReportsTheConfigurationWith
 	controller := test.controller()
 	providerID := test.configured(controller, setup, session, test.signingKey())
 
-	view, err := controller.PostProviderGet(test.request(setup, session), ProviderRequest{
+	view, err := controller.PostProviderGet(setup.SignedIn(session), ProviderRequest{
 		TenantID:   session.TenantID,
 		ProviderID: providerID,
 	})
@@ -113,7 +111,7 @@ func (test *FederationControllerTest) TestProviderGetReportsTheConfigurationWith
 	Assert.IsTrue(view.Configured)
 	Assert.Equals(1, view.KeyCount)
 	Assert.Equals(providerID, view.Provider.ProviderID)
-	Assert.IsTrue(!strings.Contains(test.encoded(view), test.clientSecret()))
+	Assert.IsTrue(!strings.Contains(setup.Encoded(view), test.clientSecret()))
 }
 
 func (test *FederationControllerTest) TestProviderGetRefusesAnotherTenant() {
@@ -124,12 +122,12 @@ func (test *FederationControllerTest) TestProviderGetRefusesAnotherTenant() {
 	controller := test.controller()
 	providerID := test.registered(controller, setup, other)
 
-	_, err := controller.PostProviderGet(test.request(setup, session), ProviderRequest{
+	_, err := controller.PostProviderGet(setup.SignedIn(session), ProviderRequest{
 		TenantID:   other.TenantID,
 		ProviderID: providerID,
 	})
 
-	Assert.Equals(http.StatusForbidden, test.status(err))
+	Assert.Equals(http.StatusForbidden, setup.Status(err))
 }
 
 func (test *FederationControllerTest) TestProviderOfAnotherTenantIsNotFoundInTheCallersTenant() {
@@ -140,13 +138,13 @@ func (test *FederationControllerTest) TestProviderOfAnotherTenantIsNotFoundInThe
 	controller := test.controller()
 	providerID := test.registered(controller, setup, other)
 
-	_, err := controller.PostProviderDisable(test.request(setup, session), ProviderDisableRequest{
+	_, err := controller.PostProviderDisable(setup.SignedIn(session), ProviderDisableRequest{
 		TenantID:   session.TenantID,
 		ProviderID: providerID,
 	})
 
-	Assert.Equals(http.StatusNotFound, test.status(err))
-	Assert.Equals("provider_not_found", test.code(err))
+	Assert.Equals(http.StatusNotFound, setup.Status(err))
+	Assert.Equals("provider_not_found", setup.ErrorCode(err))
 	Assert.IsTrue(test.stillUsable(controller, setup, other, providerID))
 }
 
@@ -157,7 +155,7 @@ func (test *FederationControllerTest) TestProviderDisableStopsNewLogins() {
 	controller := test.controller()
 	providerID := test.configured(controller, setup, session, test.signingKey())
 
-	outcome, err := controller.PostProviderDisable(test.request(setup, session), ProviderDisableRequest{
+	outcome, err := controller.PostProviderDisable(setup.SignedIn(session), ProviderDisableRequest{
 		TenantID:   session.TenantID,
 		ProviderID: providerID,
 		Reason:     "rotated away",
@@ -166,7 +164,7 @@ func (test *FederationControllerTest) TestProviderDisableStopsNewLogins() {
 
 	Assert.IsTrue(err == nil)
 	Assert.IsTrue(outcome.Disabled)
-	Assert.Equals(http.StatusNotFound, test.status(startErr))
+	Assert.Equals(http.StatusNotFound, setup.Status(startErr))
 }
 
 func (test *FederationControllerTest) TestNoRouteAnswersATokenRequest() {
@@ -189,16 +187,6 @@ func (test *FederationControllerTest) controller() *FederationController {
 			recentSignInService:  &RecentSignInService{},
 		},
 	}
-}
-
-func (test *FederationControllerTest) request(setup *SesameTestSetup, session sesame.IssuedSession) *http.Request {
-	request := test.anonymous()
-	request.Header.Set("Sesame-Session", setup.Credential(session))
-	return request
-}
-
-func (test *FederationControllerTest) anonymous() *http.Request {
-	return httptest.NewRequest(http.MethodPost, "/", nil)
 }
 
 func (test *FederationControllerTest) issuer() string {
@@ -227,8 +215,8 @@ func (test *FederationControllerTest) registered(
 	setup *SesameTestSetup,
 	session sesame.IssuedSession,
 ) string {
-	registration, err := controller.PostProviderRegister(test.request(setup, session), test.registerRequest(session.TenantID))
-	test.check(err)
+	registration, err := controller.PostProviderRegister(setup.SignedIn(session), test.registerRequest(session.TenantID))
+	setup.Check(err)
 	return registration.Provider.ProviderID
 }
 
@@ -239,13 +227,13 @@ func (test *FederationControllerTest) configured(
 	key *ecdsa.PrivateKey,
 ) string {
 	providerID := test.registered(controller, setup, session)
-	_, err := controller.PostProviderConfigure(test.request(setup, session), FederationProviderConfigureRequest{
+	_, err := controller.PostProviderConfigure(setup.SignedIn(session), FederationProviderConfigureRequest{
 		TenantID:          session.TenantID,
 		ProviderID:        providerID,
 		DiscoveryDocument: test.discovery(test.issuer()),
 		KeySetDocument:    test.keySet(key),
 	})
-	test.check(err)
+	setup.Check(err)
 	return providerID
 }
 
@@ -255,7 +243,7 @@ func (test *FederationControllerTest) stillUsable(
 	session sesame.IssuedSession,
 	providerID string,
 ) bool {
-	view, err := controller.PostProviderGet(test.request(setup, session), ProviderRequest{
+	view, err := controller.PostProviderGet(setup.SignedIn(session), ProviderRequest{
 		TenantID:   session.TenantID,
 		ProviderID: providerID,
 	})
@@ -271,7 +259,7 @@ func (test *FederationControllerTest) startRequest(tenantID string, providerID s
 }
 
 func (test *FederationControllerTest) discovery(issuer string) string {
-	return test.encoded(map[string]any{
+	return SesameTestSetup{}.Encoded(map[string]any{
 		"issuer":                                issuer,
 		"authorization_endpoint":                issuer + "/authorize",
 		"token_endpoint":                        issuer + "/token",
@@ -284,12 +272,12 @@ func (test *FederationControllerTest) discovery(issuer string) string {
 
 func (test *FederationControllerTest) signingKey() *ecdsa.PrivateKey {
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	test.check(err)
+	SesameTestSetup{}.Check(err)
 	return key
 }
 
 func (test *FederationControllerTest) keySet(key *ecdsa.PrivateKey) string {
-	return test.encoded(map[string]any{"keys": []map[string]string{{
+	return SesameTestSetup{}.Encoded(map[string]any{"keys": []map[string]string{{
 		"kty": "EC",
 		"crv": "P-256",
 		"kid": test.keyID(),
@@ -308,24 +296,6 @@ func (test *FederationControllerTest) coordinate(value []byte) string {
 	padded := make([]byte, 32)
 	copy(padded[32-len(value):], value)
 	return base64.RawURLEncoding.EncodeToString(padded)
-}
-
-func (test *FederationControllerTest) encoded(value any) string {
-	encoded, err := json.Marshal(value)
-	test.check(err)
-	return string(encoded)
-}
-
-func (test *FederationControllerTest) status(err error) int {
-	return (&SesameErrorHandler{}).Answer(err).StatusCode
-}
-
-func (test *FederationControllerTest) code(err error) string {
-	var coded host.CodedError
-	if !errors.As(err, &coded) {
-		return ""
-	}
-	return coded.ErrorCode()
 }
 
 func (test *FederationControllerTest) routesMethod(controllers []any, name string) bool {
@@ -380,12 +350,6 @@ func (test *FederationControllerTest) credentialFieldAmong(result reflect.Type) 
 
 func (test *FederationControllerTest) isTokenRequestField(name string) bool {
 	return name == "form" || name == "client_secret" || name == "code_verifier"
-}
-
-func (test *FederationControllerTest) check(err error) {
-	if err != nil {
-		panic(err)
-	}
 }
 
 func (test *FederationControllerTest) provision() *SesameTestSetup {

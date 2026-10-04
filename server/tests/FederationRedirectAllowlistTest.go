@@ -20,8 +20,8 @@ func (test *FederationRedirectAllowlistTest) TestLoginStartRefusesAnAttackersRed
 
 	login, err := controller.PostLoginStart(test.startRequest("https://attacker.example/callback"))
 
-	Assert.Equals(http.StatusBadRequest, test.status(err))
-	Assert.IsTrue(test.refused(err))
+	Assert.Equals(http.StatusBadRequest, setup.Status(err))
+	Assert.IsTrue(setup.RedirectNotAllowed(err))
 	Assert.Equals("", login.AuthorizationURL)
 	Assert.IsTrue(controller.engineService.client == nil)
 }
@@ -47,8 +47,8 @@ func (test *FederationRedirectAllowlistTest) TestLoginStartRefusesEveryRedirectU
 
 	_, err := controller.PostLoginStart(test.startRequest(test.redirectURI()))
 
-	Assert.Equals(http.StatusBadRequest, test.status(err))
-	Assert.IsTrue(test.refused(err))
+	Assert.Equals(http.StatusBadRequest, setup.Status(err))
+	Assert.IsTrue(setup.RedirectNotAllowed(err))
 	Assert.IsTrue(controller.engineService.client == nil)
 }
 
@@ -64,7 +64,7 @@ func (test *FederationRedirectAllowlistTest) TestSamlConsumerURLsDoNotAllowAFede
 
 	_, err := controller.PostLoginStart(test.startRequest(test.redirectURI()))
 
-	Assert.IsTrue(test.refused(err))
+	Assert.IsTrue(setup.RedirectNotAllowed(err))
 }
 
 func (test *FederationRedirectAllowlistTest) TestUnsafeRedirectURIConfigurationFailsClosed() {
@@ -112,21 +112,12 @@ func (test *FederationRedirectAllowlistTest) startRequest(redirectURI string) Fe
 	return FederationLoginStartRequest{TenantID: "tenant", ProviderID: "provider", RedirectURI: redirectURI}
 }
 
-func (test *FederationRedirectAllowlistTest) refused(err error) bool {
-	var refusal *host.RedirectNotAllowedError
-	return errors.As(err, &refusal)
-}
-
-func (test *FederationRedirectAllowlistTest) status(err error) int {
-	return (&SesameErrorHandler{}).Answer(err).StatusCode
-}
-
 func (test *FederationRedirectAllowlistTest) allRefusedBeforeTheEngine(addresses []string) bool {
 	refusals := []bool{}
 	for _, address := range addresses {
 		controller := test.controller()
 		_, err := controller.PostLoginStart(test.startRequest(address))
-		refusals = append(refusals, test.refused(err) && controller.engineService.client == nil)
+		refusals = append(refusals, SesameTestSetup{}.RedirectNotAllowed(err) && controller.engineService.client == nil)
 	}
 	return !slices.Contains(refusals, false)
 }

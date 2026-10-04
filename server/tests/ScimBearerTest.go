@@ -2,10 +2,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
-	"net/http/httptest"
 	"strings"
-
-	"github.com/d31ma/sesame/server/packages/sesame"
 )
 
 // @Test(SesameTestSetup, {"partition":"tests"})
@@ -18,7 +15,7 @@ func (test *ScimBearerTest) TestResourceRouteWithoutABearerTokenAnswersUnauthori
 	defer setup.Remove()
 	controller := test.controller()
 
-	_, err := controller.PostUserList(test.anonymous(), ScimListRequest{})
+	_, err := controller.PostUserList(setup.Anonymous(), ScimListRequest{})
 	response := (&SesameErrorHandler{}).Answer(err)
 
 	Assert.Equals(http.StatusUnauthorized, response.StatusCode)
@@ -31,13 +28,13 @@ func (test *ScimBearerTest) TestResourceRouteRefusesTheTokenUnderAnotherScheme()
 	defer setup.Remove()
 	session := setup.SignIn("acme", true)
 	controller := test.controller()
-	token := test.clientToken(controller, setup, session, false)
-	request := test.anonymous()
+	token := setup.ScimClient(controller, session, false).Token
+	request := setup.Anonymous()
 	request.Header.Set("Authorization", "Basic "+token)
 
 	_, err := controller.PostUserList(request, ScimListRequest{})
 
-	Assert.Equals(http.StatusUnauthorized, test.status(err))
+	Assert.Equals(http.StatusUnauthorized, setup.Status(err))
 }
 
 func (test *ScimBearerTest) TestBearerSchemeIsCaseInsensitive() {
@@ -45,8 +42,8 @@ func (test *ScimBearerTest) TestBearerSchemeIsCaseInsensitive() {
 	defer setup.Remove()
 	session := setup.SignIn("acme", true)
 	controller := test.controller()
-	token := test.clientToken(controller, setup, session, false)
-	request := test.anonymous()
+	token := setup.ScimClient(controller, session, false).Token
+	request := setup.Anonymous()
 	request.Header.Set("Authorization", "bearer "+token)
 
 	_, err := controller.PostUserList(request, ScimListRequest{})
@@ -60,7 +57,7 @@ func (test *ScimBearerTest) TestRefusedTokenIsNeverEchoed() {
 	controller := test.controller()
 	guessed := "guessed-provisioning-token-value"
 
-	_, err := controller.PostUserCreate(test.bearer(guessed), ScimResourceCreateRequest{Body: test.userBody("ada@acme.test")})
+	_, err := controller.PostUserCreate(setup.Bearer(guessed), ScimResourceCreateRequest{Body: setup.ScimUserBody("ada@acme.test")})
 	body, readErr := io.ReadAll((&SesameErrorHandler{}).Answer(err).Body)
 
 	Assert.IsTrue(readErr == nil)
@@ -74,14 +71,14 @@ func (test *ScimBearerTest) TestTokenSeesOnlyItsOwnTenantsUsers() {
 	session := setup.SignIn("acme", true)
 	other := setup.SignIn("globex", true)
 	controller := test.controller()
-	token := test.clientToken(controller, setup, session, false)
-	otherToken := test.clientToken(controller, setup, other, false)
-	created := test.createdUser(controller, token, "ada@acme.test")
+	token := setup.ScimClient(controller, session, false).Token
+	otherToken := setup.ScimClient(controller, other, false).Token
+	created := setup.ScimUserCreated(controller, token, "ada@acme.test")
 
-	_, err := controller.PostUserGet(test.bearer(otherToken), ScimResourceRequest{ResourceID: created.ID})
-	list, listErr := controller.PostUserList(test.bearer(otherToken), ScimListRequest{})
+	_, err := controller.PostUserGet(setup.Bearer(otherToken), ScimResourceRequest{ResourceID: created.ID})
+	list, listErr := controller.PostUserList(setup.Bearer(otherToken), ScimListRequest{})
 
-	Assert.Equals(http.StatusNotFound, test.status(err))
+	Assert.Equals(http.StatusNotFound, setup.Status(err))
 	Assert.IsTrue(listErr == nil)
 	Assert.Equals(0, list.TotalResults)
 }
@@ -91,11 +88,11 @@ func (test *ScimBearerTest) TestGroupRoutesNeedTheGroupGrant() {
 	defer setup.Remove()
 	session := setup.SignIn("acme", true)
 	controller := test.controller()
-	token := test.clientToken(controller, setup, session, false)
+	token := setup.ScimClient(controller, session, false).Token
 
-	_, err := controller.PostGroupCreate(test.bearer(token), ScimResourceCreateRequest{Body: test.groupBody("engineering")})
+	_, err := controller.PostGroupCreate(setup.Bearer(token), ScimResourceCreateRequest{Body: setup.ScimGroupBody("engineering")})
 
-	Assert.Equals(http.StatusForbidden, test.status(err))
+	Assert.Equals(http.StatusForbidden, setup.Status(err))
 	Assert.Equals("provisioning_forbidden", test.answeredCode(err))
 }
 
@@ -112,91 +109,10 @@ func (test *ScimBearerTest) controller() *ScimController {
 	}
 }
 
-func (test *ScimBearerTest) administrator(setup *SesameTestSetup, session sesame.IssuedSession) *http.Request {
-	request := test.anonymous()
-	request.Header.Set("Sesame-Session", setup.Credential(session))
-	return request
-}
-
-func (test *ScimBearerTest) bearer(token string) *http.Request {
-	request := test.anonymous()
-	request.Header.Set("Authorization", "Bearer "+token)
-	return request
-}
-
-func (test *ScimBearerTest) anonymous() *http.Request {
-	return httptest.NewRequest(http.MethodPost, "/", nil)
-}
-
-func (test *ScimBearerTest) registerRequest(tenantID string, canManageGroups bool) ScimClientRegisterRequest {
-	return ScimClientRegisterRequest{
-		TenantID:            tenantID,
-		Name:                "directory",
-		IdentifierNamespace: "email",
-		CanManageGroups:     canManageGroups,
-	}
-}
-
-func (test *ScimBearerTest) registeredClient(
-	controller *ScimController,
-	setup *SesameTestSetup,
-	session sesame.IssuedSession,
-	canManageGroups bool,
-) ScimClientRegistration {
-	registration, err := controller.PostClientRegister(test.administrator(setup, session), test.registerRequest(session.TenantID, canManageGroups))
-	test.check(err)
-	return registration
-}
-
-func (test *ScimBearerTest) clientToken(
-	controller *ScimController,
-	setup *SesameTestSetup,
-	session sesame.IssuedSession,
-	canManageGroups bool,
-) string {
-	return test.registeredClient(controller, setup, session, canManageGroups).Token
-}
-
-func (test *ScimBearerTest) createdUser(controller *ScimController, token string, userName string) ScimUser {
-	user, err := controller.PostUserCreate(test.bearer(token), ScimResourceCreateRequest{Body: test.userBody(userName)})
-	test.check(err)
-	return user
-}
-
-func (test *ScimBearerTest) userBody(userName string) string {
-	return test.encoded(map[string]any{
-		"schemas":  []string{"urn:ietf:params:scim:schemas:core:2.0:User"},
-		"userName": userName,
-	})
-}
-
-func (test *ScimBearerTest) groupBody(displayName string) string {
-	return test.encoded(map[string]any{
-		"schemas":     []string{"urn:ietf:params:scim:schemas:core:2.0:Group"},
-		"displayName": displayName,
-	})
-}
-
-func (test *ScimBearerTest) encoded(value any) string {
-	encoded, err := json.Marshal(value)
-	test.check(err)
-	return string(encoded)
-}
-
-func (test *ScimBearerTest) status(err error) int {
-	return (&SesameErrorHandler{}).Answer(err).StatusCode
-}
-
 func (test *ScimBearerTest) answeredCode(err error) string {
 	body, readErr := io.ReadAll((&SesameErrorHandler{}).Answer(err).Body)
-	test.check(readErr)
+	SesameTestSetup{}.Check(readErr)
 	problem := Problem{}
-	test.check(json.Unmarshal(body, &problem))
+	SesameTestSetup{}.Check(json.Unmarshal(body, &problem))
 	return problem.Code
-}
-
-func (test *ScimBearerTest) check(err error) {
-	if err != nil {
-		panic(err)
-	}
 }

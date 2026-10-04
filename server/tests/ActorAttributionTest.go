@@ -22,9 +22,9 @@ func (test *ActorAttributionTest) TestAdministratorWriteRecordsTheCallingPrincip
 	defer setup.Remove()
 	administrator := setup.SignIn("acme", true)
 	member := setup.SignInMember("acme", "member")
-	engine := test.engine()
+	engine := setup.Engine()
 
-	_, err := test.principals(engine).PostSuspend(test.request(setup.Credential(administrator)), PrincipalReference{PrincipalID: member.PrincipalID})
+	_, err := test.principals(engine).PostSuspend(setup.SignedIn(administrator), PrincipalReference{PrincipalID: member.PrincipalID})
 	test.finish(engine)
 
 	Assert.IsTrue(err == nil)
@@ -35,10 +35,10 @@ func (test *ActorAttributionTest) TestSelfServiceWriteRecordsTheCallingPrincipal
 	setup := SesameTestSetup{}.Provision()
 	defer setup.Remove()
 	member := setup.SignInMember("acme", "member")
-	engine := test.engine()
-	sessions := &SessionController{engineService: engine, tenantCallService: test.tenantCalls(engine)}
+	engine := setup.Engine()
+	sessions := &SessionController{engineService: engine, tenantCallService: setup.TenantCalls(engine)}
 
-	_, err := sessions.PostRevoke(test.request(setup.Credential(member)), SessionRevokeReason{Reason: "signed_out"})
+	_, err := sessions.PostRevoke(setup.SignedIn(member), SessionRevokeReason{Reason: "signed_out"})
 	test.finish(engine)
 
 	Assert.IsTrue(err == nil)
@@ -50,10 +50,10 @@ func (test *ActorAttributionTest) TestGrantRevokeRecordsTheCallingPrincipal() {
 	defer setup.Remove()
 	administrator := setup.SignIn("acme", true)
 	member := setup.SignInMember("acme", "member")
-	engine := test.engine()
-	calls := test.tenantCalls(engine)
+	engine := setup.Engine()
+	calls := setup.TenantCalls(engine)
 	grants := &GrantController{tenantCallService: calls}
-	request := test.request(setup.Credential(administrator))
+	request := setup.SignedIn(administrator)
 	role, _ := (&RoleController{tenantCallService: calls}).PostCreate(request, RoleCreateRequest{
 		TenantID: administrator.TenantID, Name: "reader", Permissions: []RolePermission{{Action: "doc:read", Resource: "file:*"}},
 	})
@@ -71,10 +71,10 @@ func (test *ActorAttributionTest) TestRefusedCrossTenantRevokeRecordsNothing() {
 	defer setup.Remove()
 	administrator := setup.SignIn("acme", true)
 	other := setup.SignInMember("globex", "member")
-	engine := test.engine()
-	sessions := &SessionController{engineService: engine, tenantCallService: test.tenantCalls(engine)}
+	engine := setup.Engine()
+	sessions := &SessionController{engineService: engine, tenantCallService: setup.TenantCalls(engine)}
 
-	_, err := sessions.PostRevokeByID(test.request(setup.Credential(administrator)), SessionRevokeRequest{SessionID: other.SessionID})
+	_, err := sessions.PostRevokeByID(setup.SignedIn(administrator), SessionRevokeRequest{SessionID: other.SessionID})
 	test.finish(engine)
 
 	Assert.Equals(http.StatusForbidden, (&SesameErrorHandler{}).Answer(err).StatusCode)
@@ -85,11 +85,11 @@ func (test *ActorAttributionTest) TestTenantRecordCallRecordsTheCallingPrincipal
 	setup := SesameTestSetup{}.Provision()
 	defer setup.Remove()
 	administrator := setup.SignIn("acme", true)
-	engine := test.engine()
+	engine := setup.Engine()
 	clients := &OidcClientController{
-		tenantCallService: test.tenantCalls(engine),
+		tenantCallService: setup.TenantCalls(engine),
 	}
-	request := test.request(setup.Credential(administrator))
+	request := setup.SignedIn(administrator)
 	registered, _ := clients.PostRegister(request, OidcClientRegisterRequest{
 		TenantID: administrator.TenantID, Name: "Portal", ClientType: "confidential",
 		Redirects: []string{"https://rp.example/callback"}, Scopes: []string{"openid"}, Audience: "first_party",
@@ -106,10 +106,10 @@ func (test *ActorAttributionTest) TestCallerCallRecordsTheCallingPrincipal() {
 	setup := SesameTestSetup{}.Provision()
 	defer setup.Remove()
 	member := setup.SignInMember("acme", "member")
-	engine := test.engine()
+	engine := setup.Engine()
 	oidc := &OidcController{
 		engineService:            engine,
-		tenantCallService:        test.tenantCalls(engine),
+		tenantCallService:        setup.TenantCalls(engine),
 		interactionCookieService: &InteractionCookieService{},
 	}
 	registered := sesame.ClientRegistration{}
@@ -119,7 +119,7 @@ func (test *ActorAttributionTest) TestCallerCallRecordsTheCallingPrincipal() {
 	}, &registered)
 	started, _ := oidc.PostDeviceAuthorize(OidcDeviceAuthorizeRequest{ClientID: registered.Client.ID, Scopes: []string{"openid"}})
 
-	_, err := oidc.PostDeviceDeny(test.request(setup.Credential(member)), OidcUserCodeRequest{UserCode: started.UserCode})
+	_, err := oidc.PostDeviceDeny(setup.SignedIn(member), OidcUserCodeRequest{UserCode: started.UserCode})
 	test.finish(engine)
 
 	Assert.IsTrue(registerErr == nil)
@@ -132,7 +132,7 @@ func (test *ActorAttributionTest) TestCallActsAsTheBoundCaller() {
 	setup := SesameTestSetup{}.Provision()
 	defer setup.Remove()
 	administrator := setup.SignIn("acme", true)
-	engine := test.engine()
+	engine := setup.Engine()
 
 	engine.ActAs(Caller{TenantID: administrator.TenantID, PrincipalID: administrator.PrincipalID, SessionID: administrator.SessionID})
 	err := engine.Call("principal.create", test.creation(administrator.TenantID), &Principal{})
@@ -146,7 +146,7 @@ func (test *ActorAttributionTest) TestCallWithoutACallerRecordsTheMachineOperato
 	setup := SesameTestSetup{}.Provision()
 	defer setup.Remove()
 	administrator := setup.SignIn("acme", true)
-	engine := test.engine()
+	engine := setup.Engine()
 
 	err := engine.Call("principal.create", test.creation(administrator.TenantID), &Principal{})
 	test.finish(engine)
@@ -159,7 +159,7 @@ func (test *ActorAttributionTest) TestRejectedCallerBindsNoActor() {
 	setup := SesameTestSetup{}.Provision()
 	defer setup.Remove()
 	administrator := setup.SignIn("acme", true)
-	engine := test.engine()
+	engine := setup.Engine()
 
 	_, rejected := (&CallerService{engineService: engine}).Resolve(httptest.NewRequest(http.MethodPost, "/", nil))
 	err := engine.Call("principal.create", test.creation(administrator.TenantID), &Principal{})
@@ -174,8 +174,8 @@ func (test *ActorAttributionTest) TestCallRefusesAnActorTheEngineCannotRecord() 
 	setup := SesameTestSetup{}.Provision()
 	defer setup.Remove()
 	setup.UseSettings(map[string]any{"binary": test.engineWithoutAttribution(setup), "deployment": setup.deployment})
-	bound := test.engine()
-	unbound := test.engine()
+	bound := setup.Engine()
+	unbound := setup.Engine()
 
 	bound.ActAs(Caller{TenantID: "tnt_1", PrincipalID: "prn_1", SessionID: "ses_1"})
 	boundErr := bound.Call("system.ping", struct{}{}, &SystemPing{})
@@ -194,7 +194,7 @@ func (test *ActorAttributionTest) engineWithoutAttribution(setup *SesameTestSetu
 	body := "#!/bin/sh\nwhile IFS= read -r line; do\n" +
 		"  id=$(printf '%s' \"$line\" | sed 's/.*\"request_id\":\"\\([^\"]*\\)\".*/\\1/')\n" +
 		"  printf '" + answer + "' \"$id\"\ndone\n"
-	setup.check(os.WriteFile(script, []byte(body), 0o700))
+	setup.Check(os.WriteFile(script, []byte(body), 0o700))
 	return script
 }
 
@@ -202,9 +202,9 @@ func (test *ActorAttributionTest) actors(setup *SesameTestSetup, eventType strin
 	query := "SELECT actor FROM sesame-security-events WHERE type = '" + eventType + "'"
 	root := filepath.Join(setup.deployment, "fylo-root")
 	output, err := exec.Command(setup.lookPath("fylo"), "sql", query, "--root", root, "--json").Output()
-	setup.check(err)
+	setup.Check(err)
 	events := map[string]SecurityEventActor{}
-	setup.check(json.Unmarshal(output, &events))
+	setup.Check(json.Unmarshal(output, &events))
 	return test.inOrder(events)
 }
 
@@ -229,12 +229,6 @@ func (test *ActorAttributionTest) creation(tenantID string) PrincipalCreateReque
 	return PrincipalCreateRequest{TenantID: tenantID, Kind: "human", IdentifierNamespace: "email", IdentifierValue: "created@acme.test"}
 }
 
-func (test *ActorAttributionTest) request(credential string) *http.Request {
-	request := httptest.NewRequest(http.MethodPost, "/", nil)
-	request.Header.Set("Sesame-Session", credential)
-	return request
-}
-
 func (test *ActorAttributionTest) finish(engine *EngineService) {
 	if engine.client != nil {
 		engine.client.Close()
@@ -243,20 +237,7 @@ func (test *ActorAttributionTest) finish(engine *EngineService) {
 
 func (test *ActorAttributionTest) principals(engine *EngineService) *PrincipalController {
 	return &PrincipalController{
-		tenantCallService:      test.tenantCalls(engine),
-		principalTenantService: &PrincipalTenantService{tenantCallService: test.tenantCalls(engine)},
-	}
-}
-
-func (test *ActorAttributionTest) engine() *EngineService {
-	return &EngineService{engineSettingsService: &EngineSettingsService{}}
-}
-
-func (test *ActorAttributionTest) tenantCalls(engine *EngineService) *TenantCallService {
-	return &TenantCallService{
-		callerService:        &CallerService{engineService: engine},
-		engineService:        engine,
-		administratorService: &AdministratorService{engineService: engine},
-		recentSignInService:  &RecentSignInService{},
+		tenantCallService:      SesameTestSetup{}.TenantCalls(engine),
+		principalTenantService: &PrincipalTenantService{tenantCallService: SesameTestSetup{}.TenantCalls(engine)},
 	}
 }

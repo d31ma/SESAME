@@ -1,11 +1,9 @@
 import (
 	"errors"
 	"net/http"
-	"net/http/httptest"
 	"time"
 
 	"github.com/d31ma/sesame/server/packages/host"
-	"github.com/d31ma/sesame/server/packages/sesame"
 )
 
 // @Test(SesameTestSetup, {"partition":"tests"})
@@ -18,7 +16,7 @@ func (test *PrincipalControllerTest) TestCreateRegistersAPrincipalInTheCallersTe
 	defer setup.Remove()
 	administrator := setup.SignIn("acme", true)
 
-	principal, err := test.controller().PostCreate(test.request(setup.Credential(administrator)), test.creation(administrator.TenantID))
+	principal, err := test.controller().PostCreate(setup.SignedIn(administrator), test.creation(administrator.TenantID))
 
 	Assert.IsTrue(err == nil)
 	Assert.Equals(administrator.TenantID, principal.TenantID)
@@ -33,7 +31,7 @@ func (test *PrincipalControllerTest) TestCreateRefusesAnotherTenant() {
 	administrator := setup.SignIn("acme", true)
 	other := setup.SignIn("globex", true)
 
-	principal, err := test.controller().PostCreate(test.request(setup.Credential(administrator)), test.creation(other.TenantID))
+	principal, err := test.controller().PostCreate(setup.SignedIn(administrator), test.creation(other.TenantID))
 
 	var mismatch *host.TenantMismatchError
 	Assert.IsTrue(errors.As(err, &mismatch))
@@ -45,13 +43,13 @@ func (test *PrincipalControllerTest) TestCreateRefusesAClaimedIdentifier() {
 	defer setup.Remove()
 	administrator := setup.SignIn("acme", true)
 	controller := test.controller()
-	request := test.request(setup.Credential(administrator))
+	request := setup.SignedIn(administrator)
 	_, first := controller.PostCreate(request, test.creation(administrator.TenantID))
 
 	_, err := controller.PostCreate(request, test.creation(administrator.TenantID))
 
 	Assert.IsTrue(first == nil)
-	Assert.Equals("identifier_conflict", test.code(err))
+	Assert.Equals("identifier_conflict", setup.ProtocolCode(err))
 }
 
 func (test *PrincipalControllerTest) TestCreateRefusesAMemberEvenWithoutTheRouteGuard() {
@@ -61,8 +59,8 @@ func (test *PrincipalControllerTest) TestCreateRefusesAMemberEvenWithoutTheRoute
 	member := setup.SignInMember("acme", "member")
 	controller := test.controller()
 
-	principal, err := controller.PostCreate(test.request(setup.Credential(member)), test.creation(member.TenantID))
-	_, lookup := controller.PostGet(test.request(setup.Credential(administrator)), test.lookupService(administrator.TenantID, "builder"))
+	principal, err := controller.PostCreate(setup.SignedIn(member), test.creation(member.TenantID))
+	_, lookup := controller.PostGet(setup.SignedIn(administrator), test.lookupService(administrator.TenantID, "builder"))
 
 	Assert.Equals(http.StatusForbidden, (&SesameErrorHandler{}).Answer(err).StatusCode)
 	Assert.Equals("administrator_required", test.publicCode(err))
@@ -75,7 +73,7 @@ func (test *PrincipalControllerTest) TestCreateRejectsAnAnonymousCaller() {
 	defer setup.Remove()
 	administrator := setup.SignIn("acme", true)
 
-	_, err := test.controller().PostCreate(test.anonymous(), test.creation(administrator.TenantID))
+	_, err := test.controller().PostCreate(setup.Anonymous(), test.creation(administrator.TenantID))
 
 	var rejected *host.SessionRejectedError
 	Assert.IsTrue(errors.As(err, &rejected))
@@ -87,7 +85,7 @@ func (test *PrincipalControllerTest) TestGetFindsAPrincipalByID() {
 	administrator := setup.SignIn("acme", true)
 	member := setup.SignInMember("acme", "member")
 
-	principal, err := test.controller().PostGet(test.request(setup.Credential(administrator)), PrincipalGetRequest{PrincipalID: member.PrincipalID})
+	principal, err := test.controller().PostGet(setup.SignedIn(administrator), PrincipalGetRequest{PrincipalID: member.PrincipalID})
 
 	Assert.IsTrue(err == nil)
 	Assert.Equals(member.PrincipalID, principal.PrincipalID)
@@ -100,7 +98,7 @@ func (test *PrincipalControllerTest) TestGetFindsAPrincipalByIdentifier() {
 	administrator := setup.SignIn("acme", true)
 	member := setup.SignInMember("acme", "member")
 
-	principal, err := test.controller().PostGet(test.request(setup.Credential(administrator)), test.lookup(administrator.TenantID, "member@acme.test"))
+	principal, err := test.controller().PostGet(setup.SignedIn(administrator), test.lookup(administrator.TenantID, "member@acme.test"))
 
 	Assert.IsTrue(err == nil)
 	Assert.Equals(member.PrincipalID, principal.PrincipalID)
@@ -112,7 +110,7 @@ func (test *PrincipalControllerTest) TestGetRefusesAPrincipalOfAnotherTenantByID
 	administrator := setup.SignIn("acme", true)
 	other := setup.SignIn("globex", true)
 
-	principal, err := test.controller().PostGet(test.request(setup.Credential(administrator)), PrincipalGetRequest{PrincipalID: other.PrincipalID})
+	principal, err := test.controller().PostGet(setup.SignedIn(administrator), PrincipalGetRequest{PrincipalID: other.PrincipalID})
 
 	var mismatch *host.TenantMismatchError
 	Assert.IsTrue(errors.As(err, &mismatch))
@@ -125,7 +123,7 @@ func (test *PrincipalControllerTest) TestGetRefusesAnIdentifierOfAnotherTenant()
 	administrator := setup.SignIn("acme", true)
 	other := setup.SignIn("globex", true)
 
-	principal, err := test.controller().PostGet(test.request(setup.Credential(administrator)), test.lookup(other.TenantID, "person@globex.test"))
+	principal, err := test.controller().PostGet(setup.SignedIn(administrator), test.lookup(other.TenantID, "person@globex.test"))
 
 	var mismatch *host.TenantMismatchError
 	Assert.IsTrue(errors.As(err, &mismatch))
@@ -139,7 +137,7 @@ func (test *PrincipalControllerTest) TestGetRefusesAForeignPrincipalIDNamedWithT
 	other := setup.SignIn("globex", true)
 	lookup := PrincipalGetRequest{TenantID: administrator.TenantID, PrincipalID: other.PrincipalID}
 
-	principal, err := test.controller().PostGet(test.request(setup.Credential(administrator)), lookup)
+	principal, err := test.controller().PostGet(setup.SignedIn(administrator), lookup)
 
 	var mixed *host.MixedPrincipalLookupError
 	Assert.IsTrue(errors.As(err, &mixed))
@@ -154,7 +152,7 @@ func (test *PrincipalControllerTest) TestGetRefusesAPrincipalIDMixedWithAnIdenti
 	administrator := setup.SignIn("acme", true)
 	lookup := PrincipalGetRequest{PrincipalID: administrator.PrincipalID, IdentifierNamespace: "email", IdentifierValue: "person@acme.test"}
 
-	principal, err := test.controller().PostGet(test.request(setup.Credential(administrator)), lookup)
+	principal, err := test.controller().PostGet(setup.SignedIn(administrator), lookup)
 
 	var mixed *host.MixedPrincipalLookupError
 	Assert.IsTrue(errors.As(err, &mixed))
@@ -166,9 +164,9 @@ func (test *PrincipalControllerTest) TestGetRefusesAnEmptyRequest() {
 	defer setup.Remove()
 	administrator := setup.SignIn("acme", true)
 
-	_, err := test.controller().PostGet(test.request(setup.Credential(administrator)), PrincipalGetRequest{})
+	_, err := test.controller().PostGet(setup.SignedIn(administrator), PrincipalGetRequest{})
 
-	Assert.Equals("invalid_request", test.code(err))
+	Assert.Equals("invalid_request", setup.ProtocolCode(err))
 }
 
 func (test *PrincipalControllerTest) TestSuspendSuspendsAPrincipalOfTheCallersTenantAndRepeats() {
@@ -177,7 +175,7 @@ func (test *PrincipalControllerTest) TestSuspendSuspendsAPrincipalOfTheCallersTe
 	administrator := setup.SignIn("acme", true)
 	member := setup.SignInMember("acme", "member")
 	controller := test.controller()
-	request := test.request(setup.Credential(administrator))
+	request := setup.SignedIn(administrator)
 	_, first := controller.PostSuspend(request, PrincipalReference{PrincipalID: member.PrincipalID})
 
 	principal, err := controller.PostSuspend(request, PrincipalReference{PrincipalID: member.PrincipalID})
@@ -192,13 +190,13 @@ func (test *PrincipalControllerTest) TestSuspendNeedsARecentSignIn() {
 	defer setup.Remove()
 	administrator := setup.SignIn("acme", true)
 	member := setup.SignInMember("acme", "member")
-	engine := test.engine()
-	request := test.request(setup.Credential(administrator))
+	engine := setup.Engine()
+	request := setup.SignedIn(administrator)
 
 	_, err := test.controllerWith(engine, 11*time.Minute).PostSuspend(request, PrincipalReference{PrincipalID: member.PrincipalID})
 	untouched, check := test.controllerWith(engine, 0).PostGet(request, PrincipalGetRequest{PrincipalID: member.PrincipalID})
 
-	Assert.IsTrue(test.reauthenticationRequired(err))
+	Assert.IsTrue(setup.ReauthenticationRequired(err))
 	Assert.IsTrue(check == nil)
 	Assert.Equals("active", untouched.Status)
 }
@@ -210,8 +208,8 @@ func (test *PrincipalControllerTest) TestSuspendRefusesAPrincipalOfAnotherTenant
 	other := setup.SignIn("globex", true)
 	controller := test.controller()
 
-	_, err := controller.PostSuspend(test.request(setup.Credential(administrator)), PrincipalReference{PrincipalID: other.PrincipalID})
-	untouched, check := controller.PostGet(test.request(setup.Credential(other)), PrincipalGetRequest{PrincipalID: other.PrincipalID})
+	_, err := controller.PostSuspend(setup.SignedIn(administrator), PrincipalReference{PrincipalID: other.PrincipalID})
+	untouched, check := controller.PostGet(setup.SignedIn(other), PrincipalGetRequest{PrincipalID: other.PrincipalID})
 
 	var mismatch *host.TenantMismatchError
 	Assert.IsTrue(errors.As(err, &mismatch))
@@ -236,12 +234,6 @@ func (test *PrincipalControllerTest) lookupService(tenantID string, value string
 	return PrincipalGetRequest{TenantID: tenantID, IdentifierNamespace: "service", IdentifierValue: value}
 }
 
-func (test *PrincipalControllerTest) code(err error) string {
-	protocolError := &sesame.ProtocolError{}
-	errors.As(err, &protocolError)
-	return protocolError.Code
-}
-
 func (test *PrincipalControllerTest) publicCode(err error) string {
 	var coded host.CodedError
 	errors.As(err, &coded)
@@ -251,46 +243,14 @@ func (test *PrincipalControllerTest) publicCode(err error) string {
 	return coded.ErrorCode()
 }
 
-func (test *PrincipalControllerTest) anonymous() *http.Request {
-	return httptest.NewRequest(http.MethodPost, "/", nil)
-}
-
-func (test *PrincipalControllerTest) request(credential string) *http.Request {
-	request := test.anonymous()
-	request.Header.Set("Sesame-Session", credential)
-	return request
-}
-
 func (test *PrincipalControllerTest) controller() *PrincipalController {
-	return test.controllerWith(test.engine(), 0)
-}
-
-func (test *PrincipalControllerTest) engine() *EngineService {
-	return &EngineService{engineSettingsService: &EngineSettingsService{}}
+	return test.controllerWith(SesameTestSetup{}.Engine(), 0)
 }
 
 func (test *PrincipalControllerTest) controllerWith(engine *EngineService, elapsed time.Duration) *PrincipalController {
-	calls := test.tenantCallsAfter(engine, elapsed)
+	calls := SesameTestSetup{}.TenantCallsAfter(engine, elapsed)
 	return &PrincipalController{
 		tenantCallService:      calls,
 		principalTenantService: &PrincipalTenantService{tenantCallService: calls},
 	}
-}
-
-func (test *PrincipalControllerTest) tenantCalls(engine *EngineService) *TenantCallService {
-	return test.tenantCallsAfter(engine, 0)
-}
-
-func (test *PrincipalControllerTest) tenantCallsAfter(engine *EngineService, elapsed time.Duration) *TenantCallService {
-	return &TenantCallService{
-		callerService:        &CallerService{engineService: engine},
-		engineService:        engine,
-		administratorService: &AdministratorService{engineService: engine},
-		recentSignInService:  &RecentSignInService{clockShift: elapsed},
-	}
-}
-
-func (test *PrincipalControllerTest) reauthenticationRequired(err error) bool {
-	var required *host.ReauthenticationRequiredError
-	return errors.As(err, &required)
 }

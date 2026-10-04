@@ -1,12 +1,9 @@
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
-	"net/http/httptest"
 	"strings"
 
 	"github.com/d31ma/sesame/server/packages/host"
-	"github.com/d31ma/sesame/server/packages/sesame"
 )
 
 // @Test(SesameTestSetup, {"partition":"tests"})
@@ -20,13 +17,13 @@ func (test *ScimControllerTest) TestClientRegisterReturnsTheTokenOnce() {
 	session := setup.SignIn("acme", true)
 	controller := test.controller()
 
-	registration, err := controller.PostClientRegister(test.administrator(setup, session), test.registerRequest(session.TenantID, false))
+	registration, err := controller.PostClientRegister(setup.SignedIn(session), setup.ScimRegisterRequest(session.TenantID, false))
 
 	Assert.IsTrue(err == nil)
 	Assert.IsTrue(registration.Token != "")
 	Assert.Equals(session.TenantID, registration.Client.TenantID)
 	Assert.Equals("email", registration.Client.IdentifierNamespace)
-	Assert.IsTrue(!strings.Contains(test.encoded(registration.Client), registration.Token))
+	Assert.IsTrue(!strings.Contains(setup.Encoded(registration.Client), registration.Token))
 }
 
 func (test *ScimControllerTest) TestClientRegisterRefusesAnotherTenant() {
@@ -36,7 +33,7 @@ func (test *ScimControllerTest) TestClientRegisterRefusesAnotherTenant() {
 	other := setup.SignIn("globex", true)
 	controller := test.controller()
 
-	_, err := controller.PostClientRegister(test.administrator(setup, session), test.registerRequest(other.TenantID, false))
+	_, err := controller.PostClientRegister(setup.SignedIn(session), setup.ScimRegisterRequest(other.TenantID, false))
 
 	var mismatch *host.TenantMismatchError
 	Assert.IsTrue(errors.As(err, &mismatch))
@@ -48,9 +45,9 @@ func (test *ScimControllerTest) TestClientRegisterRejectsAnAnonymousCaller() {
 	session := setup.SignIn("acme", true)
 	controller := test.controller()
 
-	_, err := controller.PostClientRegister(test.anonymous(), test.registerRequest(session.TenantID, false))
+	_, err := controller.PostClientRegister(setup.Anonymous(), setup.ScimRegisterRequest(session.TenantID, false))
 
-	Assert.Equals(http.StatusUnauthorized, test.status(err))
+	Assert.Equals(http.StatusUnauthorized, setup.Status(err))
 }
 
 func (test *ScimControllerTest) TestRotatedTokenReplacesThePreviousOne() {
@@ -58,19 +55,19 @@ func (test *ScimControllerTest) TestRotatedTokenReplacesThePreviousOne() {
 	defer setup.Remove()
 	session := setup.SignIn("acme", true)
 	controller := test.controller()
-	registration := test.registeredClient(controller, setup, session, false)
+	registration := setup.ScimClient(controller, session, false)
 
-	rotated, err := controller.PostClientRotateToken(test.administrator(setup, session), ScimClientRequest{
+	rotated, err := controller.PostClientRotateToken(setup.SignedIn(session), ScimClientRequest{
 		TenantID:     session.TenantID,
 		ScimClientID: registration.Client.ScimClientID,
 	})
-	_, oldErr := controller.PostUserList(test.bearer(registration.Token), ScimListRequest{})
-	_, newErr := controller.PostUserList(test.bearer(rotated.Token), ScimListRequest{})
+	_, oldErr := controller.PostUserList(setup.Bearer(registration.Token), ScimListRequest{})
+	_, newErr := controller.PostUserList(setup.Bearer(rotated.Token), ScimListRequest{})
 
 	Assert.IsTrue(err == nil)
 	Assert.IsTrue(rotated.Token != registration.Token)
-	Assert.Equals(1, len(test.fields(rotated)))
-	Assert.Equals(http.StatusUnauthorized, test.status(oldErr))
+	Assert.Equals(1, len(setup.Fields(rotated)))
+	Assert.Equals(http.StatusUnauthorized, setup.Status(oldErr))
 	Assert.IsTrue(newErr == nil)
 }
 
@@ -80,14 +77,14 @@ func (test *ScimControllerTest) TestClientRotateTokenRefusesAnotherTenant() {
 	session := setup.SignIn("acme", true)
 	other := setup.SignIn("globex", true)
 	controller := test.controller()
-	registration := test.registeredClient(controller, setup, other, false)
+	registration := setup.ScimClient(controller, other, false)
 
-	rotated, err := controller.PostClientRotateToken(test.administrator(setup, session), ScimClientRequest{
+	rotated, err := controller.PostClientRotateToken(setup.SignedIn(session), ScimClientRequest{
 		TenantID:     other.TenantID,
 		ScimClientID: registration.Client.ScimClientID,
 	})
 
-	Assert.Equals(http.StatusForbidden, test.status(err))
+	Assert.Equals(http.StatusForbidden, setup.Status(err))
 	Assert.Equals("", rotated.Token)
 }
 
@@ -96,18 +93,18 @@ func (test *ScimControllerTest) TestDisabledClientIsRefused() {
 	defer setup.Remove()
 	session := setup.SignIn("acme", true)
 	controller := test.controller()
-	registration := test.registeredClient(controller, setup, session, false)
+	registration := setup.ScimClient(controller, session, false)
 
-	outcome, err := controller.PostClientDisable(test.administrator(setup, session), ScimClientDisableRequest{
+	outcome, err := controller.PostClientDisable(setup.SignedIn(session), ScimClientDisableRequest{
 		TenantID:     session.TenantID,
 		ScimClientID: registration.Client.ScimClientID,
 		Reason:       "directory retired",
 	})
-	_, listErr := controller.PostUserList(test.bearer(registration.Token), ScimListRequest{})
+	_, listErr := controller.PostUserList(setup.Bearer(registration.Token), ScimListRequest{})
 
 	Assert.IsTrue(err == nil)
 	Assert.IsTrue(outcome.Disabled)
-	Assert.Equals(http.StatusUnauthorized, test.status(listErr))
+	Assert.Equals(http.StatusUnauthorized, setup.Status(listErr))
 }
 
 func (test *ScimControllerTest) TestClientOfAnotherTenantIsNotFoundInTheCallersTenant() {
@@ -116,15 +113,15 @@ func (test *ScimControllerTest) TestClientOfAnotherTenantIsNotFoundInTheCallersT
 	session := setup.SignIn("acme", true)
 	other := setup.SignIn("globex", true)
 	controller := test.controller()
-	registration := test.registeredClient(controller, setup, other, false)
+	registration := setup.ScimClient(controller, other, false)
 
-	_, err := controller.PostClientDisable(test.administrator(setup, session), ScimClientDisableRequest{
+	_, err := controller.PostClientDisable(setup.SignedIn(session), ScimClientDisableRequest{
 		TenantID:     session.TenantID,
 		ScimClientID: registration.Client.ScimClientID,
 	})
-	_, listErr := controller.PostUserList(test.bearer(registration.Token), ScimListRequest{})
+	_, listErr := controller.PostUserList(setup.Bearer(registration.Token), ScimListRequest{})
 
-	Assert.Equals(http.StatusNotFound, test.status(err))
+	Assert.Equals(http.StatusNotFound, setup.Status(err))
 	Assert.IsTrue(listErr == nil)
 }
 
@@ -138,63 +135,5 @@ func (test *ScimControllerTest) controller() *ScimController {
 			administratorService: &AdministratorService{engineService: engine},
 			recentSignInService:  &RecentSignInService{},
 		},
-	}
-}
-
-func (test *ScimControllerTest) administrator(setup *SesameTestSetup, session sesame.IssuedSession) *http.Request {
-	request := test.anonymous()
-	request.Header.Set("Sesame-Session", setup.Credential(session))
-	return request
-}
-
-func (test *ScimControllerTest) bearer(token string) *http.Request {
-	request := test.anonymous()
-	request.Header.Set("Authorization", "Bearer "+token)
-	return request
-}
-
-func (test *ScimControllerTest) anonymous() *http.Request {
-	return httptest.NewRequest(http.MethodPost, "/", nil)
-}
-
-func (test *ScimControllerTest) registerRequest(tenantID string, canManageGroups bool) ScimClientRegisterRequest {
-	return ScimClientRegisterRequest{
-		TenantID:            tenantID,
-		Name:                "directory",
-		IdentifierNamespace: "email",
-		CanManageGroups:     canManageGroups,
-	}
-}
-
-func (test *ScimControllerTest) registeredClient(
-	controller *ScimController,
-	setup *SesameTestSetup,
-	session sesame.IssuedSession,
-	canManageGroups bool,
-) ScimClientRegistration {
-	registration, err := controller.PostClientRegister(test.administrator(setup, session), test.registerRequest(session.TenantID, canManageGroups))
-	test.check(err)
-	return registration
-}
-
-func (test *ScimControllerTest) fields(value any) map[string]any {
-	fields := map[string]any{}
-	test.check(json.Unmarshal([]byte(test.encoded(value)), &fields))
-	return fields
-}
-
-func (test *ScimControllerTest) encoded(value any) string {
-	encoded, err := json.Marshal(value)
-	test.check(err)
-	return string(encoded)
-}
-
-func (test *ScimControllerTest) status(err error) int {
-	return (&SesameErrorHandler{}).Answer(err).StatusCode
-}
-
-func (test *ScimControllerTest) check(err error) {
-	if err != nil {
-		panic(err)
 	}
 }

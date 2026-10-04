@@ -16,7 +16,7 @@ func (test *TenantControllerTest) TestGetReturnsTheCallersTenant() {
 	defer setup.Remove()
 	session := setup.SignIn("acme", true)
 
-	tenant, err := test.controller().PostGet(test.request(setup.Credential(session)), TenantGetRequest{TenantID: session.TenantID})
+	tenant, err := test.controller().PostGet(setup.SignedIn(session), TenantGetRequest{TenantID: session.TenantID})
 
 	Assert.IsTrue(err == nil)
 	Assert.Equals(session.TenantID, tenant.TenantID)
@@ -30,7 +30,7 @@ func (test *TenantControllerTest) TestGetRefusesAnotherTenant() {
 	session := setup.SignIn("acme", true)
 	other := setup.SignIn("globex", true)
 
-	tenant, err := test.controller().PostGet(test.request(setup.Credential(session)), TenantGetRequest{TenantID: other.TenantID})
+	tenant, err := test.controller().PostGet(setup.SignedIn(session), TenantGetRequest{TenantID: other.TenantID})
 
 	var mismatch *host.TenantMismatchError
 	Assert.IsTrue(errors.As(err, &mismatch))
@@ -48,23 +48,8 @@ func (test *TenantControllerTest) TestGetRejectsAnAnonymousCaller() {
 	Assert.IsTrue(errors.As(err, &rejected))
 }
 
-func (test *TenantControllerTest) request(credential string) *http.Request {
-	request := httptest.NewRequest(http.MethodPost, "/", nil)
-	request.Header.Set("Sesame-Session", credential)
-	return request
-}
-
 func (test *TenantControllerTest) controller() *TenantController {
 	engine := &EngineService{engineSettingsService: &EngineSettingsService{}}
-	calls := test.tenantCalls(engine)
+	calls := SesameTestSetup{}.TenantCalls(engine)
 	return &TenantController{tenantCallService: calls}
-}
-
-func (test *TenantControllerTest) tenantCalls(engine *EngineService) *TenantCallService {
-	return &TenantCallService{
-		callerService:        &CallerService{engineService: engine},
-		engineService:        engine,
-		administratorService: &AdministratorService{engineService: engine},
-		recentSignInService:  &RecentSignInService{},
-	}
 }

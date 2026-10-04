@@ -5,7 +5,6 @@ import (
 	"crypto/sha1"
 	"encoding/base32"
 	"encoding/binary"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -29,7 +28,7 @@ func (test *AuthenticatorControllerTest) TestSetPasswordReplacesOnlyTheCallersPa
 	controller := test.controller()
 	authn := test.authn(controller)
 
-	set, err := controller.PostSetPassword(test.request(setup, session), AuthenticatorPassword{Password: newPassword})
+	set, err := controller.PostSetPassword(setup.SignedIn(session), AuthenticatorPassword{Password: newPassword})
 	oldLogin := test.loginWithPassword(authn, session, oldPassword)
 	newLogin := test.loginWithPassword(authn, session, newPassword)
 
@@ -37,7 +36,7 @@ func (test *AuthenticatorControllerTest) TestSetPasswordReplacesOnlyTheCallersPa
 	Assert.IsTrue(set.PasswordSet)
 	Assert.Equals("", oldLogin.Assurance)
 	Assert.Equals("password", newLogin.Assurance)
-	Assert.IsTrue(!strings.Contains(test.json(set), newPassword))
+	Assert.IsTrue(!strings.Contains(setup.Encoded(set), newPassword))
 }
 
 func (test *AuthenticatorControllerTest) TestSetPasswordRefusesAShortPasswordWithoutEchoingIt() {
@@ -46,9 +45,9 @@ func (test *AuthenticatorControllerTest) TestSetPasswordRefusesAShortPasswordWit
 	session, _ := test.signIn(setup)
 	short := "short-pw"
 
-	_, err := test.controller().PostSetPassword(test.request(setup, session), AuthenticatorPassword{Password: short})
+	_, err := test.controller().PostSetPassword(setup.SignedIn(session), AuthenticatorPassword{Password: short})
 
-	Assert.Equals(http.StatusBadRequest, test.status(err))
+	Assert.Equals(http.StatusBadRequest, setup.Status(err))
 	Assert.Equals(`{"code":"invalid_request"}`, test.answer(err))
 }
 
@@ -58,7 +57,7 @@ func (test *AuthenticatorControllerTest) TestTotpEnrollmentLetsTheCallerReachMfa
 	session, password := test.signIn(setup)
 	controller := test.controller()
 	authn := test.authn(controller)
-	request := test.request(setup, session)
+	request := setup.SignedIn(session)
 
 	enrollment, enrollErr := controller.PostTotpEnroll(request, AuthenticatorTotpIssuer{})
 	activation, activateErr := controller.PostTotpActivate(request, AuthenticatorTotpCode{Code: test.totp(enrollment.Secret, 0)})
@@ -84,13 +83,13 @@ func (test *AuthenticatorControllerTest) TestTotpActivateRefusesAWrongCode() {
 	defer setup.Remove()
 	session, _ := test.signIn(setup)
 	controller := test.controller()
-	request := test.request(setup, session)
+	request := setup.SignedIn(session)
 	enrollment, _ := controller.PostTotpEnroll(request, AuthenticatorTotpIssuer{Issuer: "Acme"})
 	wrong := test.totp(enrollment.Secret, 10)
 
 	activation, err := controller.PostTotpActivate(request, AuthenticatorTotpCode{Code: wrong})
 
-	Assert.Equals(http.StatusBadRequest, test.status(err))
+	Assert.Equals(http.StatusBadRequest, setup.Status(err))
 	Assert.IsTrue(!activation.Activated)
 	Assert.IsTrue(!strings.Contains(test.answer(err), wrong))
 }
@@ -100,13 +99,13 @@ func (test *AuthenticatorControllerTest) TestTotpEnrollRefusesToReplaceAnActiveF
 	defer setup.Remove()
 	session, _ := test.signIn(setup)
 	controller := test.controller()
-	request := test.request(setup, session)
+	request := setup.SignedIn(session)
 	enrollment, _ := controller.PostTotpEnroll(request, AuthenticatorTotpIssuer{})
 	controller.PostTotpActivate(request, AuthenticatorTotpCode{Code: test.totp(enrollment.Secret, 0)})
 
 	replacement, err := controller.PostTotpEnroll(request, AuthenticatorTotpIssuer{})
 
-	Assert.Equals(http.StatusConflict, test.status(err))
+	Assert.Equals(http.StatusConflict, setup.Status(err))
 	Assert.Equals("", replacement.Secret)
 }
 
@@ -116,7 +115,7 @@ func (test *AuthenticatorControllerTest) TestRecoveryCodesAreSingleUseAndReissue
 	session, password := test.signIn(setup)
 	controller := test.controller()
 	authn := test.authn(controller)
-	request := test.request(setup, session)
+	request := setup.SignedIn(session)
 
 	issued, err := controller.PostRecoveryCodesIssue(request)
 	first := test.loginWithPassword(authn, session, password)
@@ -159,7 +158,7 @@ func (test *AuthenticatorControllerTest) TestStaleSessionCannotChangeAnyAuthenti
 	defer setup.Remove()
 	session, password := test.signIn(setup)
 	controller := test.controllerAfter(11 * time.Minute)
-	request := test.request(setup, session)
+	request := setup.SignedIn(session)
 
 	_, setErr := controller.PostSetPassword(request, AuthenticatorPassword{Password: rand.Text()})
 	_, enrollErr := controller.PostTotpEnroll(request, AuthenticatorTotpIssuer{})
@@ -171,7 +170,7 @@ func (test *AuthenticatorControllerTest) TestStaleSessionCannotChangeAnyAuthenti
 	listed, listErr := controller.PostPasskeyList(request)
 	login := test.loginWithPassword(test.authn(controller), session, password)
 
-	Assert.Equals(http.StatusForbidden, test.status(setErr))
+	Assert.Equals(http.StatusForbidden, setup.Status(setErr))
 	Assert.IsTrue(test.allAnswer(`{"code":"reauthentication_required"}`,
 		[]error{setErr, enrollErr, activateErr, recoveryErr, beginErr, finishErr, removeErr}))
 	Assert.IsTrue(listErr == nil)
@@ -185,7 +184,7 @@ func (test *AuthenticatorControllerTest) TestSessionInsideTheWindowMayChangeAuth
 	session, _ := test.signIn(setup)
 	controller := test.controllerAfter(9 * time.Minute)
 
-	set, err := controller.PostSetPassword(test.request(setup, session), AuthenticatorPassword{Password: rand.Text()})
+	set, err := controller.PostSetPassword(setup.SignedIn(session), AuthenticatorPassword{Password: rand.Text()})
 
 	Assert.IsTrue(err == nil)
 	Assert.IsTrue(set.PasswordSet)
@@ -198,7 +197,7 @@ func (test *AuthenticatorControllerTest) TestAdministratorCredentialChangesNeedA
 	member := setup.SignInMember("acme", "member")
 	password := rand.Text()
 	controller := test.controllerAfter(11 * time.Minute)
-	request := test.request(setup, administrator)
+	request := setup.SignedIn(administrator)
 
 	_, setErr := controller.PostSetPasswordForPrincipal(request, AuthenticatorSetPasswordRequest{PrincipalID: member.PrincipalID, Password: password})
 	_, removeErr := controller.PostPasskeyRemoveForPrincipal(request, AuthenticatorPasskeyRemoveForPrincipalRequest{PrincipalID: member.PrincipalID, CredentialID: "AAAA"})
@@ -222,7 +221,7 @@ func (test *AuthenticatorControllerTest) TestAdministratorResetsAMembersPassword
 	controller := test.controllerAfter(9 * time.Minute)
 
 	set, err := controller.PostSetPasswordForPrincipal(
-		test.request(setup, administrator),
+		setup.SignedIn(administrator),
 		AuthenticatorSetPasswordRequest{PrincipalID: member.PrincipalID, Password: password},
 	)
 	login := test.loginAs(test.authn(controller), AuthnBeginRequest{
@@ -243,11 +242,11 @@ func (test *AuthenticatorControllerTest) TestAdministratorCannotResetAPasswordIn
 	stranger := setup.SignIn("globex", false)
 
 	set, err := test.controller().PostSetPasswordForPrincipal(
-		test.request(setup, administrator),
+		setup.SignedIn(administrator),
 		AuthenticatorSetPasswordRequest{PrincipalID: stranger.PrincipalID, Password: rand.Text()},
 	)
 
-	Assert.Equals(http.StatusForbidden, test.status(err))
+	Assert.Equals(http.StatusForbidden, setup.Status(err))
 	Assert.Equals(`{"code":"tenant_mismatch"}`, test.answer(err))
 	Assert.IsTrue(!set.PasswordSet)
 }
@@ -271,16 +270,16 @@ func (test *AuthenticatorControllerTest) signIn(setup *SesameTestSetup) (sesame.
 	ctx := context.Background()
 	password := rand.Text()
 	tenant, err := client.TenantBootstrap(ctx, "acme")
-	test.check(err)
+	setup.Check(err)
 	principal, err := client.PrincipalCreate(ctx, tenant.Tenant.ID, "human", test.identifier())
-	test.check(err)
-	test.check(client.SetPassword(ctx, principal.ID, password))
+	setup.Check(err)
+	setup.Check(client.SetPassword(ctx, principal.ID, password))
 	started, err := client.AuthenticationBegin(ctx, tenant.Tenant.ID, test.identifier())
-	test.check(err)
+	setup.Check(err)
 	_, err = client.AuthenticationVerifyPassword(ctx, started.TransactionID, password)
-	test.check(err)
+	setup.Check(err)
 	session, err := client.AuthenticationComplete(ctx, started.TransactionID, 0)
-	test.check(err)
+	setup.Check(err)
 	return session, password
 }
 
@@ -298,9 +297,9 @@ func (test *AuthenticatorControllerTest) loginWithPassword(
 
 func (test *AuthenticatorControllerTest) loginAs(authn *AuthnController, login AuthnBeginRequest, password string) AuthnTransaction {
 	begun, err := authn.PostBegin(login)
-	test.check(err)
+	SesameTestSetup{}.Check(err)
 	verified, err := authn.PostVerifyPassword(AuthnVerifyPasswordRequest{TransactionID: begun.TransactionID, Password: password})
-	test.check(err)
+	SesameTestSetup{}.Check(err)
 	return verified
 }
 
@@ -310,19 +309,13 @@ func (test *AuthenticatorControllerTest) identifier() sesame.PrincipalIdentifier
 
 func (test *AuthenticatorControllerTest) totp(secret string, stepsFromNow int64) string {
 	key, err := base32.StdEncoding.WithPadding(base32.NoPadding).DecodeString(secret)
-	test.check(err)
+	SesameTestSetup{}.Check(err)
 	counter := binary.BigEndian.AppendUint64(nil, uint64(time.Now().Unix()/30+stepsFromNow))
 	mac := hmac.New(sha1.New, key)
 	mac.Write(counter)
 	sum := mac.Sum(nil)
 	offset := sum[len(sum)-1] & 0x0f
 	return fmt.Sprintf("%06d", (binary.BigEndian.Uint32(sum[offset:])&0x7fffffff)%1000000)
-}
-
-func (test *AuthenticatorControllerTest) request(setup *SesameTestSetup, session sesame.IssuedSession) *http.Request {
-	request := httptest.NewRequest(http.MethodPost, "/", nil)
-	request.Header.Set("Sesame-Session", setup.Credential(session))
-	return request
 }
 
 func (test *AuthenticatorControllerTest) allAnswer(answer string, failures []error) bool {
@@ -334,24 +327,9 @@ func (test *AuthenticatorControllerTest) allAnswer(answer string, failures []err
 	return true
 }
 
-func (test *AuthenticatorControllerTest) status(err error) int {
-	return (&SesameErrorHandler{}).Answer(err).StatusCode
-}
-
 func (test *AuthenticatorControllerTest) answer(err error) string {
 	body, _ := io.ReadAll((&SesameErrorHandler{}).Answer(err).Body)
 	return string(body)
-}
-
-func (test *AuthenticatorControllerTest) json(value any) string {
-	encoded, _ := json.Marshal(value)
-	return string(encoded)
-}
-
-func (test *AuthenticatorControllerTest) check(err error) {
-	if err != nil {
-		panic(err)
-	}
 }
 
 func (test *AuthenticatorControllerTest) controller() *AuthenticatorController {
@@ -359,7 +337,7 @@ func (test *AuthenticatorControllerTest) controller() *AuthenticatorController {
 }
 
 func (test *AuthenticatorControllerTest) controllerAfter(elapsed time.Duration) *AuthenticatorController {
-	engine := test.engine()
+	engine := SesameTestSetup{}.Engine()
 	calls := &TenantCallService{
 		callerService:        &CallerService{engineService: engine},
 		engineService:        engine,
@@ -374,8 +352,4 @@ func (test *AuthenticatorControllerTest) controllerAfter(elapsed time.Duration) 
 
 func (test *AuthenticatorControllerTest) authn(controller *AuthenticatorController) *AuthnController {
 	return &AuthnController{engineService: controller.tenantCallService.engineService}
-}
-
-func (test *AuthenticatorControllerTest) engine() *EngineService {
-	return &EngineService{engineSettingsService: &EngineSettingsService{}}
 }

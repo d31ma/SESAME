@@ -19,10 +19,10 @@ func (test *AuthorizeControllerTest) TestDecideAllowsTheCallersGrantedPermission
 	defer setup.Remove()
 	administrator := setup.SignIn("acme", true)
 	member := setup.SignInMember("acme", "member")
-	engine := test.engine()
-	test.grantReader(engine, test.request(setup.Credential(administrator)), member)
+	engine := setup.Engine()
+	test.grantReader(engine, setup.SignedIn(administrator), member)
 
-	decision, err := test.controller(engine).PostDecide(test.request(setup.Credential(member)), test.question("file:a"))
+	decision, err := test.controller(engine).PostDecide(setup.SignedIn(member), test.question("file:a"))
 
 	Assert.IsTrue(err == nil)
 	Assert.Equals("allow", decision.Decision)
@@ -35,10 +35,10 @@ func (test *AuthorizeControllerTest) TestDecideDeniesAPermissionTheCallerLacks()
 	defer setup.Remove()
 	administrator := setup.SignIn("acme", true)
 	member := setup.SignInMember("acme", "member")
-	engine := test.engine()
-	test.grantReader(engine, test.request(setup.Credential(administrator)), member)
+	engine := setup.Engine()
+	test.grantReader(engine, setup.SignedIn(administrator), member)
 
-	decision, err := test.controller(engine).PostDecide(test.request(setup.Credential(member)), test.question("disk:a"))
+	decision, err := test.controller(engine).PostDecide(setup.SignedIn(member), test.question("disk:a"))
 
 	Assert.IsTrue(err == nil)
 	Assert.Equals("deny", decision.Decision)
@@ -52,7 +52,7 @@ func (test *AuthorizeControllerTest) TestDecideAnswersForTheCallerNotTheAdminist
 	member := setup.SignInMember("acme", "member")
 	question := AuthorizeDecideRequest{Action: "sesame:administer", Resource: "sesame:tenant"}
 
-	decision, err := test.controller(test.engine()).PostDecide(test.request(setup.Credential(member)), question)
+	decision, err := test.controller(setup.Engine()).PostDecide(setup.SignedIn(member), question)
 
 	Assert.IsTrue(err == nil)
 	Assert.Equals("deny", decision.Decision)
@@ -66,9 +66,9 @@ func (test *AuthorizeControllerTest) TestDecideRefusesACallerAssertedSessionAttr
 	question := test.question("file:a")
 	question.Context = map[string]string{"session.assurance": "mfa"}
 
-	_, err := test.controller(test.engine()).PostDecide(test.request(setup.Credential(member)), question)
+	_, err := test.controller(setup.Engine()).PostDecide(setup.SignedIn(member), question)
 
-	Assert.Equals("invalid_request", test.code(err))
+	Assert.Equals("invalid_request", setup.ProtocolCode(err))
 }
 
 func (test *AuthorizeControllerTest) TestDecideRefusesAStalePolicyVersion() {
@@ -76,16 +76,16 @@ func (test *AuthorizeControllerTest) TestDecideRefusesAStalePolicyVersion() {
 	defer setup.Remove()
 	administrator := setup.SignIn("acme", true)
 	member := setup.SignInMember("acme", "member")
-	engine := test.engine()
+	engine := setup.Engine()
 	controller := test.controller(engine)
-	first, _ := controller.PostDecide(test.request(setup.Credential(member)), test.question("file:a"))
-	test.grantReader(engine, test.request(setup.Credential(administrator)), member)
+	first, _ := controller.PostDecide(setup.SignedIn(member), test.question("file:a"))
+	test.grantReader(engine, setup.SignedIn(administrator), member)
 	pinned := test.question("file:a")
 	pinned.PolicyVersion = &first.PolicyVersion
 
-	_, err := controller.PostDecide(test.request(setup.Credential(member)), pinned)
+	_, err := controller.PostDecide(setup.SignedIn(member), pinned)
 
-	Assert.Equals("stale_policy_version", test.code(err))
+	Assert.Equals("stale_policy_version", setup.ProtocolCode(err))
 }
 
 func (test *AuthorizeControllerTest) TestDecideRejectsARevokedSession() {
@@ -95,7 +95,7 @@ func (test *AuthorizeControllerTest) TestDecideRejectsARevokedSession() {
 	member := setup.SignInMember("acme", "member")
 	setup.Revoke(member)
 
-	decision, err := test.controller(test.engine()).PostDecide(test.request(setup.Credential(member)), test.question("file:a"))
+	decision, err := test.controller(setup.Engine()).PostDecide(setup.SignedIn(member), test.question("file:a"))
 
 	var rejected *host.SessionRejectedError
 	Assert.IsTrue(errors.As(err, &rejected))
@@ -106,7 +106,7 @@ func (test *AuthorizeControllerTest) TestDecideRejectsAnAnonymousCaller() {
 	setup := SesameTestSetup{}.Provision()
 	defer setup.Remove()
 
-	_, err := test.controller(test.engine()).PostDecide(httptest.NewRequest(http.MethodPost, "/", nil), test.question("file:a"))
+	_, err := test.controller(setup.Engine()).PostDecide(httptest.NewRequest(http.MethodPost, "/", nil), test.question("file:a"))
 
 	var rejected *host.SessionRejectedError
 	Assert.IsTrue(errors.As(err, &rejected))
@@ -149,14 +149,14 @@ func (test *AuthorizeControllerTest) TestDecideBatchAnswersEveryQuestionUnderOne
 	defer setup.Remove()
 	administrator := setup.SignIn("acme", true)
 	member := setup.SignInMember("acme", "member")
-	engine := test.engine()
-	test.grantReader(engine, test.request(setup.Credential(administrator)), member)
+	engine := setup.Engine()
+	test.grantReader(engine, setup.SignedIn(administrator), member)
 	batch := AuthorizeDecideBatchRequest{Requests: []AuthorizeQuestion{
 		{Action: "doc:read", Resource: "file:a"},
 		{Action: "doc:read", Resource: "disk:a"},
 	}}
 
-	answer, err := test.controller(engine).PostDecideBatch(test.request(setup.Credential(member)), batch)
+	answer, err := test.controller(engine).PostDecideBatch(setup.SignedIn(member), batch)
 
 	Assert.IsTrue(err == nil)
 	Assert.Equals(2, len(answer.Decisions))
@@ -171,9 +171,9 @@ func (test *AuthorizeControllerTest) TestDecideBatchRefusesMoreThanOneHundredQue
 	administrator := setup.SignIn("acme", true)
 	batch := AuthorizeDecideBatchRequest{Requests: test.questions(101)}
 
-	_, err := test.controller(test.engine()).PostDecideBatch(test.request(setup.Credential(administrator)), batch)
+	_, err := test.controller(setup.Engine()).PostDecideBatch(setup.SignedIn(administrator), batch)
 
-	Assert.Equals("invalid_request", test.code(err))
+	Assert.Equals("invalid_request", setup.ProtocolCode(err))
 }
 
 func (test *AuthorizeControllerTest) TestDecideBatchRejectsAnAnonymousCaller() {
@@ -181,7 +181,7 @@ func (test *AuthorizeControllerTest) TestDecideBatchRejectsAnAnonymousCaller() {
 	defer setup.Remove()
 	batch := AuthorizeDecideBatchRequest{Requests: []AuthorizeQuestion{{Action: "doc:read", Resource: "file:a"}}}
 
-	answer, err := test.controller(test.engine()).PostDecideBatch(httptest.NewRequest(http.MethodPost, "/", nil), batch)
+	answer, err := test.controller(setup.Engine()).PostDecideBatch(httptest.NewRequest(http.MethodPost, "/", nil), batch)
 
 	var rejected *host.SessionRejectedError
 	Assert.IsTrue(errors.As(err, &rejected))
@@ -189,7 +189,7 @@ func (test *AuthorizeControllerTest) TestDecideBatchRejectsAnAnonymousCaller() {
 }
 
 func (test *AuthorizeControllerTest) grantReader(engine *EngineService, request *http.Request, member sesame.IssuedSession) {
-	calls := test.tenantCalls(engine)
+	calls := SesameTestSetup{}.TenantCalls(engine)
 	role, err := (&RoleController{tenantCallService: calls}).PostCreate(request, RoleCreateRequest{
 		TenantID:    member.TenantID,
 		Name:        "reader",
@@ -222,31 +222,6 @@ func (test *AuthorizeControllerTest) decodeStrictly(body string, target any) err
 	return decoder.Decode(target)
 }
 
-func (test *AuthorizeControllerTest) code(err error) string {
-	protocolError := &sesame.ProtocolError{}
-	errors.As(err, &protocolError)
-	return protocolError.Code
-}
-
-func (test *AuthorizeControllerTest) request(credential string) *http.Request {
-	request := httptest.NewRequest(http.MethodPost, "/", nil)
-	request.Header.Set("Sesame-Session", credential)
-	return request
-}
-
-func (test *AuthorizeControllerTest) engine() *EngineService {
-	return &EngineService{engineSettingsService: &EngineSettingsService{}}
-}
-
 func (test *AuthorizeControllerTest) controller(engine *EngineService) *AuthorizeController {
-	return &AuthorizeController{tenantCallService: test.tenantCalls(engine)}
-}
-
-func (test *AuthorizeControllerTest) tenantCalls(engine *EngineService) *TenantCallService {
-	return &TenantCallService{
-		callerService:        &CallerService{engineService: engine},
-		engineService:        engine,
-		administratorService: &AdministratorService{engineService: engine},
-		recentSignInService:  &RecentSignInService{},
-	}
+	return &AuthorizeController{tenantCallService: SesameTestSetup{}.TenantCalls(engine)}
 }

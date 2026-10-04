@@ -18,7 +18,7 @@ func (test *PrincipalTenantServiceTest) TestRequireReturnsAPrincipalOfTheCallers
 	administrator := setup.SignIn("acme", true)
 	member := setup.SignInMember("acme", "member")
 
-	principal, err := test.service().Require(test.request(setup.Credential(administrator)), member.PrincipalID)
+	principal, err := test.service().Require(setup.SignedIn(administrator), member.PrincipalID)
 
 	Assert.IsTrue(err == nil)
 	Assert.Equals(member.PrincipalID, principal.PrincipalID)
@@ -32,7 +32,7 @@ func (test *PrincipalTenantServiceTest) TestRequireRefusesAPrincipalOfAnotherTen
 	administrator := setup.SignIn("acme", true)
 	other := setup.SignIn("globex", true)
 
-	principal, err := test.service().Require(test.request(setup.Credential(administrator)), other.PrincipalID)
+	principal, err := test.service().Require(setup.SignedIn(administrator), other.PrincipalID)
 
 	var mismatch *host.TenantMismatchError
 	Assert.IsTrue(errors.As(err, &mismatch))
@@ -45,7 +45,7 @@ func (test *PrincipalTenantServiceTest) TestRequireReportsAnUnknownPrincipal() {
 	defer setup.Remove()
 	administrator := setup.SignIn("acme", true)
 
-	_, err := test.service().Require(test.request(setup.Credential(administrator)), "prn_00000000000000000000000000000000")
+	_, err := test.service().Require(setup.SignedIn(administrator), "prn_00000000000000000000000000000000")
 
 	protocolError := &sesame.ProtocolError{}
 	Assert.IsTrue(errors.As(err, &protocolError))
@@ -71,7 +71,7 @@ func (test *PrincipalTenantServiceTest) TestCallRunsTheOperationForAPrincipalOfT
 	member := setup.SignInMember("acme", "member")
 	suspended := Principal{}
 
-	err := test.service().Call(test.request(setup.Credential(administrator)), member.PrincipalID, EngineCall{
+	err := test.service().Call(setup.SignedIn(administrator), member.PrincipalID, EngineCall{
 		Operation:  "principal.suspend",
 		Parameters: PrincipalReference{PrincipalID: member.PrincipalID},
 		Result:     &suspended,
@@ -89,12 +89,12 @@ func (test *PrincipalTenantServiceTest) TestCallRefusesAPrincipalOfAnotherTenant
 	service := test.service()
 	suspended := Principal{}
 
-	err := service.Call(test.request(setup.Credential(administrator)), other.PrincipalID, EngineCall{
+	err := service.Call(setup.SignedIn(administrator), other.PrincipalID, EngineCall{
 		Operation:  "principal.suspend",
 		Parameters: PrincipalReference{PrincipalID: other.PrincipalID},
 		Result:     &suspended,
 	})
-	untouched, check := service.Require(test.request(setup.Credential(other)), other.PrincipalID)
+	untouched, check := service.Require(setup.SignedIn(other), other.PrincipalID)
 
 	var mismatch *host.TenantMismatchError
 	Assert.IsTrue(errors.As(err, &mismatch))
@@ -103,22 +103,7 @@ func (test *PrincipalTenantServiceTest) TestCallRefusesAPrincipalOfAnotherTenant
 	Assert.Equals("active", untouched.Status)
 }
 
-func (test *PrincipalTenantServiceTest) request(credential string) *http.Request {
-	request := httptest.NewRequest(http.MethodPost, "/", nil)
-	request.Header.Set("Sesame-Session", credential)
-	return request
-}
-
 func (test *PrincipalTenantServiceTest) service() *PrincipalTenantService {
 	engine := &EngineService{engineSettingsService: &EngineSettingsService{}}
-	return &PrincipalTenantService{tenantCallService: test.tenantCalls(engine)}
-}
-
-func (test *PrincipalTenantServiceTest) tenantCalls(engine *EngineService) *TenantCallService {
-	return &TenantCallService{
-		callerService:        &CallerService{engineService: engine},
-		engineService:        engine,
-		administratorService: &AdministratorService{engineService: engine},
-		recentSignInService:  &RecentSignInService{},
-	}
+	return &PrincipalTenantService{tenantCallService: SesameTestSetup{}.TenantCalls(engine)}
 }

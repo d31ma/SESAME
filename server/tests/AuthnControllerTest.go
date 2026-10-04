@@ -33,7 +33,7 @@ func (test *AuthnControllerTest) TestPasswordLoginIssuesAUsableSession() {
 	Assert.IsTrue(session.PrincipalID != "")
 	Assert.Equals(login.TenantID, session.TenantID)
 	Assert.IsTrue(session.SessionSecret != "")
-	Assert.IsTrue(!strings.Contains(test.json(verified), password))
+	Assert.IsTrue(!strings.Contains(setup.Encoded(verified), password))
 }
 
 func (test *AuthnControllerTest) TestCompleteBodyCannotChooseTheSessionLifetime() {
@@ -91,7 +91,7 @@ func (test *AuthnControllerTest) TestWrongPasswordSpendsAnAttemptAndEchoesNothin
 	Assert.IsTrue(err == nil)
 	Assert.Equals(begun.AttemptsLeft-1, verified.AttemptsLeft)
 	Assert.Equals("", verified.Assurance)
-	Assert.IsTrue(!strings.Contains(test.json(verified), wrong))
+	Assert.IsTrue(!strings.Contains(setup.Encoded(verified), wrong))
 }
 
 func (test *AuthnControllerTest) TestTransactionClosesAfterItsAttemptsAreSpent() {
@@ -105,7 +105,7 @@ func (test *AuthnControllerTest) TestTransactionClosesAfterItsAttemptsAreSpent()
 
 	_, err := controller.PostVerifyPassword(test.password(begun, password))
 
-	Assert.Equals(http.StatusConflict, test.status(err))
+	Assert.Equals(http.StatusConflict, setup.Status(err))
 	Assert.Equals(`{"code":"transaction_closed"}`, test.answer(err))
 }
 
@@ -118,7 +118,7 @@ func (test *AuthnControllerTest) TestCompleteBeforeAnyFactorIsRefused() {
 
 	session, err := controller.PostComplete(AuthnCompleteRequest{TransactionID: begun.TransactionID})
 
-	Assert.Equals(http.StatusConflict, test.status(err))
+	Assert.Equals(http.StatusConflict, setup.Status(err))
 	Assert.Equals("", session.SessionSecret)
 }
 
@@ -135,7 +135,7 @@ func (test *AuthnControllerTest) TestCompleteIsSingleUse() {
 
 	Assert.IsTrue(firstErr == nil)
 	Assert.IsTrue(first.SessionSecret != "")
-	Assert.Equals(http.StatusConflict, test.status(err))
+	Assert.Equals(http.StatusConflict, setup.Status(err))
 	Assert.Equals("", replayed.SessionSecret)
 }
 
@@ -149,7 +149,7 @@ func (test *AuthnControllerTest) TestUnknownTransactionIsNotFound() {
 		Password:      password,
 	})
 
-	Assert.Equals(http.StatusNotFound, test.status(err))
+	Assert.Equals(http.StatusNotFound, setup.Status(err))
 	Assert.IsTrue(!strings.Contains(test.answer(err), password))
 }
 
@@ -160,7 +160,7 @@ func (test *AuthnControllerTest) TestMalformedTransactionIsABadRequestThatEchoes
 
 	_, err := test.controller().PostVerifyPassword(AuthnVerifyPasswordRequest{TransactionID: "x", Password: password})
 
-	Assert.Equals(http.StatusBadRequest, test.status(err))
+	Assert.Equals(http.StatusBadRequest, setup.Status(err))
 	Assert.Equals(`{"code":"invalid_request"}`, test.answer(err))
 }
 
@@ -173,7 +173,7 @@ func (test *AuthnControllerTest) TestTotpBeforeTheFirstFactorIsRefused() {
 
 	verified, err := controller.PostVerifyTotp(AuthnCodeRequest{TransactionID: begun.TransactionID, Code: "123456"})
 
-	Assert.Equals(http.StatusConflict, test.status(err))
+	Assert.Equals(http.StatusConflict, setup.Status(err))
 	Assert.Equals("", verified.Assurance)
 }
 
@@ -187,7 +187,7 @@ func (test *AuthnControllerTest) TestRecoveryCodeBeforeTheFirstFactorIsRefused()
 
 	_, err := controller.PostVerifyRecoveryCode(AuthnCodeRequest{TransactionID: begun.TransactionID, Code: code})
 
-	Assert.Equals(http.StatusConflict, test.status(err))
+	Assert.Equals(http.StatusConflict, setup.Status(err))
 	Assert.IsTrue(!strings.Contains(test.answer(err), code))
 }
 
@@ -232,21 +232,15 @@ func (test *AuthnControllerTest) login(setup *SesameTestSetup, tenantName string
 	identifier := sesame.PrincipalIdentifier{Namespace: "email", Value: "person@" + tenantName + ".test"}
 	password := rand.Text()
 	tenant, err := client.TenantBootstrap(ctx, tenantName)
-	test.check(err)
+	setup.Check(err)
 	principal, err := client.PrincipalCreate(ctx, tenant.Tenant.ID, "human", identifier)
-	test.check(err)
-	test.check(client.SetPassword(ctx, principal.ID, password))
+	setup.Check(err)
+	setup.Check(client.SetPassword(ctx, principal.ID, password))
 	return AuthnBeginRequest{
 		TenantID:            tenant.Tenant.ID,
 		IdentifierNamespace: identifier.Namespace,
 		IdentifierValue:     identifier.Value,
 	}, password
-}
-
-func (test *AuthnControllerTest) check(err error) {
-	if err != nil {
-		panic(err)
-	}
 }
 
 func (test *AuthnControllerTest) password(transaction AuthnTransaction, password string) AuthnVerifyPasswordRequest {
@@ -257,10 +251,6 @@ func (test *AuthnControllerTest) spendAttempts(controller *AuthnController, wron
 	for range attempts {
 		controller.PostVerifyPassword(wrong)
 	}
-}
-
-func (test *AuthnControllerTest) status(err error) int {
-	return (&SesameErrorHandler{}).Answer(err).StatusCode
 }
 
 func (test *AuthnControllerTest) answer(err error) string {
@@ -275,11 +265,6 @@ func (test *AuthnControllerTest) decodeStrictly(body string, target any) error {
 	decoder := json.NewDecoder(strings.NewReader(body))
 	decoder.DisallowUnknownFields()
 	return decoder.Decode(target)
-}
-
-func (test *AuthnControllerTest) json(value any) string {
-	encoded, _ := json.Marshal(value)
-	return string(encoded)
 }
 
 func (test *AuthnControllerTest) controller() *AuthnController {

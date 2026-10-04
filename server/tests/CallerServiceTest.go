@@ -16,7 +16,7 @@ func (test *CallerServiceTest) TestResolveReturnsTheSessionCaller() {
 	defer setup.Remove()
 	session := setup.SignIn("acme", false)
 
-	caller, err := test.callers().Resolve(test.request(setup.Credential(session)))
+	caller, err := test.callers().Resolve(setup.SignedIn(session))
 
 	Assert.IsTrue(err == nil)
 	Assert.Equals(session.TenantID, caller.TenantID)
@@ -30,7 +30,7 @@ func (test *CallerServiceTest) TestResolveRejectsAMissingCredential() {
 
 	_, err := test.callers().Resolve(httptest.NewRequest(http.MethodPost, "/", nil))
 
-	Assert.IsTrue(test.rejected(err))
+	Assert.IsTrue(setup.SessionRejected(err))
 }
 
 func (test *CallerServiceTest) TestResolveRejectsACredentialWithoutASecret() {
@@ -38,9 +38,9 @@ func (test *CallerServiceTest) TestResolveRejectsACredentialWithoutASecret() {
 	defer setup.Remove()
 	session := setup.SignIn("acme", false)
 
-	_, err := test.callers().Resolve(test.request(session.SessionID))
+	_, err := test.callers().Resolve(setup.Request(session.SessionID))
 
-	Assert.IsTrue(test.rejected(err))
+	Assert.IsTrue(setup.SessionRejected(err))
 }
 
 func (test *CallerServiceTest) TestResolveRejectsAWrongSecret() {
@@ -48,18 +48,18 @@ func (test *CallerServiceTest) TestResolveRejectsAWrongSecret() {
 	defer setup.Remove()
 	session := setup.SignIn("acme", false)
 
-	_, err := test.callers().Resolve(test.request(session.SessionID + ":not-the-secret"))
+	_, err := test.callers().Resolve(setup.Request(session.SessionID + ":not-the-secret"))
 
-	Assert.IsTrue(test.rejected(err))
+	Assert.IsTrue(setup.SessionRejected(err))
 }
 
 func (test *CallerServiceTest) TestResolveRejectsAnUnknownSession() {
 	setup := SesameTestSetup{}.Provision()
 	defer setup.Remove()
 
-	_, err := test.callers().Resolve(test.request("not-a-session:not-a-secret"))
+	_, err := test.callers().Resolve(setup.Request("not-a-session:not-a-secret"))
 
-	Assert.IsTrue(test.rejected(err))
+	Assert.IsTrue(setup.SessionRejected(err))
 }
 
 func (test *CallerServiceTest) TestResolveRejectsARevokedSession() {
@@ -68,9 +68,9 @@ func (test *CallerServiceTest) TestResolveRejectsARevokedSession() {
 	session := setup.SignIn("acme", false)
 	setup.Revoke(session)
 
-	_, err := test.callers().Resolve(test.request(setup.Credential(session)))
+	_, err := test.callers().Resolve(setup.SignedIn(session))
 
-	Assert.IsTrue(test.rejected(err))
+	Assert.IsTrue(setup.SessionRejected(err))
 }
 
 func (test *CallerServiceTest) TestResolveFailsClosedWhenTheEngineIsBusy() {
@@ -81,7 +81,7 @@ func (test *CallerServiceTest) TestResolveFailsClosedWhenTheEngineIsBusy() {
 	defer holder.Close()
 	setup.UseWait(200)
 
-	_, err := test.callers().Resolve(test.request(setup.Credential(session)))
+	_, err := test.callers().Resolve(setup.SignedIn(session))
 
 	var busy *host.EngineBusyError
 	Assert.IsTrue(errors.As(err, &busy))
@@ -107,17 +107,6 @@ func (test *CallerServiceTest) TestRequireTenantRefusesAnEmptyTenant() {
 
 	var mismatch *host.TenantMismatchError
 	Assert.IsTrue(errors.As(err, &mismatch))
-}
-
-func (test *CallerServiceTest) rejected(err error) bool {
-	var rejected *host.SessionRejectedError
-	return errors.As(err, &rejected)
-}
-
-func (test *CallerServiceTest) request(credential string) *http.Request {
-	request := httptest.NewRequest(http.MethodPost, "/", nil)
-	request.Header.Set("Sesame-Session", credential)
-	return request
 }
 
 func (test *CallerServiceTest) callers() *CallerService {

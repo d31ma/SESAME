@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
-	"net/http/httptest"
 
 	"github.com/d31ma/sesame/server/packages/sesame"
 )
@@ -26,8 +25,8 @@ func (test *AuthenticatorPasskeyTest) TestRegisteredPasskeySignsTheCallerInWithM
 	controller := test.controller()
 	authn := &AuthnController{engineService: controller.tenantCallService.engineService}
 
-	stored := test.register(controller, test.request(setup, session), key)
-	listed, listErr := controller.PostPasskeyList(test.request(setup, session))
+	stored := test.register(controller, setup.SignedIn(session), key)
+	listed, listErr := controller.PostPasskeyList(setup.SignedIn(session))
 	verified := test.loginWithPasskey(authn, session, key, stored.CredentialID)
 	issued, completeErr := authn.PostComplete(AuthnCompleteRequest{TransactionID: verified.TransactionID})
 
@@ -46,14 +45,14 @@ func (test *AuthenticatorPasskeyTest) TestRegistrationChallengeIsSpentOnFirstUse
 	session := setup.SignIn("acme", false)
 	key := test.key()
 	controller := test.controller()
-	request := test.request(setup, session)
+	request := setup.SignedIn(session)
 	challenge, _ := controller.PostPasskeyRegisterBegin(request)
 	attestation := test.attestation(challenge, key)
 	controller.PostPasskeyRegisterFinish(request, attestation)
 
 	replayed, err := controller.PostPasskeyRegisterFinish(request, attestation)
 
-	Assert.Equals(http.StatusBadRequest, test.status(err))
+	Assert.Equals(http.StatusBadRequest, setup.Status(err))
 	Assert.Equals("", replayed.CredentialID)
 }
 
@@ -64,13 +63,13 @@ func (test *AuthenticatorPasskeyTest) TestRemovedPasskeyNoLongerSignsIn() {
 	key := test.key()
 	controller := test.controller()
 	authn := &AuthnController{engineService: controller.tenantCallService.engineService}
-	stored := test.register(controller, test.request(setup, session), key)
+	stored := test.register(controller, setup.SignedIn(session), key)
 
 	removal, err := controller.PostPasskeyRemove(
-		test.request(setup, session),
+		setup.SignedIn(session),
 		AuthenticatorPasskeyRemoveRequest{CredentialID: stored.CredentialID},
 	)
-	listed, _ := controller.PostPasskeyList(test.request(setup, session))
+	listed, _ := controller.PostPasskeyList(setup.SignedIn(session))
 	verified := test.loginWithPasskey(authn, session, key, stored.CredentialID)
 
 	Assert.IsTrue(err == nil)
@@ -85,20 +84,20 @@ func (test *AuthenticatorPasskeyTest) TestRemovingAnotherPrincipalsPasskeyAnswer
 	owner := setup.SignIn("acme", false)
 	intruder := setup.SignInMember("acme", "intruder")
 	controller := test.controller()
-	stored := test.register(controller, test.request(setup, owner), test.key())
+	stored := test.register(controller, setup.SignedIn(owner), test.key())
 
 	_, foreignErr := controller.PostPasskeyRemove(
-		test.request(setup, intruder),
+		setup.SignedIn(intruder),
 		AuthenticatorPasskeyRemoveRequest{CredentialID: stored.CredentialID},
 	)
 	_, unknownErr := controller.PostPasskeyRemove(
-		test.request(setup, intruder),
+		setup.SignedIn(intruder),
 		AuthenticatorPasskeyRemoveRequest{CredentialID: test.encode(test.randomBytes())},
 	)
-	ownerList, _ := controller.PostPasskeyList(test.request(setup, owner))
-	intruderList, _ := controller.PostPasskeyList(test.request(setup, intruder))
+	ownerList, _ := controller.PostPasskeyList(setup.SignedIn(owner))
+	intruderList, _ := controller.PostPasskeyList(setup.SignedIn(intruder))
 
-	Assert.Equals(http.StatusNotFound, test.status(foreignErr))
+	Assert.Equals(http.StatusNotFound, setup.Status(foreignErr))
 	Assert.Equals(test.answer(unknownErr), test.answer(foreignErr))
 	Assert.Equals(`{"code":"passkey_not_found"}`, test.answer(foreignErr))
 	Assert.Equals(1, len(ownerList.Passkeys))
@@ -111,17 +110,17 @@ func (test *AuthenticatorPasskeyTest) TestAdministratorListsAndRemovesAMembersPa
 	administrator := setup.SignIn("acme", true)
 	member := setup.SignInMember("acme", "member")
 	controller := test.controller()
-	stored := test.register(controller, test.request(setup, member), test.key())
+	stored := test.register(controller, setup.SignedIn(member), test.key())
 
 	listed, listErr := controller.PostPasskeyListForPrincipal(
-		test.request(setup, administrator),
+		setup.SignedIn(administrator),
 		PrincipalReference{PrincipalID: member.PrincipalID},
 	)
 	removal, err := controller.PostPasskeyRemoveForPrincipal(
-		test.request(setup, administrator),
+		setup.SignedIn(administrator),
 		AuthenticatorPasskeyRemoveForPrincipalRequest{PrincipalID: member.PrincipalID, CredentialID: stored.CredentialID},
 	)
-	remaining, _ := controller.PostPasskeyList(test.request(setup, member))
+	remaining, _ := controller.PostPasskeyList(setup.SignedIn(member))
 
 	Assert.IsTrue(listErr == nil)
 	Assert.Equals(1, len(listed.Passkeys))
@@ -137,15 +136,15 @@ func (test *AuthenticatorPasskeyTest) TestAdministratorRemovalNamesTheOwnerOfThe
 	owner := setup.SignInMember("acme", "owner")
 	bystander := setup.SignInMember("acme", "bystander")
 	controller := test.controller()
-	stored := test.register(controller, test.request(setup, owner), test.key())
+	stored := test.register(controller, setup.SignedIn(owner), test.key())
 
 	_, err := controller.PostPasskeyRemoveForPrincipal(
-		test.request(setup, administrator),
+		setup.SignedIn(administrator),
 		AuthenticatorPasskeyRemoveForPrincipalRequest{PrincipalID: bystander.PrincipalID, CredentialID: stored.CredentialID},
 	)
-	remaining, _ := controller.PostPasskeyList(test.request(setup, owner))
+	remaining, _ := controller.PostPasskeyList(setup.SignedIn(owner))
 
-	Assert.Equals(http.StatusNotFound, test.status(err))
+	Assert.Equals(http.StatusNotFound, setup.Status(err))
 	Assert.Equals(`{"code":"passkey_not_found"}`, test.answer(err))
 	Assert.Equals(1, len(remaining.Passkeys))
 }
@@ -156,17 +155,17 @@ func (test *AuthenticatorPasskeyTest) TestAdministratorCannotReachAnotherTenants
 	administrator := setup.SignIn("acme", true)
 	stranger := setup.SignIn("globex", false)
 	controller := test.controller()
-	stored := test.register(controller, test.request(setup, stranger), test.key())
+	stored := test.register(controller, setup.SignedIn(stranger), test.key())
 
 	listed, listErr := controller.PostPasskeyListForPrincipal(
-		test.request(setup, administrator),
+		setup.SignedIn(administrator),
 		PrincipalReference{PrincipalID: stranger.PrincipalID},
 	)
 	_, removeErr := controller.PostPasskeyRemoveForPrincipal(
-		test.request(setup, administrator),
+		setup.SignedIn(administrator),
 		AuthenticatorPasskeyRemoveForPrincipalRequest{PrincipalID: stranger.PrincipalID, CredentialID: stored.CredentialID},
 	)
-	remaining, _ := controller.PostPasskeyList(test.request(setup, stranger))
+	remaining, _ := controller.PostPasskeyList(setup.SignedIn(stranger))
 
 	Assert.Equals(`{"code":"tenant_mismatch"}`, test.answer(listErr))
 	Assert.Equals(0, len(listed.Passkeys))
@@ -180,9 +179,9 @@ func (test *AuthenticatorPasskeyTest) register(
 	key *ecdsa.PrivateKey,
 ) AuthenticatorPasskey {
 	challenge, err := controller.PostPasskeyRegisterBegin(request)
-	test.check(err)
+	SesameTestSetup{}.Check(err)
 	stored, err := controller.PostPasskeyRegisterFinish(request, test.attestation(challenge, key))
-	test.check(err)
+	SesameTestSetup{}.Check(err)
 	return stored
 }
 
@@ -197,9 +196,9 @@ func (test *AuthenticatorPasskeyTest) loginWithPasskey(
 		IdentifierNamespace: "email",
 		IdentifierValue:     "person@acme.test",
 	})
-	test.check(err)
+	SesameTestSetup{}.Check(err)
 	options, err := authn.PostPasskeyOptions(AuthnTransactionRequest{TransactionID: begun.TransactionID})
-	test.check(err)
+	SesameTestSetup{}.Check(err)
 	authenticatorData := test.authenticatorData(options.RelyingPartyID, 0x01|0x04, 1)
 	clientData := test.clientData("webauthn.get", options.Challenge, options.Origin)
 	verified, err := authn.PostVerifyPasskey(AuthnVerifyPasskeyRequest{
@@ -209,7 +208,7 @@ func (test *AuthenticatorPasskeyTest) loginWithPasskey(
 		ClientDataJSON:    test.encode(clientData),
 		Signature:         test.encode(test.sign(key, authenticatorData, clientData)),
 	})
-	test.check(err)
+	SesameTestSetup{}.Check(err)
 	return verified
 }
 
@@ -247,7 +246,7 @@ func (test *AuthenticatorPasskeyTest) attestedCredential(key *ecdsa.PrivateKey) 
 
 func (test *AuthenticatorPasskeyTest) coseKey(key *ecdsa.PrivateKey) []byte {
 	point, err := key.PublicKey.Bytes()
-	test.check(err)
+	SesameTestSetup{}.Check(err)
 	encoded := test.head(5, 5)
 	encoded = append(encoded, append(test.head(0, 1), test.head(0, 2)...)...)
 	encoded = append(encoded, append(test.head(0, 3), test.head(1, 6)...)...)
@@ -276,7 +275,7 @@ func (test *AuthenticatorPasskeyTest) clientData(kind string, challenge string, 
 	encoded, err := json.Marshal(map[string]any{
 		"type": kind, "challenge": challenge, "origin": origin, "crossOrigin": false,
 	})
-	test.check(err)
+	SesameTestSetup{}.Check(err)
 	return encoded
 }
 
@@ -284,20 +283,20 @@ func (test *AuthenticatorPasskeyTest) sign(key *ecdsa.PrivateKey, authenticatorD
 	clientHash := sha256.Sum256(clientData)
 	digest := sha256.Sum256(append(append([]byte{}, authenticatorData...), clientHash[:]...))
 	signature, err := ecdsa.SignASN1(rand.Reader, key, digest[:])
-	test.check(err)
+	SesameTestSetup{}.Check(err)
 	return signature
 }
 
 func (test *AuthenticatorPasskeyTest) key() *ecdsa.PrivateKey {
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	test.check(err)
+	SesameTestSetup{}.Check(err)
 	return key
 }
 
 func (test *AuthenticatorPasskeyTest) randomBytes() []byte {
 	value := make([]byte, 20)
 	_, err := rand.Read(value)
-	test.check(err)
+	SesameTestSetup{}.Check(err)
 	return value
 }
 
@@ -305,25 +304,9 @@ func (test *AuthenticatorPasskeyTest) encode(value []byte) string {
 	return base64.RawURLEncoding.EncodeToString(value)
 }
 
-func (test *AuthenticatorPasskeyTest) request(setup *SesameTestSetup, session sesame.IssuedSession) *http.Request {
-	request := httptest.NewRequest(http.MethodPost, "/", nil)
-	request.Header.Set("Sesame-Session", setup.Credential(session))
-	return request
-}
-
-func (test *AuthenticatorPasskeyTest) status(err error) int {
-	return (&SesameErrorHandler{}).Answer(err).StatusCode
-}
-
 func (test *AuthenticatorPasskeyTest) answer(err error) string {
 	body, _ := io.ReadAll((&SesameErrorHandler{}).Answer(err).Body)
 	return string(body)
-}
-
-func (test *AuthenticatorPasskeyTest) check(err error) {
-	if err != nil {
-		panic(err)
-	}
 }
 
 func (test *AuthenticatorPasskeyTest) controller() *AuthenticatorController {

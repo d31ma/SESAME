@@ -4,7 +4,6 @@ import (
 	"net/http/httptest"
 
 	"github.com/d31ma/sesame/server/packages/host"
-	"github.com/d31ma/sesame/server/packages/sesame"
 )
 
 // @Test(SesameTestSetup, {"partition":"tests"})
@@ -17,7 +16,7 @@ func (test *RoleControllerTest) TestCreateDefinesARoleInTheCallersTenant() {
 	defer setup.Remove()
 	administrator := setup.SignIn("acme", true)
 
-	role, err := test.controller().PostCreate(test.request(setup.Credential(administrator)), test.creation(administrator.TenantID, "doc:read"))
+	role, err := test.controller().PostCreate(setup.SignedIn(administrator), test.creation(administrator.TenantID, "doc:read"))
 
 	Assert.IsTrue(err == nil)
 	Assert.IsTrue(role.RoleID != "")
@@ -33,7 +32,7 @@ func (test *RoleControllerTest) TestCreateRefusesAnotherTenant() {
 	administrator := setup.SignIn("acme", true)
 	other := setup.SignIn("globex", true)
 
-	role, err := test.controller().PostCreate(test.request(setup.Credential(administrator)), test.creation(other.TenantID, "doc:read"))
+	role, err := test.controller().PostCreate(setup.SignedIn(administrator), test.creation(other.TenantID, "doc:read"))
 
 	var mismatch *host.TenantMismatchError
 	Assert.IsTrue(errors.As(err, &mismatch))
@@ -45,13 +44,13 @@ func (test *RoleControllerTest) TestCreateRefusesATakenName() {
 	defer setup.Remove()
 	administrator := setup.SignIn("acme", true)
 	controller := test.controller()
-	request := test.request(setup.Credential(administrator))
+	request := setup.SignedIn(administrator)
 	_, first := controller.PostCreate(request, test.creation(administrator.TenantID, "doc:read"))
 
 	_, err := controller.PostCreate(request, test.creation(administrator.TenantID, "doc:read"))
 
 	Assert.IsTrue(first == nil)
-	Assert.Equals("role_exists", test.code(err))
+	Assert.Equals("role_exists", setup.ProtocolCode(err))
 }
 
 func (test *RoleControllerTest) TestCreateRefusesAMalformedPermission() {
@@ -59,9 +58,9 @@ func (test *RoleControllerTest) TestCreateRefusesAMalformedPermission() {
 	defer setup.Remove()
 	administrator := setup.SignIn("acme", true)
 
-	_, err := test.controller().PostCreate(test.request(setup.Credential(administrator)), test.creation(administrator.TenantID, "Read Everything"))
+	_, err := test.controller().PostCreate(setup.SignedIn(administrator), test.creation(administrator.TenantID, "Read Everything"))
 
-	Assert.Equals("invalid_request", test.code(err))
+	Assert.Equals("invalid_request", setup.ProtocolCode(err))
 }
 
 func (test *RoleControllerTest) TestCreateRejectsAnAnonymousCaller() {
@@ -87,28 +86,7 @@ func (test *RoleControllerTest) creation(tenantID string, action string) RoleCre
 	}
 }
 
-func (test *RoleControllerTest) code(err error) string {
-	protocolError := &sesame.ProtocolError{}
-	errors.As(err, &protocolError)
-	return protocolError.Code
-}
-
-func (test *RoleControllerTest) request(credential string) *http.Request {
-	request := httptest.NewRequest(http.MethodPost, "/", nil)
-	request.Header.Set("Sesame-Session", credential)
-	return request
-}
-
 func (test *RoleControllerTest) controller() *RoleController {
 	engine := &EngineService{engineSettingsService: &EngineSettingsService{}}
-	return &RoleController{tenantCallService: test.tenantCalls(engine)}
-}
-
-func (test *RoleControllerTest) tenantCalls(engine *EngineService) *TenantCallService {
-	return &TenantCallService{
-		callerService:        &CallerService{engineService: engine},
-		engineService:        engine,
-		administratorService: &AdministratorService{engineService: engine},
-		recentSignInService:  &RecentSignInService{},
-	}
+	return &RoleController{tenantCallService: SesameTestSetup{}.TenantCalls(engine)}
 }
