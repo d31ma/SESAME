@@ -5,6 +5,153 @@ All notable changes to SESAME will be documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and releases use UTC-derived CalVer in `YY.WW.DD` form.
 
+## [Unreleased]
+
+### Breaking
+
+- **The nine copy-in language SDKs are retired.** `clients/` (Node.js/TypeScript,
+  Python, Rust, Java, Kotlin, C#, PHP, Ruby, Dart), `sesame-clients.tar.gz`,
+  `tools/package-clients.sh` and `tools/verify-sdk-install.sh` are removed, and
+  releases no longer publish a client bundle. Move each language to the HTTP API
+  of the Yon host or to the machine protocol
+  ([docs/SDK_DISTRIBUTION.md](docs/SDK_DISTRIBUTION.md#migrating-from-the-retired-language-sdks)):
+  - Node.js/TypeScript: call the Yon routes with `fetch`, or spawn
+    `sesame exec --loop` with `child_process` and speak api/machine/v1.
+  - Python: `urllib.request` against the Yon routes, or `subprocess` with
+    `sesame exec --loop`.
+  - Rust: any HTTP client against the Yon routes, or `std::process::Command`
+    with `sesame exec --loop`.
+  - Java and Kotlin: `java.net.http.HttpClient` against the Yon routes, or
+    `ProcessBuilder` with `sesame exec --loop`.
+  - C#: `HttpClient` against the Yon routes, or `System.Diagnostics.Process`
+    with `sesame exec --loop`.
+  - PHP: `curl` or streams against the Yon routes, or `proc_open` with
+    `sesame exec --loop`.
+  - Ruby: `Net::HTTP` against the Yon routes, or `Open3` with
+    `sesame exec --loop`.
+  - Dart: `dart:io` `HttpClient` against the Yon routes, or `Process.start`
+    with `sesame exec --loop`.
+  Over HTTP the caller signs in with `Sesame-Session: <session_id>:<session_secret>`
+  instead of naming identities the engine trusts, and errors arrive as an HTTP
+  status with `{"code":"<code>"}`. A host that spawns the engine itself should
+  send `system.version` first and refuse a `protocol_version` other than `1`,
+  as the old SDKs did.
+- **The Go SDK moved.** Its import path is now
+  `github.com/d31ma/sesame/server/packages/sesame`, in its own
+  standard-library-only module `github.com/d31ma/sesame/server/packages`
+  (history kept). Change the import from `github.com/d31ma/sesame/clients/go/sesame`
+  and resolve the module at the release commit
+  (`go get github.com/d31ma/sesame/server/packages@<commit>`): CalVer tags are
+  not semantic import versions for a nested module. Importing it no longer adds
+  `golang.org/x/crypto` or `golang.org/x/sys` to your module graph. It gains
+  `ErrDeploymentLocked`, `StartWhenAvailable`, `ProtocolError.ErrorCode()`,
+  `RequireActor`, and audit attribution through `sesame.WithActor(ctx, actor)`.
+- `api/machine/v1/operations.json` replaces `sdk_gaps` with `http_coverage`:
+  every operation records how it is reached over HTTP (`routed` with its
+  routes, `standard_endpoint`, `command_line_only`, `not_routed_for_security`).
+- The `sesame init` example file is now `sesame.env.example` (`sesame.env`),
+  because `ty` reserves the project-root `.env` for `YON_` names. `--env-file`
+  still takes any path.
+- `provisioning_denied` answers `401` with `WWW-Authenticate: Bearer` over HTTP
+  (it was a `403` mapping in host guidance).
+
+### Added
+
+- **SESAME ships a Yon host project**
+  ([ADR 0007](docs/adr/0007-sesame-ships-a-yon-host-project.md),
+  [docs/YON.md](docs/YON.md)). The repository root is a Tachyon Yon project:
+  `ty serve` serves SESAME's operations as `POST /api/v1/<family>/<operation>`
+  routes. Each request starts one engine; when another request's engine owns
+  the deployment it waits up to `sesame.waitmilliseconds` and then answers
+  `503 engine_busy` with `Retry-After: 1`. Developer preview: a few requests
+  per second. The `sesame` engine still opens no port; `ty` owns the listener.
+- Sign-in over HTTP with the `Sesame-Session` header (the session id and
+  secret `authn.complete` issues). The `Administrator` role is granted only
+  when SESAME allows `sesame:administer` on `sesame:tenant` in the session's
+  tenant; every tenant-bound route refuses another tenant with
+  `403 tenant_mismatch` before the operation runs. Errors answer
+  `{"code":"<code>"}` through one code-to-status table; engine messages never
+  reach the client.
+- System routes: `system/{ping,version,readiness}` (public) and
+  `system/metrics` (administrator); `tenant/get` (administrator of that
+  tenant).
+- Directory routes ([docs/yon/directory.md](docs/yon/directory.md)):
+  `principal/{create,get,suspend}`, `role/create`, `grant/{create,revoke}`,
+  `group/{create,member-add,member-remove}` for tenant administrators, and
+  `authorize/{decide,decide-batch}` as signed-in self-service decided from the
+  caller's own session.
+- Authentication routes ([docs/yon/authn.md](docs/yon/authn.md)): public login
+  steps `authn/{begin,verify-password,verify-totp,verify-recovery-code,
+  passkey-options,verify-passkey,complete}`; `session/verify` (public),
+  `session/revoke` (the caller's session) and `session/revoke-by-id`
+  (administrator, own tenant); self-service
+  `authenticator/{set-password,totp-enroll,totp-activate,recovery-codes-issue,
+  passkey-register-begin,passkey-register-finish,passkey-list,passkey-remove}`,
+  where changes need a session issued in the last 10 minutes
+  (`403 reauthentication_required`); administrator
+  `authenticator/{set-password,passkey-list,passkey-remove}-for-principal`;
+  `token/jwks` (public).
+- OAuth and OpenID Connect ([docs/yon/oidc.md](docs/yon/oidc.md)): the standard
+  endpoints `GET /oidc/openid-configuration`, `GET /oidc/jwks`,
+  `GET /oidc/authorize` (interaction secret only in an HttpOnly Secure cookie
+  scoped to `/api/v1/oidc`), `POST /oidc/token`, `POST /oidc/introspect`,
+  `POST /oidc/revoke` and `GET /oidc/logout` through `standards.dispatch`;
+  administrator `oidc-client/{register,get,rotate-secret,disable}` and
+  `oidc/refresh-family-{get,revoke}`; signed-in
+  `oidc/{interaction-get,interaction-complete,consent-grant,consent-get,
+  consent-withdraw,device-lookup,device-approve,device-deny}`; public
+  `oidc/{pushed-authorize,device-authorize,dpop-verify}` (SESAME JSON shapes,
+  not yet RFC 9126/8628 standard shapes). Discovery at `/.well-known` needs a
+  reverse-proxy rewrite.
+- Federation, SAML and SCIM ([docs/yon/federation.md](docs/yon/federation.md)):
+  `federation/provider-{register,configure,get,disable}` and
+  `saml/provider-{register,get,disable}` for tenant administrators; public
+  `federation/login-{start,complete}` and `saml/login-{start,complete}`;
+  `scim/client-{register,rotate-token,disable}` for tenant administrators and
+  `scim/{user,group}-*` authenticated by `Authorization: Bearer`.
+  `federation.login_exchange` is never routed: its answer carries the
+  provider's client secret and the PKCE verifier.
+- Optional `actor` attribution on machine-protocol v1 requests: a host names
+  the calling principal (`tenant_id`, `principal_id`, `session_id`); the engine
+  checks the session is live and belongs to that principal and tenant, refuses
+  any write into another tenant, and records
+  `principal:<tenant>/<principal>/<session>` instead of `operator:machine`.
+  Requests without `actor` are unchanged. `system.version` returns
+  `request_fields`. New error codes `invalid_actor`, `actor_session_invalid`,
+  `actor_tenant_mismatch`. The Yon host sends the verified caller on every
+  engine call of a signed-in request.
+- `test/contract` ties `operations.json` to the `@PostRoute`/`@GetRoute`
+  annotations in `server/controllers`: a new engine operation or route without
+  an `http_coverage` entry fails the build.
+
+### Changed
+
+- CI runs the Go package tests in `server/packages` instead of nine SDK
+  contract jobs and the client-bundle job, and checks formatting of the Go
+  module sources only (Yon handler files are checked by `ty`). The Yon host's
+  `ty bundle` and `ty test --coverage` run in the local release gate until a
+  released `ty` carries Tachyon ADR 0095 and the `ty handler invoke`
+  argument-binding fix ([docs/YON.md](docs/YON.md#continuous-integration)).
+- The website names the HTTP API and the Go package instead of ten SDKs.
+- `tenant.bootstrap` and `admin.bootstrap` stay command-line only.
+- Developed and gated against Tachyon `ty` 26.36.01 at commit `bf098bfc` (an
+  unreleased build). Running the routes from the command line with
+  `ty handler invoke` needs Tachyon's argument-binding fix (`d070022f`), which
+  is not merged upstream yet.
+
+### Fixed
+
+- `api/schema/machine-v1.schema.json` listed only six framing error codes; it
+  now lists every code and a test keeps it in step with the engine.
+  `fixtures.ndjson` is replayed byte for byte in tests.
+- Engine idempotent no-op paths answered before the actor tenant check; one
+  guard now refuses them for another tenant's records.
+- The Go package could leave the engine's FYLO child running after a request
+  gave up on a busy deployment or `Close` timed out, because it killed only the
+  `sesame` process. The engine now leads its own process group, and the client
+  ends and reaps the whole group before returning (Unix; Windows still ends only
+  the engine process).
+
 ## [26.33.02] - 2026-08-11
 
 ### Added
