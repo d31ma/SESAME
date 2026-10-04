@@ -22,7 +22,7 @@ is refused with `400` before SESAME runs.
 | `POST /api/v1/grant/create` | `grant.create` | an administrator | the body's `tenant_id` must be the caller's tenant; SESAME then refuses a role, principal or group of another tenant (`role_not_found`, `principal_not_found`, `group_not_found`) |
 | `POST /api/v1/grant/revoke` | `grant.revoke` | an administrator | the caller is sent as the request's actor; SESAME refuses a grant of another tenant with `403 {"code":"actor_tenant_mismatch"}` and revokes nothing |
 | `POST /api/v1/group/create` | `group.create` | an administrator | the body's `tenant_id` must be the caller's tenant |
-| `POST /api/v1/group/member-add` | `group.member_add` | an administrator | the principal must be in the caller's tenant; SESAME then refuses a group whose tenant differs from the principal's (`principal_not_found`) |
+| `POST /api/v1/group/member-add` | `group.member_add` | an administrator | the principal must be in the caller's tenant; SESAME then refuses a group of another tenant (`403 {"code":"actor_tenant_mismatch"}`) |
 | `POST /api/v1/group/member-remove` | `group.member_remove` | an administrator | as `member-add` |
 | `POST /api/v1/authorize/decide` | `authorize.decide` | any signed-in principal, about itself | the caller's own session supplies the tenant, the principal and the session |
 | `POST /api/v1/authorize/decide-batch` | `authorize.decide_batch` | any signed-in principal, about itself | as `decide`, for every question in the batch |
@@ -48,9 +48,9 @@ operation runs.
 **Operations that name no tenant.** `principal.get` by id,
 `principal.suspend`, `group.member_add` and `group.member_remove` carry no
 `tenant_id`. The host first loads the named principal and refuses it unless it
-belongs to the caller's tenant. For group membership this also protects the
-group: SESAME refuses to join or remove a principal and a group of different
-tenants, so a group of another tenant answers `principal_not_found`.
+belongs to the caller's tenant. For group membership SESAME also protects the
+group: the caller is the request's actor, so a group of another tenant answers
+`403 {"code":"actor_tenant_mismatch"}`, whatever its members.
 
 `grant.revoke` takes only `grant_id`, and SESAME offers no way to read a
 grant's tenant first. Its isolation is SESAME's own: every route that acts for

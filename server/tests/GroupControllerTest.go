@@ -117,7 +117,7 @@ func (test *GroupControllerTest) TestMemberAddRefusesAGroupOfAnotherTenant() {
 
 	membership, err := controller.PostMemberAdd(test.request(setup.Credential(administrator)), GroupMemberRequest{GroupID: foreign.GroupID, PrincipalID: member.PrincipalID})
 
-	Assert.Equals("principal_not_found", test.code(err))
+	Assert.Equals("actor_tenant_mismatch", test.code(err))
 	Assert.IsTrue(!membership.Member)
 }
 
