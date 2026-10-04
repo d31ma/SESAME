@@ -94,12 +94,12 @@ func (handler *SesameErrorHandler) badRequestCodes() []string {
 }
 
 func (handler *SesameErrorHandler) unauthorizedCodes() []string {
-	return []string{"session_rejected", "session_inactive"}
+	return []string{"session_rejected", "session_inactive", "actor_session_invalid"}
 }
 
 func (handler *SesameErrorHandler) forbiddenCodes() []string {
 	return []string{
-		"tenant_mismatch", "access_denied", "provisioning_denied", "provisioning_forbidden",
+		"tenant_mismatch", "actor_tenant_mismatch", "access_denied", "provisioning_denied", "provisioning_forbidden",
 		"client_disabled", "consent_required", "subject_not_linked", "saml_subject_not_linked",
 	}
 }

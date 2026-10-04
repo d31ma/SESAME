@@ -67,6 +67,21 @@ func (test *SesameErrorHandlerTest) TestInactiveSessionAnswersUnauthorized() {
 	Assert.Equals(http.StatusUnauthorized, test.answer(test.engineError("session_inactive")).StatusCode)
 }
 
+func (test *SesameErrorHandlerTest) TestInvalidActorSessionAnswersUnauthorized() {
+	Assert.Equals(http.StatusUnauthorized, test.answer(test.engineError("actor_session_invalid")).StatusCode)
+}
+
+func (test *SesameErrorHandlerTest) TestActorOfAnotherTenantAnswersForbidden() {
+	Assert.Equals(http.StatusForbidden, test.answer(test.engineError("actor_tenant_mismatch")).StatusCode)
+}
+
+func (test *SesameErrorHandlerTest) TestMalformedActorIsAHostFault() {
+	response := test.answer(test.engineError("invalid_actor"))
+
+	Assert.Equals(http.StatusInternalServerError, response.StatusCode)
+	Assert.Equals("internal_error", test.code(response))
+}
+
 func (test *SesameErrorHandlerTest) TestWrappedEngineErrorIsAnsweredByItsCode() {
 	wrapped := fmt.Errorf("principal.get: %w", test.engineError("principal_not_found"))
 
