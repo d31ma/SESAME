@@ -29,6 +29,8 @@ const (
 	protocolVersion = "1"
 	maxFrameBytes   = 1 << 20
 	closeTimeout    = 2 * time.Second
+
+	processGroupPollInterval = 10 * time.Millisecond
 )
 
 // Options controls local SESAME process startup.
@@ -131,6 +133,7 @@ func Start(ctx context.Context, options Options) (*Client, error) {
 		)
 	}
 	command := exec.Command(binary, arguments...)
+	ownProcessGroup(command)
 	// When the caller wants diagnostics, they get all of them. Otherwise the
 	// startup window is captured and the rest discarded: the engine refuses a
 	// missing deployment or an unusable FYLO root by writing why to stderr and
@@ -1714,7 +1717,9 @@ func (c *Client) Request(ctx context.Context, operation string, parameters, resu
 	select {
 	case <-ctx.Done():
 		c.closed = true
-		_ = c.command.Process.Kill()
+		killProcessGroup(c.command)
+		<-c.done
+		c.endProcessGroup()
 		return ctx.Err()
 	case scan := <-scanned:
 		if scan.err != nil {
@@ -1740,16 +1745,29 @@ func (c *Client) Close() error {
 
 	select {
 	case err := <-c.done:
+		c.endProcessGroup()
 		if err != nil {
 			return fmt.Errorf("wait for sesame process: %w", err)
 		}
 		return nil
 	case <-timer.C:
-		if err := c.command.Process.Kill(); err != nil {
-			return fmt.Errorf("kill unresponsive sesame process: %w", err)
-		}
+		killProcessGroup(c.command)
 		<-c.done
+		c.endProcessGroup()
 		return errors.New("sesame process did not exit before the close timeout")
+	}
+}
+
+// endProcessGroup returns once no process the engine started can still run.
+// An engine that is given up on, killed, or exits leaving its FYLO runtime
+// behind would otherwise leave that runtime able to take the FYLO root after
+// the caller was told the engine is gone, or to write into a deployment the
+// caller is removing.
+func (c *Client) endProcessGroup() {
+	killProcessGroup(c.command)
+	deadline := time.Now().Add(closeTimeout)
+	for !processGroupEnded(c.command) && time.Now().Before(deadline) {
+		time.Sleep(processGroupPollInterval)
 	}
 }
 
