@@ -101,7 +101,7 @@ func (s *Service) recordProvisioningClientLocked(
 			TokenDigest:         digest,
 		})
 	if err != nil {
-		return scimdomain.Client{}, "", fmt.Errorf("%w: %v", ErrStorageFailure, err)
+		return scimdomain.Client{}, "", fmt.Errorf("%w: %w", ErrStorageFailure, err)
 	}
 	if err := s.applySCIMClientRegistered(event); err != nil {
 		return scimdomain.Client{}, "", err
@@ -165,7 +165,7 @@ func (s *Service) appendSCIMClientDisabled(
 			Reason:   reason,
 		})
 	if err != nil {
-		return fmt.Errorf("%w: %v", ErrStorageFailure, err)
+		return fmt.Errorf("%w: %w", ErrStorageFailure, err)
 	}
 	if err := s.applySCIMClientDisabled(event); err != nil {
 		return err
@@ -270,7 +270,7 @@ func (s *Service) appendPrincipalForProvisioning(
 			IdentifierValue:     identifier.Value,
 		})
 	if err != nil {
-		return fmt.Errorf("%w: %v", ErrStorageFailure, err)
+		return fmt.Errorf("%w: %w", ErrStorageFailure, err)
 	}
 	return s.applyPrincipalCreated(event)
 }
@@ -294,7 +294,7 @@ func (s *Service) appendUserProvisioned(
 			At:          s.now().Format(time.RFC3339Nano),
 		})
 	if err != nil {
-		return fmt.Errorf("%w: %v", ErrStorageFailure, err)
+		return fmt.Errorf("%w: %w", ErrStorageFailure, err)
 	}
 	return s.applySCIMUserProvisioned(event)
 }
@@ -309,7 +309,7 @@ func (s *Service) suspendForProvisioningLocked(
 	event, err := s.ledger.Append(ctx, principaldomain.EventSuspended, tenantID, actor,
 		principaldomain.SuspendedPayload{PrincipalID: principalID, TenantID: tenantID})
 	if err != nil {
-		return fmt.Errorf("%w: %v", ErrStorageFailure, err)
+		return fmt.Errorf("%w: %w", ErrStorageFailure, err)
 	}
 	return s.applyPrincipalSuspended(event)
 }
@@ -486,7 +486,7 @@ func (s *Service) deprovisionLocked(
 			At:          s.now().Format(time.RFC3339Nano),
 		})
 	if err != nil {
-		return fmt.Errorf("%w: %v", ErrStorageFailure, err)
+		return fmt.Errorf("%w: %w", ErrStorageFailure, err)
 	}
 	if err := s.applySCIMUserDeprovisioned(event); err != nil {
 		return err
@@ -613,7 +613,7 @@ func (s *Service) writePatchLocked(
 			At:          s.now().Format(time.RFC3339Nano),
 		})
 	if err != nil {
-		return fmt.Errorf("%w: %v", ErrStorageFailure, err)
+		return fmt.Errorf("%w: %w", ErrStorageFailure, err)
 	}
 	if err := s.applySCIMUserUpdated(event); err != nil {
 		return err
@@ -685,7 +685,7 @@ func (s *Service) rotateProvisioningTokenLocked(
 			TokenDigest: digest,
 		})
 	if err != nil {
-		return "", fmt.Errorf("%w: %v", ErrStorageFailure, err)
+		return "", fmt.Errorf("%w: %w", ErrStorageFailure, err)
 	}
 	if err := s.applySCIMClientTokenRotated(event); err != nil {
 		return "", err

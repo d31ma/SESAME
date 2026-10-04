@@ -222,7 +222,7 @@ func (s *Service) spendDPoPProofLocked(
 			ExpiresAt:  expiresAt.Format(time.RFC3339Nano),
 		})
 	if err != nil {
-		return fmt.Errorf("%w: %v", ErrStorageFailure, err)
+		return fmt.Errorf("%w: %w", ErrStorageFailure, err)
 	}
 	return s.applyDPoPProofSpent(event)
 }

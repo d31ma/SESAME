@@ -349,7 +349,7 @@ func (s *Service) setMembershipLocked(
 			PrincipalID: principalID,
 		})
 	if err != nil {
-		return fmt.Errorf("%w: %v", ErrStorageFailure, err)
+		return fmt.Errorf("%w: %w", ErrStorageFailure, err)
 	}
 	return s.applyGroupMembership(event)
 }
@@ -425,7 +425,7 @@ func (s *Service) groupCreateLocked(
 			Name:     normalized,
 		})
 	if err != nil {
-		return authzdomain.Group{}, fmt.Errorf("%w: %v", ErrStorageFailure, err)
+		return authzdomain.Group{}, fmt.Errorf("%w: %w", ErrStorageFailure, err)
 	}
 	if err := s.applyGroupCreated(event); err != nil {
 		return authzdomain.Group{}, err

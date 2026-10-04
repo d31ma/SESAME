@@ -95,7 +95,7 @@ func (s *Service) ConsentGrant(
 			GrantedAt:   oidcdomain.FormatConsentTime(now),
 		})
 	if err != nil {
-		return oidcdomain.Consent{}, fmt.Errorf("%w: %v", ErrStorageFailure, err)
+		return oidcdomain.Consent{}, fmt.Errorf("%w: %w", ErrStorageFailure, err)
 	}
 	if err := s.applyConsentGranted(event); err != nil {
 		return oidcdomain.Consent{}, err
@@ -147,7 +147,7 @@ func (s *Service) ConsentWithdraw(
 			TenantID:    existing.TenantID,
 		})
 	if err != nil {
-		return fmt.Errorf("%w: %v", ErrStorageFailure, err)
+		return fmt.Errorf("%w: %w", ErrStorageFailure, err)
 	}
 	if err := s.applyConsentWithdrawn(event); err != nil {
 		return err

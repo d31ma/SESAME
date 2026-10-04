@@ -169,7 +169,7 @@ func (s *Service) recordSAMLProviderLocked(
 			Linking:             request.Linking,
 		})
 	if err != nil {
-		return samldomain.Provider{}, fmt.Errorf("%w: %v", ErrStorageFailure, err)
+		return samldomain.Provider{}, fmt.Errorf("%w: %w", ErrStorageFailure, err)
 	}
 	if err := s.applySAMLProviderRegistered(event); err != nil {
 		return samldomain.Provider{}, err
@@ -212,7 +212,7 @@ func (s *Service) appendSAMLProviderDisabled(
 			ProviderID: providerID, TenantID: tenantID, Reason: reason,
 		})
 	if err != nil {
-		return fmt.Errorf("%w: %v", ErrStorageFailure, err)
+		return fmt.Errorf("%w: %w", ErrStorageFailure, err)
 	}
 	if err := s.applySAMLProviderDisabled(event); err != nil {
 		return err
@@ -335,7 +335,7 @@ func (s *Service) appendSAMLLoginStarted(
 			ExpiresAt:  expiresAt.Format(time.RFC3339Nano),
 		})
 	if err != nil {
-		return fmt.Errorf("%w: %v", ErrStorageFailure, err)
+		return fmt.Errorf("%w: %w", ErrStorageFailure, err)
 	}
 	return s.applySAMLLoginStarted(event)
 }
@@ -600,7 +600,7 @@ func (s *Service) appendPrincipalForSAML(
 			IdentifierValue:     identifier.Value,
 		})
 	if err != nil {
-		return fmt.Errorf("%w: %v", ErrStorageFailure, err)
+		return fmt.Errorf("%w: %w", ErrStorageFailure, err)
 	}
 	return s.applyPrincipalCreated(event)
 }
@@ -633,7 +633,7 @@ func (s *Service) issueSAMLSessionLocked(
 			Assurance:    authndomain.AssuranceFederated,
 		})
 	if err != nil {
-		return IssuedSession{}, fmt.Errorf("%w: %v", ErrStorageFailure, err)
+		return IssuedSession{}, fmt.Errorf("%w: %w", ErrStorageFailure, err)
 	}
 	if err := s.applySessionIssued(event); err != nil {
 		return IssuedSession{}, err
@@ -669,7 +669,7 @@ func (s *Service) appendSAMLLoginCompleted(
 			CompletedAt: s.now().Format(time.RFC3339Nano),
 		})
 	if err != nil {
-		return fmt.Errorf("%w: %v", ErrStorageFailure, err)
+		return fmt.Errorf("%w: %w", ErrStorageFailure, err)
 	}
 	return s.applySAMLLoginCompleted(event)
 }

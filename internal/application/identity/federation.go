@@ -231,7 +231,7 @@ func (s *Service) recordProviderLocked(
 			SecretSealed: sealed,
 		})
 	if err != nil {
-		return federationdomain.Provider{}, fmt.Errorf("%w: %v", ErrStorageFailure, err)
+		return federationdomain.Provider{}, fmt.Errorf("%w: %w", ErrStorageFailure, err)
 	}
 	if err := s.applyProviderRegistered(event); err != nil {
 		return federationdomain.Provider{}, err
@@ -430,7 +430,7 @@ func (s *Service) appendLoginStarted(
 			SecretsSealed: sealed,
 		})
 	if err != nil {
-		return fmt.Errorf("%w: %v", ErrStorageFailure, err)
+		return fmt.Errorf("%w: %w", ErrStorageFailure, err)
 	}
 	return s.applyLoginStarted(event)
 }
@@ -522,7 +522,7 @@ func (s *Service) openLoginSecretsLocked(loginID string) (loginSecrets, error) {
 	}
 	plaintext, err := authenticatordomain.Open(s.secretsKey, sealed)
 	if err != nil {
-		return loginSecrets{}, fmt.Errorf("%w: %v", ErrStorageFailure, err)
+		return loginSecrets{}, fmt.Errorf("%w: %w", ErrStorageFailure, err)
 	}
 	return decodeLoginSecrets(plaintext)
 }
@@ -563,7 +563,7 @@ func (s *Service) openProviderSecret(sealed string) (string, error) {
 	}
 	secret, err := authenticatordomain.Open(s.secretsKey, sealed)
 	if err != nil {
-		return "", fmt.Errorf("%w: %v", ErrStorageFailure, err)
+		return "", fmt.Errorf("%w: %w", ErrStorageFailure, err)
 	}
 	return secret, nil
 }
@@ -759,7 +759,7 @@ func (s *Service) issueFederatedSessionLocked(
 			Assurance:    authndomain.AssuranceFederated,
 		})
 	if err != nil {
-		return IssuedSession{}, fmt.Errorf("%w: %v", ErrStorageFailure, err)
+		return IssuedSession{}, fmt.Errorf("%w: %w", ErrStorageFailure, err)
 	}
 	if err := s.applySessionIssued(event); err != nil {
 		return IssuedSession{}, err
@@ -792,7 +792,7 @@ func (s *Service) appendLoginCompleted(
 			CompletedAt: s.now().Format(time.RFC3339Nano),
 		})
 	if err != nil {
-		return fmt.Errorf("%w: %v", ErrStorageFailure, err)
+		return fmt.Errorf("%w: %w", ErrStorageFailure, err)
 	}
 	return s.applyLoginCompleted(event)
 }
@@ -890,7 +890,7 @@ func (s *Service) appendPrincipalCreated(
 			IdentifierValue:     identifier.Value,
 		})
 	if err != nil {
-		return fmt.Errorf("%w: %v", ErrStorageFailure, err)
+		return fmt.Errorf("%w: %w", ErrStorageFailure, err)
 	}
 	return s.applyPrincipalCreated(event)
 }
@@ -912,7 +912,7 @@ func (s *Service) appendSubjectLinked(
 			LinkedAt:    s.now().Format(time.RFC3339Nano),
 		})
 	if err != nil {
-		return fmt.Errorf("%w: %v", ErrStorageFailure, err)
+		return fmt.Errorf("%w: %w", ErrStorageFailure, err)
 	}
 	return s.applySubjectLinked(event)
 }
@@ -1026,7 +1026,7 @@ func (s *Service) appendProviderDisabled(
 			Reason:     reason,
 		})
 	if err != nil {
-		return fmt.Errorf("%w: %v", ErrStorageFailure, err)
+		return fmt.Errorf("%w: %w", ErrStorageFailure, err)
 	}
 	if err := s.applyProviderDisabled(event); err != nil {
 		return err

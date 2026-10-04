@@ -170,7 +170,7 @@ func (s *Service) PasskeyRegisterFinish(
 			RegisteredAt: s.now().Format(time.RFC3339Nano),
 		})
 	if err != nil {
-		return authenticatordomain.Passkey{}, fmt.Errorf("%w: %v", ErrStorageFailure, err)
+		return authenticatordomain.Passkey{}, fmt.Errorf("%w: %w", ErrStorageFailure, err)
 	}
 	if err := s.applyPasskeyRegistered(event); err != nil {
 		return authenticatordomain.Passkey{}, err
@@ -311,7 +311,7 @@ func (s *Service) AuthenticationVerifyPasskey(
 				Attempts:      attempts,
 			})
 		if appendErr != nil {
-			return AuthenticationResult{}, fmt.Errorf("%w: %v", ErrStorageFailure, appendErr)
+			return AuthenticationResult{}, fmt.Errorf("%w: %w", ErrStorageFailure, appendErr)
 		}
 		if err := s.applyAuthenticationFailed(event); err != nil {
 			return AuthenticationResult{}, err
@@ -331,7 +331,7 @@ func (s *Service) AuthenticationVerifyPasskey(
 			UserVerified: asserted.UserVerified,
 		})
 	if err != nil {
-		return AuthenticationResult{}, fmt.Errorf("%w: %v", ErrStorageFailure, err)
+		return AuthenticationResult{}, fmt.Errorf("%w: %w", ErrStorageFailure, err)
 	}
 	if err := s.applyPasskeyUsed(used); err != nil {
 		return AuthenticationResult{}, err
@@ -353,7 +353,7 @@ func (s *Service) AuthenticationVerifyPasskey(
 			Attempts:      transaction.Attempts + 1,
 		})
 	if err != nil {
-		return AuthenticationResult{}, fmt.Errorf("%w: %v", ErrStorageFailure, err)
+		return AuthenticationResult{}, fmt.Errorf("%w: %w", ErrStorageFailure, err)
 	}
 	if err := s.applyAuthenticationFactorVerified(event); err != nil {
 		return AuthenticationResult{}, err
@@ -388,7 +388,7 @@ func (s *Service) PasskeyRemove(ctx context.Context, credentialID, actor string)
 			TenantID:     stored.TenantID,
 		})
 	if err != nil {
-		return fmt.Errorf("%w: %v", ErrStorageFailure, err)
+		return fmt.Errorf("%w: %w", ErrStorageFailure, err)
 	}
 	if err := s.applyPasskeyRemoved(event); err != nil {
 		return err

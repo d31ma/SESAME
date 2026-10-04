@@ -134,7 +134,7 @@ func (s *Service) openDeviceAuthorizationLocked(
 			ExpiresAt:             expiresAt.Format(time.RFC3339Nano),
 		})
 	if err != nil {
-		return StartedDeviceAuthorization{}, fmt.Errorf("%w: %v", ErrStorageFailure, err)
+		return StartedDeviceAuthorization{}, fmt.Errorf("%w: %w", ErrStorageFailure, err)
 	}
 	if err := s.applyDeviceAuthorizationStarted(event); err != nil {
 		return StartedDeviceAuthorization{}, err
@@ -279,7 +279,7 @@ func (s *Service) approveDeviceLocked(
 			ApprovedAt:            s.now().Format(time.RFC3339Nano),
 		})
 	if err != nil {
-		return PendingDeviceAuthorization{}, fmt.Errorf("%w: %v", ErrStorageFailure, err)
+		return PendingDeviceAuthorization{}, fmt.Errorf("%w: %w", ErrStorageFailure, err)
 	}
 	if err := s.applyDeviceAuthorizationApproved(event); err != nil {
 		return PendingDeviceAuthorization{}, err
@@ -334,7 +334,7 @@ func (s *Service) denyDeviceLocked(
 			DeniedAt:              s.now().Format(time.RFC3339Nano),
 		})
 	if err != nil {
-		return fmt.Errorf("%w: %v", ErrStorageFailure, err)
+		return fmt.Errorf("%w: %w", ErrStorageFailure, err)
 	}
 	if err := s.applyDeviceAuthorizationDenied(event); err != nil {
 		return err
@@ -413,7 +413,7 @@ func (s *Service) redeemDeviceLocked(
 			RedeemedAt:            now.Format(time.RFC3339Nano),
 		})
 	if err != nil {
-		return TokenResponse{}, fmt.Errorf("%w: %v", ErrStorageFailure, err)
+		return TokenResponse{}, fmt.Errorf("%w: %w", ErrStorageFailure, err)
 	}
 	if err := s.applyDeviceCodeRedeemed(event); err != nil {
 		return TokenResponse{}, err

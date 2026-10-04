@@ -61,7 +61,7 @@ func (s *Service) RecoveryCodesIssue(
 			Digests:     digests,
 		})
 	if err != nil {
-		return authenticatordomain.RecoveryCodeSet{}, fmt.Errorf("%w: %v", ErrStorageFailure, err)
+		return authenticatordomain.RecoveryCodeSet{}, fmt.Errorf("%w: %w", ErrStorageFailure, err)
 	}
 	if err := s.applyRecoveryCodesIssued(event); err != nil {
 		return authenticatordomain.RecoveryCodeSet{}, err
@@ -146,7 +146,7 @@ func (s *Service) AuthenticationVerifyRecoveryCode(
 				Attempts:      attempts,
 			})
 		if err != nil {
-			return AuthenticationResult{}, fmt.Errorf("%w: %v", ErrStorageFailure, err)
+			return AuthenticationResult{}, fmt.Errorf("%w: %w", ErrStorageFailure, err)
 		}
 		if err := s.applyAuthenticationFailed(event); err != nil {
 			return AuthenticationResult{}, err
@@ -165,7 +165,7 @@ func (s *Service) AuthenticationVerifyRecoveryCode(
 			Digest:      matched,
 		})
 	if err != nil {
-		return AuthenticationResult{}, fmt.Errorf("%w: %v", ErrStorageFailure, err)
+		return AuthenticationResult{}, fmt.Errorf("%w: %w", ErrStorageFailure, err)
 	}
 	if err := s.applyRecoveryCodeUsed(used); err != nil {
 		return AuthenticationResult{}, err
@@ -181,7 +181,7 @@ func (s *Service) AuthenticationVerifyRecoveryCode(
 			Attempts:      transaction.Attempts + 1,
 		})
 	if err != nil {
-		return AuthenticationResult{}, fmt.Errorf("%w: %v", ErrStorageFailure, err)
+		return AuthenticationResult{}, fmt.Errorf("%w: %w", ErrStorageFailure, err)
 	}
 	if err := s.applyAuthenticationFactorVerified(event); err != nil {
 		return AuthenticationResult{}, err

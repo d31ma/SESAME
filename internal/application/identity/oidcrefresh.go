@@ -121,7 +121,7 @@ func (s *Service) refreshExchange(
 			TenantID:       stored.TenantID,
 		})
 	if err != nil {
-		return TokenResponse{}, fmt.Errorf("%w: %v", ErrStorageFailure, err)
+		return TokenResponse{}, fmt.Errorf("%w: %w", ErrStorageFailure, err)
 	}
 	if err := s.applyRefreshSpent(event); err != nil {
 		return TokenResponse{}, err
@@ -188,7 +188,7 @@ func (s *Service) issueRefreshLocked(
 
 	event, err := s.ledger.Append(ctx, oidcdomain.EventRefreshIssued, subject.TenantID, actor, payload)
 	if err != nil {
-		return "", fmt.Errorf("%w: %v", ErrStorageFailure, err)
+		return "", fmt.Errorf("%w: %w", ErrStorageFailure, err)
 	}
 	if err := s.applyRefreshIssued(event); err != nil {
 		return "", err
@@ -246,7 +246,7 @@ func (s *Service) revokeFamilyLocked(
 			Reason:   reason,
 		})
 	if err != nil {
-		return fmt.Errorf("%w: %v", ErrStorageFailure, err)
+		return fmt.Errorf("%w: %w", ErrStorageFailure, err)
 	}
 	return s.applyRefreshFamilyRevoked(event)
 }

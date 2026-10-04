@@ -79,7 +79,7 @@ func (s *Service) PasswordSet(ctx context.Context, principalID, password, actor 
 			Verifier:    verifier,
 		})
 	if err != nil {
-		return fmt.Errorf("%w: %v", ErrStorageFailure, err)
+		return fmt.Errorf("%w: %w", ErrStorageFailure, err)
 	}
 	if err := s.applyPasswordSet(event); err != nil {
 		return err
@@ -152,7 +152,7 @@ func (s *Service) AuthenticationBegin(
 		PasskeyChallenge:    passkeyChallenge,
 	})
 	if err != nil {
-		return AuthenticationResult{}, fmt.Errorf("%w: %v", ErrStorageFailure, err)
+		return AuthenticationResult{}, fmt.Errorf("%w: %w", ErrStorageFailure, err)
 	}
 	if err := s.applyAuthenticationStarted(event); err != nil {
 		return AuthenticationResult{}, err
@@ -227,7 +227,7 @@ func (s *Service) AuthenticationVerifyPassword(
 				Attempts:      attempts,
 			})
 		if err != nil {
-			return AuthenticationResult{}, fmt.Errorf("%w: %v", ErrStorageFailure, err)
+			return AuthenticationResult{}, fmt.Errorf("%w: %w", ErrStorageFailure, err)
 		}
 		if err := s.applyAuthenticationFailed(event); err != nil {
 			return AuthenticationResult{}, err
@@ -246,7 +246,7 @@ func (s *Service) AuthenticationVerifyPassword(
 			Attempts:      transaction.Attempts + 1,
 		})
 	if err != nil {
-		return AuthenticationResult{}, fmt.Errorf("%w: %v", ErrStorageFailure, err)
+		return AuthenticationResult{}, fmt.Errorf("%w: %w", ErrStorageFailure, err)
 	}
 	if err := s.applyAuthenticationFactorVerified(event); err != nil {
 		return AuthenticationResult{}, err
@@ -349,7 +349,7 @@ func (s *Service) AuthenticationComplete(
 			Assurance:    transaction.Assurance,
 		})
 	if err != nil {
-		return IssuedSession{}, fmt.Errorf("%w: %v", ErrStorageFailure, err)
+		return IssuedSession{}, fmt.Errorf("%w: %w", ErrStorageFailure, err)
 	}
 	if err := s.applySessionIssued(issued); err != nil {
 		return IssuedSession{}, err
@@ -362,7 +362,7 @@ func (s *Service) AuthenticationComplete(
 			SessionID:     sessionID,
 		})
 	if err != nil {
-		return IssuedSession{}, fmt.Errorf("%w: %v", ErrStorageFailure, err)
+		return IssuedSession{}, fmt.Errorf("%w: %w", ErrStorageFailure, err)
 	}
 	if err := s.applyAuthenticationCompleted(completed); err != nil {
 		return IssuedSession{}, err
@@ -406,6 +406,13 @@ func (s *Service) verifySessionLocked(
 	if !exists || !sessiondomain.VerifySecret(stored.SecretDigest, secret) {
 		return sessiondomain.Session{}, ErrSessionNotFound
 	}
+	return s.usableSessionLocked(stored, now)
+}
+
+func (s *Service) usableSessionLocked(
+	stored sessiondomain.Session,
+	now time.Time,
+) (sessiondomain.Session, error) {
 	if !stored.Active(now) {
 		return sessiondomain.Session{}, ErrSessionInactive
 	}
@@ -448,7 +455,7 @@ func (s *Service) SessionRevoke(ctx context.Context, sessionID, reason, actor st
 			Reason:    reason,
 		})
 	if err != nil {
-		return fmt.Errorf("%w: %v", ErrStorageFailure, err)
+		return fmt.Errorf("%w: %w", ErrStorageFailure, err)
 	}
 	if err := s.applySessionRevoked(event); err != nil {
 		return err
@@ -471,7 +478,7 @@ func (s *Service) failTransactionLocked(
 			Attempts:      transaction.Attempts,
 		})
 	if err != nil {
-		return fmt.Errorf("%w: %v", ErrStorageFailure, err)
+		return fmt.Errorf("%w: %w", ErrStorageFailure, err)
 	}
 	return s.applyAuthenticationFailed(event)
 }

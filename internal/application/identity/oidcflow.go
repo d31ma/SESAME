@@ -217,7 +217,7 @@ func (s *Service) startInteractionLocked(
 			SecretDigest:  digest,
 		})
 	if err != nil {
-		return StartedInteraction{}, fmt.Errorf("%w: %v", ErrStorageFailure, err)
+		return StartedInteraction{}, fmt.Errorf("%w: %w", ErrStorageFailure, err)
 	}
 	if err := s.applyInteractionStarted(event); err != nil {
 		return StartedInteraction{}, err
@@ -312,7 +312,7 @@ func (s *Service) AuthorizationComplete(
 			CodeExpiresAt: now.Add(oidcdomain.CodeLifetime).Format(time.RFC3339Nano),
 		})
 	if err != nil {
-		return AuthorizationResponse{}, fmt.Errorf("%w: %v", ErrStorageFailure, err)
+		return AuthorizationResponse{}, fmt.Errorf("%w: %w", ErrStorageFailure, err)
 	}
 	if err := s.applyCodeIssued(event); err != nil {
 		return AuthorizationResponse{}, err
@@ -421,7 +421,7 @@ func (s *Service) codeExchange(
 			TenantID:      interaction.TenantID,
 		})
 	if err != nil {
-		return TokenResponse{}, fmt.Errorf("%w: %v", ErrStorageFailure, err)
+		return TokenResponse{}, fmt.Errorf("%w: %w", ErrStorageFailure, err)
 	}
 	if err := s.applyCodeRedeemed(event); err != nil {
 		return TokenResponse{}, err

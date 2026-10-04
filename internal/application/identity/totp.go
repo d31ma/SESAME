@@ -86,7 +86,7 @@ func (s *Service) TOTPEnroll(
 			SealedSecret: sealed,
 		})
 	if err != nil {
-		return authenticatordomain.TOTPEnrollment{}, fmt.Errorf("%w: %v", ErrStorageFailure, err)
+		return authenticatordomain.TOTPEnrollment{}, fmt.Errorf("%w: %w", ErrStorageFailure, err)
 	}
 	if err := s.applyTOTPEnrolled(event); err != nil {
 		return authenticatordomain.TOTPEnrollment{}, err
@@ -148,7 +148,7 @@ func (s *Service) TOTPActivate(
 			Counter:     counter,
 		})
 	if err != nil {
-		return fmt.Errorf("%w: %v", ErrStorageFailure, err)
+		return fmt.Errorf("%w: %w", ErrStorageFailure, err)
 	}
 	if err := s.applyTOTPActivated(event); err != nil {
 		return err
@@ -223,7 +223,7 @@ func (s *Service) AuthenticationVerifyTOTP(
 				Attempts:      attempts,
 			})
 		if err != nil {
-			return AuthenticationResult{}, fmt.Errorf("%w: %v", ErrStorageFailure, err)
+			return AuthenticationResult{}, fmt.Errorf("%w: %w", ErrStorageFailure, err)
 		}
 		if err := s.applyAuthenticationFailed(event); err != nil {
 			return AuthenticationResult{}, err
@@ -241,7 +241,7 @@ func (s *Service) AuthenticationVerifyTOTP(
 			Counter:     counter,
 		})
 	if err != nil {
-		return AuthenticationResult{}, fmt.Errorf("%w: %v", ErrStorageFailure, err)
+		return AuthenticationResult{}, fmt.Errorf("%w: %w", ErrStorageFailure, err)
 	}
 	if err := s.applyTOTPUsed(used); err != nil {
 		return AuthenticationResult{}, err
@@ -257,7 +257,7 @@ func (s *Service) AuthenticationVerifyTOTP(
 			Attempts:      transaction.Attempts + 1,
 		})
 	if err != nil {
-		return AuthenticationResult{}, fmt.Errorf("%w: %v", ErrStorageFailure, err)
+		return AuthenticationResult{}, fmt.Errorf("%w: %w", ErrStorageFailure, err)
 	}
 	if err := s.applyAuthenticationFactorVerified(event); err != nil {
 		return AuthenticationResult{}, err

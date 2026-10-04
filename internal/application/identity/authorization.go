@@ -121,7 +121,7 @@ func (s *Service) RoleCreate(
 		Permissions: authzdomain.EncodePermissions(permissions),
 	})
 	if err != nil {
-		return authzdomain.Role{}, fmt.Errorf("%w: %v", ErrStorageFailure, err)
+		return authzdomain.Role{}, fmt.Errorf("%w: %w", ErrStorageFailure, err)
 	}
 	if err := s.applyRoleCreated(event); err != nil {
 		return authzdomain.Role{}, err
@@ -199,7 +199,7 @@ func (s *Service) GrantCreate(
 		RoleID:      roleID,
 	})
 	if err != nil {
-		return authzdomain.Grant{}, fmt.Errorf("%w: %v", ErrStorageFailure, err)
+		return authzdomain.Grant{}, fmt.Errorf("%w: %w", ErrStorageFailure, err)
 	}
 	if err := s.applyGrantCreated(event); err != nil {
 		return authzdomain.Grant{}, err
@@ -234,7 +234,7 @@ func (s *Service) GrantRevoke(ctx context.Context, grantID, actor string) error 
 		TenantID: grant.TenantID,
 	})
 	if err != nil {
-		return fmt.Errorf("%w: %v", ErrStorageFailure, err)
+		return fmt.Errorf("%w: %w", ErrStorageFailure, err)
 	}
 	if err := s.applyGrantRevoked(event); err != nil {
 		return err

@@ -127,7 +127,7 @@ func (s *Service) ClientRegister(
 			SecretVerifier:         verifier,
 		})
 	if err != nil {
-		return ClientRegistration{}, fmt.Errorf("%w: %v", ErrStorageFailure, err)
+		return ClientRegistration{}, fmt.Errorf("%w: %w", ErrStorageFailure, err)
 	}
 	if err := s.applyClientRegistered(event); err != nil {
 		return ClientRegistration{}, err
@@ -195,7 +195,7 @@ func (s *Service) ClientRotateSecret(ctx context.Context, clientID, actor string
 			SecretVerifier: verifier,
 		})
 	if err != nil {
-		return "", fmt.Errorf("%w: %v", ErrStorageFailure, err)
+		return "", fmt.Errorf("%w: %w", ErrStorageFailure, err)
 	}
 	if err := s.applyClientSecretRotated(event); err != nil {
 		return "", err
@@ -236,7 +236,7 @@ func (s *Service) ClientDisable(ctx context.Context, clientID, reason, actor str
 			Reason:   reason,
 		})
 	if err != nil {
-		return fmt.Errorf("%w: %v", ErrStorageFailure, err)
+		return fmt.Errorf("%w: %w", ErrStorageFailure, err)
 	}
 	if err := s.applyClientDisabled(event); err != nil {
 		return err

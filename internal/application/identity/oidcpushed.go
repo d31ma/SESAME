@@ -129,7 +129,7 @@ func (s *Service) storePushedRequestLocked(
 			ExpiresAt:           expiresAt.Format(time.RFC3339Nano),
 		})
 	if err != nil {
-		return PushedAuthorizationRequest{}, fmt.Errorf("%w: %v", ErrStorageFailure, err)
+		return PushedAuthorizationRequest{}, fmt.Errorf("%w: %w", ErrStorageFailure, err)
 	}
 	if err := s.applyPushedRequestCreated(event); err != nil {
 		return PushedAuthorizationRequest{}, err
@@ -173,7 +173,7 @@ func (s *Service) resolvePushedRequestLocked(
 			ConsumedAt:      now.Format(time.RFC3339Nano),
 		})
 	if err != nil {
-		return AuthorizationRequest{}, fmt.Errorf("%w: %v", ErrStorageFailure, err)
+		return AuthorizationRequest{}, fmt.Errorf("%w: %w", ErrStorageFailure, err)
 	}
 	if err := s.applyPushedRequestConsumed(event); err != nil {
 		return AuthorizationRequest{}, err

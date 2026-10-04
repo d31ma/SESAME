@@ -331,7 +331,7 @@ func NewFromSnapshot(
 	tail []audit.Event,
 ) (*Service, error) {
 	service := &Service{
-		ledger:               ledger,
+		ledger:               guardActorTenant(ledger),
 		logger:               slog.New(slog.DiscardHandler),
 		byName:               make(map[string]tenantdomain.Tenant),
 		byID:                 make(map[string]tenantdomain.Tenant),
@@ -924,7 +924,7 @@ func (s *Service) Bootstrap(ctx context.Context, name, actor string) (BootstrapR
 		Status:   tenantdomain.StatusActive,
 	})
 	if err != nil {
-		return BootstrapResult{}, fmt.Errorf("%w: %v", ErrStorageFailure, err)
+		return BootstrapResult{}, fmt.Errorf("%w: %w", ErrStorageFailure, err)
 	}
 	if err := s.applyBootstrapped(event); err != nil {
 		return BootstrapResult{}, err
@@ -1037,7 +1037,7 @@ func (s *Service) PrincipalCreate(
 		IdentifierValue:     identifier.Value,
 	})
 	if err != nil {
-		return principaldomain.Principal{}, fmt.Errorf("%w: %v", ErrStorageFailure, err)
+		return principaldomain.Principal{}, fmt.Errorf("%w: %w", ErrStorageFailure, err)
 	}
 	if err := s.applyPrincipalCreated(event); err != nil {
 		return principaldomain.Principal{}, err
@@ -1079,7 +1079,7 @@ func (s *Service) PrincipalSuspend(
 		TenantID:    current.TenantID,
 	})
 	if err != nil {
-		return principaldomain.Principal{}, fmt.Errorf("%w: %v", ErrStorageFailure, err)
+		return principaldomain.Principal{}, fmt.Errorf("%w: %w", ErrStorageFailure, err)
 	}
 	if err := s.applyPrincipalSuspended(event); err != nil {
 		return principaldomain.Principal{}, err

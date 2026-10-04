@@ -60,7 +60,7 @@ func (s *Service) GroupCreate(
 		Name:     normalized,
 	})
 	if err != nil {
-		return authzdomain.Group{}, fmt.Errorf("%w: %v", ErrStorageFailure, err)
+		return authzdomain.Group{}, fmt.Errorf("%w: %w", ErrStorageFailure, err)
 	}
 	if err := s.applyGroupCreated(event); err != nil {
 		return authzdomain.Group{}, err
@@ -140,7 +140,7 @@ func (s *Service) groupMembership(
 		PrincipalID: principalID,
 	})
 	if err != nil {
-		return fmt.Errorf("%w: %v", ErrStorageFailure, err)
+		return fmt.Errorf("%w: %w", ErrStorageFailure, err)
 	}
 	if err := s.applyGroupMembership(event); err != nil {
 		return err
@@ -203,7 +203,7 @@ func (s *Service) GrantCreateForGroup(
 		RoleID:   roleID,
 	})
 	if err != nil {
-		return authzdomain.Grant{}, fmt.Errorf("%w: %v", ErrStorageFailure, err)
+		return authzdomain.Grant{}, fmt.Errorf("%w: %w", ErrStorageFailure, err)
 	}
 	if err := s.applyGrantCreated(event); err != nil {
 		return authzdomain.Grant{}, err
