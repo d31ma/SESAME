@@ -4,21 +4,13 @@ type RecentSignInServiceTest struct {
 }
 
 func (test *RecentSignInServiceTest) TestCredentialAndPrivilegeChangesArePrivileged() {
-	service := &RecentSignInService{}
-	privileged := []bool{}
-	for _, operation := range test.changes() {
-		privileged = append(privileged, service.Privileged(EngineCall{Operation: operation}))
-	}
+	privileged := test.privileged(test.changes())
 
 	Assert.Equals(test.everyOne(len(test.changes())), privileged)
 }
 
 func (test *RecentSignInServiceTest) TestReadsAndReductionsAreNotPrivileged() {
-	service := &RecentSignInService{}
-	privileged := []bool{}
-	for _, operation := range test.readsAndReductions() {
-		privileged = append(privileged, service.Privileged(EngineCall{Operation: operation}))
-	}
+	privileged := test.privileged(test.readsAndReductions())
 
 	Assert.Equals(make([]bool, len(test.readsAndReductions())), privileged)
 }
@@ -27,6 +19,15 @@ func (test *RecentSignInServiceTest) TestAMarkedCallIsPrivileged() {
 	service := &RecentSignInService{}
 
 	Assert.IsTrue(service.Privileged(EngineCall{Operation: "authenticator.passkey_list", Privileged: true}))
+}
+
+func (test *RecentSignInServiceTest) privileged(operations []string) []bool {
+	service := &RecentSignInService{}
+	privileged := []bool{}
+	for _, operation := range operations {
+		privileged = append(privileged, service.Privileged(EngineCall{Operation: operation}))
+	}
+	return privileged
 }
 
 func (test *RecentSignInServiceTest) changes() []string {
