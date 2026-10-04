@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -16,20 +17,22 @@ import (
 const (
 	remotesDirectory        = "remotes"
 	remotesRegenerate       = "go run ./tools/remotes/generate"
+	remoteReadme            = "README.md"
 	remoteSessionHeader     = "Sesame-Session"
 	remoteBearerHeader      = "Authorization"
 	remoteProvisioningRoute = "/api/v1/scim/"
 )
 
 var (
-	remoteLanguages      = []string{"go", "typescript"}
-	remoteClientPath     = regexp.MustCompile(`(?i)http_?client\(\s*\{\s*"path"\s*:\s*"(/[^"]*)"`)
-	remoteRequestMarker  = regexp.MustCompile(`(?i)(get|post|put|patch|delete)_?request\(\s*"(/[^"]*)"\s*\)`)
-	remoteHeaderMarker   = regexp.MustCompile(`(?i)request_?header\(\s*"([^"]+)"\s*\)`)
-	remoteRoleFiles      = []string{"server/setups/SesameSetup", "server/helpers/SesameTransportHelper"}
-	remoteRemoteFolder   = filepath.Join("server", "remotes")
-	remoteMissingHeader  = ""
-	remoteRequiredHeader = map[string]string{
+	remoteTemplateFolder    = filepath.Join("tools", "remotes", "templates")
+	remoteBaselineLanguages = []string{"go", "typescript"}
+	remoteClientPath        = regexp.MustCompile(`(?i)http_?client\(\s*\{\s*"path"\s*:\s*"(/[^"]*)"`)
+	remoteRequestMarker     = regexp.MustCompile(`(?i)(get|post|put|patch|delete)_?request\(\s*"(/[^"]*)"\s*\)`)
+	remoteHeaderMarker      = regexp.MustCompile(`(?i)request_?header\(\s*"([^"]+)"\s*\)`)
+	remoteRoleFiles         = []string{"server/setups/SesameSetup", "server/helpers/SesameTransportHelper"}
+	remoteRemoteFolder      = filepath.Join("server", "remotes")
+	remoteMissingHeader     = ""
+	remoteRequiredHeader    = map[string]string{
 		accessSignedIn:      remoteSessionHeader,
 		accessAdministrator: remoteSessionHeader,
 	}
@@ -66,11 +69,29 @@ func TestCommittedRemotesMatchTheGenerator(t *testing.T) {
 	}
 }
 
+func TestRemoteLanguagesAreTheTemplateFolders(t *testing.T) {
+	t.Parallel()
+
+	_, root := loadManifest(t)
+	languages := remoteLanguages(t, root)
+	for _, required := range remoteBaselineLanguages {
+		if !slices.Contains(languages, required) {
+			t.Errorf("tools/remotes/templates has no %s folder; found %v", required, languages)
+		}
+	}
+	for _, language := range languages {
+		readme := filepath.Join(root, remotesDirectory, language, remoteReadme)
+		if _, err := os.Stat(readme); err != nil {
+			t.Errorf("remotes/%s needs a %s: %v", language, remoteReadme, err)
+		}
+	}
+}
+
 func TestEveryLanguageShipsTheSetupAndTheTransportHelper(t *testing.T) {
 	t.Parallel()
 
 	_, root := loadManifest(t)
-	for _, language := range remoteLanguages {
+	for _, language := range remoteLanguages(t, root) {
 		for _, role := range remoteRoleFiles {
 			matches, err := filepath.Glob(filepath.Join(root, remotesDirectory, language, filepath.FromSlash(role)+".*"))
 			if err != nil || len(matches) != 1 {
@@ -85,7 +106,7 @@ func TestEveryRoutedRouteHasExactlyOneRemoteMethodPerLanguage(t *testing.T) {
 
 	loaded, root := loadManifest(t)
 	access := routeAccessFromManifest(loaded)
-	for _, language := range remoteLanguages {
+	for _, language := range remoteLanguages(t, root) {
 		methods := remoteMethods(t, filepath.Join(root, remotesDirectory, language, remoteRemoteFolder))
 		for operation, coverage := range loaded.HTTPCoverage {
 			if coverage.Category != coverageRouted {
@@ -132,6 +153,25 @@ func TestRemoteHeadersFollowTheRouteAccess(t *testing.T) {
 			t.Errorf("%s: header %q; want %q", name, got, testCase.want)
 		}
 	}
+}
+
+func remoteLanguages(t *testing.T, root string) []string {
+	t.Helper()
+
+	entries, err := os.ReadDir(filepath.Join(root, remoteTemplateFolder))
+	if err != nil {
+		t.Fatalf("list the remote template languages: %v", err)
+	}
+	languages := []string{}
+	for _, entry := range entries {
+		if entry.IsDir() {
+			languages = append(languages, entry.Name())
+		}
+	}
+	if len(languages) == 0 {
+		t.Fatalf("%s holds no language folders", remoteTemplateFolder)
+	}
+	return languages
 }
 
 func remoteHeaderFor(route string, access string) string {
