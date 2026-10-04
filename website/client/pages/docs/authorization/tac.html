@@ -128,12 +128,9 @@ decision = client.decide(&#123;
           <code>deny_session_invalid</code>.
         </p>
         <p class="doc-note">
-          All ten SDKs can express this. Python, Node.js, and Go take a request
-          object, so a session is just another key; the other seven carry a named
-          <code>decideForSession</code> beside their positional
-          <code>decide</code>. A contract test asserts every shim can reach the
-          capability, because a shim that cannot is the same kind of drift as a
-          missing operation.
+          Over HTTP this is the only form: <code>POST /api/v1/authorize/decide</code>
+          always decides for the caller's own session, so a principal cannot ask
+          on behalf of another or assert its own assurance level.
         </p>
       </div>
 
@@ -169,7 +166,7 @@ replay = client.decide(request, policy_version=4)</code></pre>
         <ul>
           <li><a href="/docs/errors">Reason and error codes</a> — every code these operations can return.</li>
           <li><a href="/docs/mfa">MFA and step-up</a> — raising the assurance a condition can require.</li>
-          <li><a href="https://github.com/d31ma/sesame/blob/main/api/machine/v1/decisions.golden.json" target="_blank" rel="noopener">Golden decision corpus</a> — the shared cases every SDK asserts against.</li>
+          <li><a href="https://github.com/d31ma/sesame/blob/main/api/machine/v1/decisions.golden.json" target="_blank" rel="noopener">Golden decision corpus</a> — the shared cases the engine and the Go package assert against.</li>
         </ul>
       </div>
     </div>

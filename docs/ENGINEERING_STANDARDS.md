@@ -16,8 +16,10 @@ large number of folders or abstractions.
 - Keep non-public Go implementation under `internal`.
 - Store canonical wire contracts under `api`; generated artifacts must identify
   their source and must never be edited by hand.
-- Keep client shims under `clients/<language>` with independent manifests,
-  tests, examples, and release metadata.
+- Keep the Go package in `server/packages`, its own standard-library-only
+  module, and the Yon host's controllers, services, models and roles under
+  `server/`. Engine production code under `cmd/` and `internal/` never
+  imports `server/`.
 - Put black-box and system-wide tests under `test`; package-local tests remain
   beside the Go code they exercise.
 - Record hard-to-reverse choices in ADRs and proposed public behavior in RFCs.
@@ -104,7 +106,8 @@ Every behavior starts with an observable test at the narrowest stable boundary.
 - Unit tests cover deterministic domain behavior.
 - Table/property/model tests cover state spaces and invariants.
 - Integration tests use the pinned real FYLO executable.
-- Contract tests exercise CLI, NDJSON, host-framework adapters, and SDK parity.
+- Contract tests exercise CLI, NDJSON, host-framework adapters, the Yon route
+  table, and the Go package.
 - Race tests cover mutable shared state.
 - Fuzz tests cover all parsers and security boundaries.
 - Crash tests inject termination around every durable acknowledgement boundary.

@@ -48,7 +48,7 @@ is temporary, so both paths must be absolute.
 | `sesame.deployment` | `YON_SESAME_DEPLOYMENT` | Absolute path of the deployment created by `sesame init`. Required. |
 | `sesame.waitmilliseconds` | none: set it in a JSON file | How long a request waits while another request's engine owns the deployment. Default 5000, at most 20000. `.env` values are text, and this one must be a number. |
 
-Set the two paths either in `.env` (copy `.env.example`) or in a profile file:
+Set the two paths either in `.env` at the project root or in a profile file:
 
 ```json
 {
@@ -99,8 +99,27 @@ publish the schemas.
 | `POST /api/v1/system/metrics` | `system.metrics` | an administrator |
 | `POST /api/v1/tenant/get` | `tenant.get` (by `tenant_id`) | an administrator of that tenant |
 
+Every other family has its own page with its routes, who may call each one,
+and why:
+
+| Families | Page |
+| --- | --- |
+| `principal`, `role`, `grant`, `group`, `authorize` | [Directory and authorization routes](yon/directory.md) |
+| `authn`, `authenticator`, `session`, `token` | [Authentication routes](yon/authn.md) |
+| `oidc_client`, `oidc`, and the standard endpoints under `/oidc` | [OAuth and OpenID Connect routes](yon/oidc.md) |
+| `federation`, `saml`, `scim` | [Federation, SAML and SCIM routes](yon/federation.md) |
+
 `sesame init`, `tenant.bootstrap` and `admin.bootstrap` stay on the command
-line.
+line. `federation.login_exchange` is never routed, because its answer carries
+the identity provider's client secret.
+
+`api/machine/v1/operations.json` records, under `http_coverage`, how each
+operation is reached: `routed` with its routes, `standard_endpoint` with the
+standard route that serves it, `command_line_only`, or
+`not_routed_for_security`. `go test ./test/contract` compares that record with
+the `@PostRoute` and `@GetRoute` annotations in `server/controllers`, so a new
+route or a new engine operation fails the build until the manifest describes
+it.
 
 ## Sign in
 
@@ -125,7 +144,7 @@ Errors answer `{"code":"<code>"}`:
 | Status | When |
 | --- | --- |
 | `400` | The engine refused the request as invalid. |
-| `401` | `session_rejected`, `session_inactive`, `actor_session_invalid`. |
+| `401` | `session_rejected`, `session_inactive`, `actor_session_invalid`, `provisioning_denied` (with `WWW-Authenticate: Bearer`). |
 | `403` | `tenant_mismatch`, `actor_tenant_mismatch`, `access_denied` and other refusals. |
 | `404` | A named record does not exist (`principal_not_found`, ...). |
 | `409` | A conflict (`identifier_conflict`, `stale_policy_version`, ...). |
@@ -171,3 +190,19 @@ The Go SDK and the host errors have ordinary Go tests:
 ```bash
 (cd server/packages && go test ./...)
 ```
+
+## Continuous integration
+
+GitHub Actions does not run the Yon tests yet. `ty test --coverage` and
+`ty bundle` need a `ty` build that includes Tachyon ADR 0095 (native Go code
+under `server/packages/`) and the `ty handler invoke` argument-binding fix,
+and no published Tachyon release carries both. Until one does, the release
+gate runs them locally with a pinned development build of `ty`, and CI runs
+everything else: the engine tests, the Go package tests in `server/packages`
+and the `test/contract` checks that tie `api/machine/v1/operations.json` to
+the routes in `server/controllers`.
+
+When Tachyon publishes a release with both changes, CI gains a job that
+installs that pinned release, builds the engine from this tree, puts it first
+on `PATH` and runs `ty bundle` and `ty test --coverage`, and this section is
+removed.

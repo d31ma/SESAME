@@ -46,9 +46,9 @@ jobs:
           cache: false
 
       - name: Check VERSION against the tag
-        # VERSION is what every SDK manifest is held to. If it disagrees with
-        # the tag, the release would publish clients stamped with a version
-        # the engine never shipped.
+        # VERSION is what the engine reports as its own version. If it
+        # disagrees with the tag, the release would publish binaries stamped
+        # with a version that was never tagged.
         shell: bash
         run: |
           set -euo pipefail
@@ -95,33 +95,10 @@ jobs:
           windows amd64 .exe
           TARGETS
 
-      - name: Package language clients
-        # One file per language, paired with this release's binary and machine
-        # protocol. There is no registry and no per-ecosystem manifest; the
-        # tarball is the distribution. See docs/SDK_DISTRIBUTION.md.
+      - name: Write checksums
+        shell: bash
         run: |
           set -euo pipefail
-          tools/package-clients.sh release-assets/sesame-clients.tar.gz
-          # The compile-and-run proof for every shim is a CI job; here we only
-          # confirm the archive actually contains what a user will look for,
-          # since a release that ships a tarball missing someone's language is
-          # not recoverable after the fact.
-          contents="$(tar -tzf release-assets/sesame-clients.tar.gz)"
-          while read -r shim; do
-            grep -Fqx "clients/${shim}" <<<"$contents" || {
-              echo "sesame-clients.tar.gz is missing ${shim}" >&2; exit 1; }
-          done <<'SHIMS'
-          LICENSE
-          node/sesame.mjs
-          python/sesame.py
-          rust/sesame.rs
-          java/Sesame.java
-          kotlin/Sesame.kt
-          csharp/Sesame.cs
-          php/sesame.php
-          ruby/sesame.rb
-          dart/sesame.dart
-          SHIMS
           (cd release-assets && shasum -a 256 sesame-* > SHA256SUMS)
 
       - name: Generate SPDX SBOM

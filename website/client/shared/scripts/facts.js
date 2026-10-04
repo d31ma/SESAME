@@ -6,25 +6,14 @@
 // here so a change lands in one place, and so a claim can be checked against
 // the repository rather than against another page.
 
-// Language shims in clients/. Each is one dependency-free file that owns a
-// SESAME subprocess over the NDJSON machine protocol.
-export const SDK_LANGUAGES = [
-  'Go',
-  'Node.js',
-  'Python',
-  'Rust',
-  'Java',
-  'Kotlin',
-  'C#',
-  'PHP',
-  'Ruby',
-  'Dart',
-]
-export const SDK_COUNT = SDK_LANGUAGES.length
+// The one language package SESAME ships: the Go package in server/packages.
+// Every other language reaches SESAME over HTTP through the Yon host, or by
+// spawning `sesame exec --loop` itself.
+export const SDK_LANGUAGES = ['Go']
 
 // Operations in api/machine/v1/operations.json — the canonical surface, held
 // in agreement with the engine's dispatch table, the protocol reference, and
-// every SDK's source by test/contract.
+// the Yon controllers' routes by test/contract.
 export const OPERATION_COUNT = 85
 
 // Release targets built by .github/workflows/release.yml.
@@ -71,9 +60,9 @@ export const PROVEN = [
       'A hash-chained security ledger on FYLO with rebuildable projections, verified snapshots, and restart evidence run against a real FYLO runtime.',
   },
   {
-    area: 'Ten drop-in clients',
+    area: 'HTTP API and Go package',
     detail:
-      'One dependency-free file per language, each holding the whole operation surface. A contract test resolves every operation against every shim, so a capability cannot ship in one language and quietly miss another.',
+      'A Yon host serves every operation that may leave the machine over HTTP, signed in with a SESAME session and held to the caller\'s tenant. A contract test ties every route to the operation manifest, so an operation cannot ship without saying how it is reached. Go hosts can drive the engine directly through a standard-library-only package.',
   },
 ]
 

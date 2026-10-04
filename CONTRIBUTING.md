@@ -33,8 +33,9 @@ tests, and cross-compilation checks.
 - Keep changes vertically complete across contracts, implementation, negative
   paths, documentation, and migration behavior.
 - Do not add an empty package or speculative abstraction.
-- Update JSON Schema, machine fixtures, framework adapters, and SDKs together
-  when a public contract changes.
+- Update JSON Schema, machine fixtures, framework adapters, the Go package in
+  `server/packages`, the Yon controllers and `api/machine/v1/operations.json`
+  together when a public contract changes.
 - Preserve public API and stored-data compatibility unless an accepted ADR/RFC
   defines the break and migration.
 - Add threat-model coverage for changes involving credentials, sessions,

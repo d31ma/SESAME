@@ -55,10 +55,7 @@ func TestWebsiteOperationCountMatchesTheManifest(t *testing.T) {
 	}
 }
 
-// TestWebsiteSDKListMatchesTheShippedClients: every language named on the site
-// must be one a developer can actually download, and every shipped shim must
-// be named — an omission understates the project, which is a bug too.
-func TestWebsiteSDKListMatchesTheShippedClients(t *testing.T) {
+func TestWebsiteNamesOnlyTheGoPackage(t *testing.T) {
 	t.Parallel()
 
 	facts, root := loadFacts(t)
@@ -66,34 +63,40 @@ func TestWebsiteSDKListMatchesTheShippedClients(t *testing.T) {
 	if block == nil {
 		t.Fatal("the website facts declare no SDK_LANGUAGES")
 	}
-
-	// The site spells languages for a reader; clients/ spells them for a file
-	// system. This is the mapping between the two.
-	directoryFor := map[string]string{
-		"Go": "go", "Node.js": "node", "Python": "python", "Rust": "rust",
-		"Java": "java", "Kotlin": "kotlin", "C#": "csharp", "PHP": "php",
-		"Ruby": "ruby", "Dart": "dart",
-	}
-
-	advertised := map[string]bool{}
+	var advertised []string
 	for _, quoted := range regexp.MustCompile(`'([^']+)'`).FindAllStringSubmatch(block[1], -1) {
-		language := quoted[1]
-		directory, known := directoryFor[language]
-		if !known {
-			t.Errorf("the website names SDK %q, which has no clients/ directory mapping", language)
-			continue
-		}
-		if _, err := os.Stat(sdkDirectory(root, directory)); err != nil {
-			t.Errorf("the website names SDK %q, but %s does not exist", language, sdkRelativeDirectory(directory))
-			continue
-		}
-		advertised[directory] = true
+		advertised = append(advertised, quoted[1])
 	}
+	if len(advertised) != 1 || advertised[0] != goPackageLanguage {
+		t.Errorf("the website names SDKs %v; SESAME ships only the %s package in %s", advertised, goPackageLanguage, goPackageDirectory)
+	}
+	if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(goPackageDirectory))); err != nil {
+		t.Errorf("the website names the %s package, but %s does not exist", goPackageLanguage, goPackageDirectory)
+	}
+}
 
-	for _, sdk := range shippedSDKs(t, root) {
-		if !advertised[sdk] {
-			t.Errorf("%s ships, but the website never mentions it", sdkRelativeDirectory(sdk))
+func TestWebsiteNeverPointsAtRetiredClients(t *testing.T) {
+	t.Parallel()
+
+	root := repositoryRoot(t)
+	err := filepath.WalkDir(filepath.Join(root, "website", "client"), func(path string, entry os.DirEntry, err error) error {
+		if err != nil || entry.IsDir() {
+			return err
 		}
+		content, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		for _, retired := range retiredClientMarkers {
+			if strings.Contains(string(content), retired) {
+				relative, _ := filepath.Rel(root, path)
+				t.Errorf("%s still points at %q, which SESAME no longer ships", relative, retired)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("walk the website: %v", err)
 	}
 }
 
@@ -148,16 +151,7 @@ func TestWebsiteMakesNoUnearnedSupportClaim(t *testing.T) {
 	}
 }
 
-// TestWebsiteGuideSnippetsCallRealSDKMethods is the guard that makes the
-// guides worth publishing.
-//
-// Their whole claim is that they are working call sequences rather than
-// descriptions of one, and the cheapest way for that to become false is an
-// SDK method being renamed while a snippet keeps the old name. Every
-// `client.<method>(` in the guide snippets has to be defined by at least one
-// shim that spells methods that way — the ten languages fall into three
-// casing families, and a method resolves if any shim in its family has it.
-func TestWebsiteGuideSnippetsCallRealSDKMethods(t *testing.T) {
+func TestWebsiteGuideSnippetsCallRealGoMethods(t *testing.T) {
 	t.Parallel()
 
 	root := repositoryRoot(t)
@@ -166,61 +160,13 @@ func TestWebsiteGuideSnippetsCallRealSDKMethods(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read the guide snippets: %v", err)
 	}
-
-	read := func(parts ...string) string {
-		content, err := os.ReadFile(filepath.Join(append([]string{root}, parts...)...))
-		if err != nil {
-			t.Fatalf("read %v: %v", parts, err)
-		}
-		return string(content)
-	}
-	// How each shim spells a method definition, grouped by the casing its
-	// language uses. A PascalCase call could be Go or C#; a camelCase one
-	// could be any of five.
-	families := map[string][]struct {
-		language   string
-		source     string
-		definition string
-	}{
-		"snake": {
-			{"Python", read("clients", "python", "sesame.py"), "def %s("},
-			{"Ruby", read("clients", "ruby", "sesame.rb"), "def %s("},
-			{"Rust", read("clients", "rust", "sesame.rs"), "fn %s("},
-		},
-		"camel": {
-			{"Node.js", read("clients", "node", "sesame.mjs"), "    %s = "},
-			{"Java", read("clients", "java", "Sesame.java"), " %s("},
-			{"Kotlin", read("clients", "kotlin", "Sesame.kt"), "fun %s("},
-			{"PHP", read("clients", "php", "sesame.php"), "function %s("},
-			{"Dart", read("clients", "dart", "sesame.dart"), "> %s("},
-		},
-		"pascal": {
-			{"Go", read("server", "packages", "sesame", "client.go"), "func (c *Client) %s("},
-			{"C#", read("clients", "csharp", "Sesame.cs"), " %s("},
-		},
-	}
+	source := goPackageSource(t, root)
 
 	calls := regexp.MustCompile(`client\.([A-Za-z_][A-Za-z0-9_]*)\(`).
 		FindAllStringSubmatch(string(snippets), -1)
 	if len(calls) == 0 {
 		t.Fatal("no client calls found in the guide snippets")
 	}
-
-	family := func(method string) string {
-		switch {
-		case strings.Contains(method, "_"):
-			return "snake"
-		case method[0] >= 'A' && method[0] <= 'Z':
-			return "pascal"
-		case strings.ToLower(method) != method:
-			return "camel"
-		default:
-			// A single lowercase word — `authorize`, `decide`, `request` — is
-			// spelled the same in every non-Pascal language.
-			return "any"
-		}
-	}
-
 	seen := map[string]bool{}
 	for _, call := range calls {
 		method := call[1]
@@ -228,28 +174,11 @@ func TestWebsiteGuideSnippetsCallRealSDKMethods(t *testing.T) {
 			continue
 		}
 		seen[method] = true
-
-		wanted := family(method)
-		found := false
-		for name, shims := range families {
-			if wanted != "any" && name != wanted {
-				continue
-			}
-			for _, shim := range shims {
-				if strings.Contains(shim.source, fmt.Sprintf(shim.definition, method)) {
-					found = true
-					break
-				}
-			}
-			if found {
-				break
-			}
-		}
-		if !found {
-			t.Errorf("a guide calls client.%s(), which no %s-cased shim defines", method, wanted)
+		if !strings.Contains(source, fmt.Sprintf("func (c *Client) %s(", method)) {
+			t.Errorf("a guide calls client.%s(), which the Go package does not define", method)
 		}
 	}
-	t.Logf("resolved %d distinct SDK methods referenced by the guides", len(seen))
+	t.Logf("resolved %d distinct Go methods referenced by the guides", len(seen))
 }
 
 // TestWebsiteDocsNavIsWhole keeps the documentation map honest.

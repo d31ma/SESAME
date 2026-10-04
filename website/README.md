@@ -132,16 +132,17 @@ clean at 320, 375, 414, 768, 834, 1024, 1920, and 2560 across all eight pages.
 ## Claims are tested
 
 `facts.js` is the single source of truth for everything countable — the
-operation count, the SDK list, and the two-column
+operation count, the language package list, and the two-column
 "what is built / what is not" copy on the homepage.
 
 It is not decoration. `test/contract/website_test.go` in the parent repository
 joins it back to the sources it describes, and fails if:
 
 - the advertised operation count differs from `api/machine/v1/operations.json`;
-- the site names an SDK that is not in `clients/`, or omits one that is;
-- a guide snippet calls an SDK method no shim of that naming convention
-  defines, or a guide card links to a route the site does not serve;
+- the site names a language package other than the Go package in
+  `server/packages`, or still points at the retired `clients/` bundle;
+- a guide snippet calls a method the Go package does not define, or a guide
+  card links to a route the site does not serve;
 - the error reference documents a code the engine cannot return, or omits one
   it can;
 - any page contains a support claim SESAME has not earned — "OpenID

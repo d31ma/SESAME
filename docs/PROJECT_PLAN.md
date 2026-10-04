@@ -413,16 +413,15 @@ internal/
 api/
   schema/
   machine/v1/
-clients/
-  go/
-  node/
-  python/
-  rust/
-  java/
-  csharp/
-  php/
-  ruby/
-  dart/
+server/
+  controllers/
+  services/
+  models/
+  roles/
+  tests/
+  packages/
+    sesame/
+    host/
 conformance/
 test/
   blackbox/
@@ -905,6 +904,17 @@ every expected file before anything is attested.
 [docs/SDK_DISTRIBUTION.md](SDK_DISTRIBUTION.md) records the install steps,
 verification, and an explicit account of what the model costs — no dependency
 resolver, no lockfile entry, and no transitive install.
+
+**Superseded 2026-10-04.** The nine copy-in shims, `sesame-clients.tar.gz` and
+`tools/verify-sdk-install.sh` are retired. SESAME ships a Yon host instead
+([ADR 0007](adr/0007-sesame-ships-a-yon-host-project.md),
+[docs/YON.md](YON.md)): every language reaches SESAME over HTTP, and the Go
+package moved to `server/packages`. `operations.json` now records how each
+operation is reached over HTTP instead of per-SDK gaps, and `test/contract`
+checks it against the controllers' routes.
+[docs/SDK_DISTRIBUTION.md](SDK_DISTRIBUTION.md) gives the migration path for
+each former SDK language. The exit-gate rows above are kept as the record of
+what was proven then.
 
 ### Phase 6: Federation and Provisioning
 

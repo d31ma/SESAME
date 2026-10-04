@@ -62,10 +62,13 @@ jobs:
           path: coverage.out
           retention-days: 14
 
-  sdk-interop:
-    name: SDK contract corpus (Go, Node, Python)
-    # Every SDK runs the same scenario against real compiled binaries, so a
-    # divergence fails the language that drifted rather than hiding in a mock.
+  go-package:
+    name: Go package contract corpus
+    # The Go package in server/packages is the Yon host's engine transport and
+    # the public package for Go hosts. Its scenario runs against a real
+    # compiled engine, so a protocol divergence fails here rather than in a mock.
+    # The Yon host's own tests (ty bundle, ty test --coverage) run in the local
+    # release gate until a released ty can be installed here; see docs/YON.md.
     runs-on: ubuntu-latest
     steps:
       - name: Check out source
@@ -77,171 +80,9 @@ jobs:
           go-version-file: go.mod
           cache: false
 
-      - name: Set up Node
-        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
-        with:
-          node-version: 22
-
-      - name: Set up Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
-        with:
-          python-version: "3.12"
-
-      - name: Run Go SDK contract corpus
+      - name: Run the Go package tests
         working-directory: server/packages
-        run: go test -count=1 -run TestSDKContractScenario ./sesame
-
-      - name: Run Node SDK contract corpus
-        working-directory: clients/node
-        run: node --test
-
-      - name: Run Python SDK contract corpus
-        working-directory: clients/python
-        run: python3 -m unittest -v test_contract
-
-  sdk-interop-extended:
-    name: SDK contract corpus (Rust, Java, Kotlin, C#, PHP, Ruby, Dart)
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out source
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-
-      - name: Set up Go
-        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
-        with:
-          go-version-file: go.mod
-          cache: false
-
-      - name: Set up .NET
-        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
-        with:
-          dotnet-version: "8.0.x"
-
-      - name: Set up Java
-        uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4
-        with:
-          distribution: temurin
-          java-version: "21"
-
-      - name: Set up PHP
-        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
-        with:
-          php-version: "8.3"
-
-      - name: Set up Ruby
-        uses: ruby/setup-ruby@a4effe49ee8ee5b8b5091268c473a4628afb5651 # v1
-        with:
-          ruby-version: "3.3"
-
-      - name: Set up Dart
-        uses: dart-lang/setup-dart@65eb853c7ba17dde3be364c3d2858773e7144260 # v1
-
-      - name: Run Rust SDK contract corpus
-        working-directory: clients/rust
-        run: |
-          rustc --edition 2021 --test contract_test.rs -o sesame-rust-contract
-          ./sesame-rust-contract --nocapture
-
-      - name: Run Java SDK contract corpus
-        working-directory: clients/java
-        run: |
-          javac -d build Sesame.java SesameContractTest.java
-          java -cp build ma.del.sesame.SesameContractTest
-
-      - name: Set up Kotlin
-        run: |
-          curl -fsSL -o kotlin.zip \
-            https://github.com/JetBrains/kotlin/releases/download/v2.1.10/kotlin-compiler-2.1.10.zip
-          unzip -q kotlin.zip -d "$HOME"
-          echo "$HOME/kotlinc/bin" >> "$GITHUB_PATH"
-
-      - name: Run Kotlin SDK contract corpus
-        working-directory: clients/kotlin
-        run: |
-          kotlinc Sesame.kt ContractTest.kt -include-runtime -d sesame-kotlin-contract.jar
-          java -jar sesame-kotlin-contract.jar
-
-      - name: Run C# SDK contract corpus
-        working-directory: clients/csharp
-        run: dotnet run --project SesameContractTest.csproj
-
-      - name: Run PHP SDK contract corpus
-        run: php clients/php/contract_test.php
-
-      - name: Run Ruby SDK contract corpus
-        run: ruby clients/ruby/contract_test.rb
-
-      - name: Run Dart SDK contract corpus
-        run: dart run clients/dart/contract_test.dart
-
-  sdk-bundle:
-    name: Verify the client bundle can be consumed
-    # SESAME distributes clients as one file per language inside
-    # sesame-clients.tar.gz, with no package manifests and no registry. That
-    # makes this the only check between a release and a client nobody can use:
-    # it builds the tarball, extracts it, and copies each shim into a
-    # throwaway project exactly as a developer would.
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out source
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-
-      - name: Set up Go
-        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
-        with:
-          go-version-file: go.mod
-          cache: false
-
-      - name: Set up Node
-        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
-        with:
-          node-version: 22
-
-      - name: Set up Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
-        with:
-          python-version: "3.12"
-
-      - name: Set up .NET
-        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
-        with:
-          dotnet-version: "8.0.x"
-
-      - name: Set up Java
-        uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4
-        with:
-          distribution: temurin
-          java-version: "21"
-
-      - name: Set up PHP
-        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
-        with:
-          php-version: "8.3"
-
-      - name: Set up Ruby
-        uses: ruby/setup-ruby@a4effe49ee8ee5b8b5091268c473a4628afb5651 # v1
-        with:
-          ruby-version: "3.3"
-
-      - name: Set up Dart
-        uses: dart-lang/setup-dart@65eb853c7ba17dde3be364c3d2858773e7144260 # v1
-
-      - name: Set up Kotlin
-        run: |
-          curl -fsSL -o kotlin.zip \
-            https://github.com/JetBrains/kotlin/releases/download/v2.1.10/kotlin-compiler-2.1.10.zip
-          unzip -q kotlin.zip -d "$HOME"
-          echo "$HOME/kotlinc/bin" >> "$GITHUB_PATH"
-
-      - name: Build and consume the client bundle
-        run: tools/verify-sdk-install.sh dist/sesame-clients.tar.gz
-
-      - name: Upload the client bundle
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: sesame-clients
-          path: dist/sesame-clients.tar.gz
-          if-no-files-found: error
+        run: go test -count=1 ./...
 
   quality:
     name: Formatting, race, static analysis, and vulnerabilities
@@ -257,8 +98,12 @@ jobs:
           cache: false
 
       - name: Check formatting
+        # Yon handler files under server/ have no package clause, so gofmt
+        # cannot parse them; ty checks those. A parse error elsewhere fails.
         shell: bash
-        run: test -z "$(gofmt -l .)"
+        run: |
+          unformatted="$(gofmt -l cmd internal test tools examples server/packages 2>&1)"
+          test -z "$unformatted" || { echo "$unformatted"; exit 1; }
 
       - name: Run race detector
         run: go test -race -count=1 ./...

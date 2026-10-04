@@ -4,7 +4,8 @@
 
 This document covers the planned single-owner SESAME v1 engine, its host
 application, FYLO child process and local data root, operator CLI, local machine
-interface, language SDKs and framework adapters, external interaction clients,
+interface, the Yon host (`server/`), the Go package and framework adapters,
+external interaction clients,
 protocol endpoints exposed by the host, connectors, key-management boundary,
 release artifacts, and audit export.
 
@@ -28,7 +29,8 @@ flows, trust boundaries, and mitigations.
 2. Host framework adapter to the local SESAME machine process.
 3. Operator CLI and SDK to privileged administration commands.
 4. External interaction client to persisted authentication transactions.
-5. Local SDK shim to the SESAME NDJSON machine process.
+5. Local Go package (in the Yon host or a Go application) to the SESAME NDJSON
+   machine process.
 6. SESAME command coordinator to the FYLO machine process.
 7. SESAME/FYLO processes to the local filesystem.
 8. SESAME to the external key-management or sealed-file boundary.
@@ -201,9 +203,9 @@ Three limits are worth stating plainly.
 - Logs and traces pass automated secret-canary tests.
 - Backup restoration reproduces expected identity and policy decisions.
 - Every supported OS/architecture passes native crash, recovery, upgrade,
-  packaging, and SDK interoperability tests.
-- Every published SDK version passes the shared contract corpus against the
-  minimum and maximum compatible SESAME versions.
+  packaging, Go package, and Yon host interoperability tests.
+- Every published Go package and Yon host passes the shared contract corpus
+  against the minimum and maximum compatible SESAME versions.
 - A third-party security review is complete before v1.0.
 - The project publishes a security policy, supported-version window, and private
   disclosure channel before accepting production users.

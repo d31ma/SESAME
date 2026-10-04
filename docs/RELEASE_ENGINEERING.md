@@ -63,14 +63,14 @@ sesame-linux-arm64
 sesame-darwin-amd64
 sesame-darwin-arm64
 sesame-windows-amd64.exe
-sesame-clients.tar.gz
 SHA256SUMS
 sesame-v<version>.spdx.json
 ```
 
 The workflow generates checksums, an SPDX SBOM, and signed GitHub build
-attestations. `sesame-clients.tar.gz` contains the nine copy-file SDK shims;
-the Go SDK resolves from the SESAME module tag. These developer-preview assets
+attestations. There is no client bundle: the Go package resolves from the
+release commit, and every other language uses the Yon host's HTTP API or the
+machine protocol ([distribution](SDK_DISTRIBUTION.md)). These developer-preview assets
 do not bundle FYLO, CHEX, or TTID and do not by themselves establish native
 platform support.
 
@@ -178,23 +178,25 @@ identifier, crash, backup/restore, migration, and performance gate. A
 user-supplied executable path is advanced configuration and does not widen the
 supported version range.
 
-## SDK Releases
+## Go Package and Yon Host Releases
 
-SDKs share the SESAME release version and provenance chain. Each release
-publishes `sesame-clients.tar.gz`, containing one source file for Node, Python,
-Rust, Java, Kotlin, C#, PHP, Ruby, and Dart. Consumers copy the applicable file
-into their project; SESAME does not publish those shims to ecosystem package
-registries. Go is the exception: its SDK lives in the SESAME module and
-resolves from the same repository tag as the engine.
+The Go package (`github.com/d31ma/sesame/server/packages`) and the Yon host
+(`server/`) share the SESAME release version and provenance chain: both are
+taken from the release commit. The Go package is its own module; CalVer tags
+are not semantic import versions for a nested module, so consumers resolve it
+at the release commit as a pseudo-version. Releases up to 26.33.02 also shipped
+`sesame-clients.tar.gz` with nine copy-in language shims; those are retired.
 
 `api/machine/v1/operations.json` is the canonical typed-operation surface and
-records any SDK gaps. `api/standards/v1/host-adapter.schema.json` is the
-normative host-adapter wire schema. An SDK bundle is blocked unless every shim
-passes its native contract scenario against a real SESAME executable, the
-operation-parity checks pass, and `tools/verify-sdk-install.sh` proves every
-documented copy-file installation from the release archive. SDK compatibility
-is bounded by the machine protocol and reported operation set, not by an
-independent per-language release version.
+records how each operation is reached over HTTP (`http_coverage`).
+`api/standards/v1/host-adapter.schema.json` is the normative host-adapter wire
+schema. A release is blocked unless the Go package passes its contract scenario
+against a real SESAME executable, `test/contract` ties every operation to the
+Yon controllers' routes, and the Yon host's `ty bundle` and
+`ty test --coverage` pass against the release engine (run in the local release
+gate until a released `ty` can run in CI; see [docs/YON.md](YON.md)).
+Compatibility is bounded by the machine protocol and reported operation set,
+not by an independent per-language release version.
 
 ## Promotion Gates
 
@@ -209,7 +211,7 @@ independent per-language release version.
 - candidate native matrix passes;
 - restore and upgrade drills pass;
 - OIDC conformance and adversarial tests pass for claimed profiles;
-- SDK compatibility matrix is published;
+- Go package and Yon host compatibility matrix is published;
 - SBOM, provenance, checksums, and signatures are verifiable;
 - threat model has no unowned critical finding.
 

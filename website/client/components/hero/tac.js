@@ -1,15 +1,9 @@
-import { SDK_COUNT } from '../../shared/scripts/facts.js'
-
 export default class extends Tac {
-  // The lede reads "in any of {sdkCount} languages" — the number of shims
-  // that can drive the engine directly.
-  sdkCount = SDK_COUNT
-
   installCmd = 'go install github.com/d31ma/sesame/cmd/sesame@latest'
   installCopied = false
 
   ticks = [
-    'No network listener',
+    'Engine opens no port',
     'One direct dependency',
     'Default deny, always',
     'Apache-2.0',

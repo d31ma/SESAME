@@ -17,15 +17,15 @@ import (
 )
 
 // The operation manifest is the one place the machine surface is written down.
-// These three tests make it binding rather than decorative: it is checked
-// against the engine that routes the operations, the documentation that
-// describes them, and the SDKs that expose them. A manifest nothing checks is
-// a promise, and this project does not ship promises as evidence.
+// These tests make it binding rather than decorative: it is checked against
+// the engine that routes the operations, the documentation that describes
+// them, and the Yon controllers that expose them over HTTP. A manifest nothing
+// checks is a promise, and this project does not ship promises as evidence.
 
 type manifest struct {
-	ProtocolVersion string              `json:"protocol_version"`
-	Operations      []string            `json:"operations"`
-	SDKGaps         map[string][]string `json:"sdk_gaps"`
+	ProtocolVersion string                       `json:"protocol_version"`
+	Operations      []string                     `json:"operations"`
+	HTTPCoverage    map[string]operationCoverage `json:"http_coverage"`
 }
 
 func loadManifest(t *testing.T) (manifest, string) {
@@ -196,157 +196,5 @@ func TestEveryOperationIsDocumented(t *testing.T) {
 	if len(undocumented) != 0 {
 		sort.Strings(undocumented)
 		t.Fatalf("operations missing from api/machine/v1/README.md: %s", strings.Join(undocumented, ", "))
-	}
-}
-
-// TestSDKCoverageMatchesTheDeclaredGaps measures what each shim actually
-// exposes and compares it against what the manifest admits.
-//
-// A gap is not a defect: every SDK can reach every operation through its
-// generic request escape hatch, and a typed method is a convenience. What
-// would be a defect is a gap nobody wrote down, or a closed gap the manifest
-// still advertises. Both fail here, which turns SDK parity into a list that
-// can only shrink deliberately.
-func TestSDKCoverageMatchesTheDeclaredGaps(t *testing.T) {
-	t.Parallel()
-
-	loaded, root := loadManifest(t)
-	extensions := map[string]struct{}{
-		".go": {}, ".js": {}, ".mjs": {}, ".ts": {}, ".py": {}, ".rs": {},
-		".java": {}, ".kt": {}, ".cs": {}, ".php": {}, ".rb": {}, ".dart": {},
-	}
-
-	for sdk, declared := range loaded.SDKGaps {
-		directory := sdkDirectory(root, sdk)
-		if _, err := os.Stat(directory); err != nil {
-			t.Errorf("the manifest names SDK %q, which does not exist", sdk)
-			continue
-		}
-
-		var builder strings.Builder
-		err := filepath.WalkDir(directory, func(path string, entry os.DirEntry, err error) error {
-			if err != nil {
-				return err
-			}
-			// Build output is not SDK source. Reading it would let a
-			// generated file satisfy a coverage claim the hand-written
-			// client does not actually make.
-			if entry.IsDir() {
-				switch entry.Name() {
-				case "obj", "bin", "target", "node_modules", "build", ".dart_tool", "__pycache__":
-					return filepath.SkipDir
-				}
-				return nil
-			}
-			if _, ok := extensions[filepath.Ext(path)]; !ok {
-				return nil
-			}
-			content, err := os.ReadFile(path)
-			if err != nil {
-				return err
-			}
-			builder.Write(content)
-			builder.WriteString("\n")
-			return nil
-		})
-		if err != nil {
-			t.Fatalf("scan the %s SDK: %v", sdk, err)
-		}
-		source := builder.String()
-
-		measured := map[string]struct{}{}
-		for _, operation := range loaded.Operations {
-			if !strings.Contains(source, `"`+operation+`"`) &&
-				!strings.Contains(source, `'`+operation+`'`) {
-				measured[operation] = struct{}{}
-			}
-		}
-		declaredSet := map[string]struct{}{}
-		for _, operation := range declared {
-			declaredSet[operation] = struct{}{}
-		}
-
-		var undeclared, stale []string
-		for operation := range measured {
-			if _, ok := declaredSet[operation]; !ok {
-				undeclared = append(undeclared, operation)
-			}
-		}
-		for operation := range declaredSet {
-			if _, ok := measured[operation]; !ok {
-				stale = append(stale, operation)
-			}
-		}
-		sort.Strings(undeclared)
-		sort.Strings(stale)
-		if len(undeclared) != 0 {
-			t.Errorf("the %s SDK is missing operations the manifest does not admit: %s",
-				sdk, strings.Join(undeclared, ", "))
-		}
-		if len(stale) != 0 {
-			t.Errorf("the %s SDK now covers operations the manifest still lists as gaps; "+
-				"remove them from api/machine/v1/operations.json: %s", sdk, strings.Join(stale, ", "))
-		}
-	}
-
-	// Every shim must be accounted for, so a new SDK cannot arrive with no
-	// declared surface at all.
-	for _, sdk := range shippedSDKs(t, root) {
-		if _, ok := loaded.SDKGaps[sdk]; !ok {
-			t.Errorf("SDK %q has no entry in the manifest's sdk_gaps", sdk)
-		}
-	}
-}
-
-// TestEverySDKCanExpressASessionDecision guards the parity gap that let seven
-// shims ship without it.
-//
-// The engine accepts a session in place of a principal on authorize.decide,
-// which is how a step-up condition is enforced. Python, Node and Go could
-// express that because their decide() takes a request object; the other seven
-// took positional arguments and silently could not, so the only route was the
-// raw request() escape hatch. A capability the engine has and a shim cannot
-// reach is the same kind of drift as a missing operation.
-func TestEverySDKCanExpressASessionDecision(t *testing.T) {
-	t.Parallel()
-
-	root := repositoryRoot(t)
-
-	// Each shim either takes a request object on decide (so a session is just
-	// another key) or carries a named session variant.
-	shims := map[string][]string{
-		filepath.Join("clients", "python", "sesame.py"):            {"def decide(self, request"},
-		filepath.Join("clients", "node", "sesame.mjs"):             {"decide = (request"},
-		filepath.Join("server", "packages", "sesame", "client.go"): {"SessionID     string"},
-		filepath.Join("clients", "ruby", "sesame.rb"):              {"def decide_for_session("},
-		filepath.Join("clients", "php", "sesame.php"):              {"function decideForSession("},
-		filepath.Join("clients", "java", "Sesame.java"):            {"Object decideForSession("},
-		filepath.Join("clients", "kotlin", "Sesame.kt"):            {"fun decideForSession("},
-		filepath.Join("clients", "csharp", "Sesame.cs"):            {"JsonElement DecideForSession("},
-		filepath.Join("clients", "dart", "sesame.dart"):            {"decideForSession("},
-		filepath.Join("clients", "rust", "sesame.rs"):              {"fn decide_for_session("},
-	}
-
-	shipped := len(shippedSDKs(t, root))
-	if len(shims) != shipped {
-		t.Fatalf("this test covers %d shims; clients/ ships %d", len(shims), shipped)
-	}
-
-	for path, wanted := range shims {
-		content, err := os.ReadFile(filepath.Join(root, path))
-		if err != nil {
-			t.Errorf("read %s: %v", path, err)
-			continue
-		}
-		found := false
-		for _, marker := range wanted {
-			if strings.Contains(string(content), marker) {
-				found = true
-				break
-			}
-		}
-		if !found {
-			t.Errorf("%s cannot express a session-based decision; the engine accepts one", path)
-		}
 	}
 }

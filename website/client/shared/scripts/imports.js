@@ -123,7 +123,7 @@ if (typeof document !== 'undefined') {
     // Description copy is deliberately conservative: this is a developer
     // preview, and a search result is a support claim like any other.
     const DESCRIPTION =
-        'SESAME is an open-source, headless authentication and authorization engine backed by FYLO. It opens no network listener — your application owns every route and drives the engine over a versioned stdin/stdout protocol. OIDC provider, passkeys, TOTP, deterministic default-deny authorization, inbound OIDC and SAML federation, and SCIM provisioning, with drop-in clients for ten languages.'
+        'SESAME is an open-source, headless authentication and authorization engine backed by FYLO. The engine opens no network listener; its Yon host serves an HTTP API, and Go hosts can drive the engine over a versioned stdin/stdout protocol. OIDC provider, passkeys, TOTP, deterministic default-deny authorization, inbound OIDC and SAML federation, and SCIM provisioning.'
     const seoMeta = [
         { name: 'description', content: DESCRIPTION },
         {

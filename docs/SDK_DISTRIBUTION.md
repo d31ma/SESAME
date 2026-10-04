@@ -1,137 +1,126 @@
-# SDK distribution
+# Distribution
 
-SESAME distributes its clients the way [FYLO](https://fylo.del.ma) does, and
-for the same reason: each shim is a single dependency-free file, so the
-simplest thing that works is to hand you the file.
+A SESAME release ships the `sesame` engine for each built platform, a
+`SHA256SUMS` file, an SPDX SBOM and a signed build attestation for every
+binary. There is no client bundle. Applications reach SESAME in one of three
+ways, and all three end at the same engine, which makes every security
+decision.
 
-**There is no package registry and no per-ecosystem package manifest.** Every
-release ships `sesame-clients.tar.gz` alongside the engine binaries. You take
-the one file for your language, drop it into your project, and call it.
+| Way | For | What you take from SESAME |
+| --- | --- | --- |
+| HTTP through the Yon host | any language that can send an HTTP request | the engine binary and this repository's Yon project (`server/`), served by `ty` |
+| The Go package | Go applications that host the engine themselves | `github.com/d31ma/sesame/server/packages/sesame` |
+| The machine protocol | any language that spawns the engine itself | the engine binary; you write the NDJSON transport |
 
 ## Get the engine
 
-The clients spawn a SESAME executable and speak the machine protocol to it
-over stdin/stdout. Download the binary for your platform from
-[the release](https://github.com/d31ma/sesame/releases), and verify it:
+Download the binary for your platform from
+[the release](https://github.com/d31ma/sesame/releases) and verify it:
 
 ```bash
 gh attestation verify sesame-linux-amd64 --repo d31ma/sesame
 ```
 
-## Get the client for your language
-
-```bash
-curl -fsSL https://github.com/d31ma/sesame/releases/latest/download/sesame-clients.tar.gz | tar -xz
-# then copy e.g. clients/python/sesame.py into your project
-```
-
-| Language | File | Runtime dependencies |
-| --- | --- | --- |
-| Node/TS | `node/sesame.mjs` (+ `sesame.d.mts`) | none (stdlib) |
-| Python | `python/sesame.py` | none (stdlib) |
-| Rust | `rust/sesame.rs` | none (std) |
-| Java | `java/Sesame.java` | none (JDK) |
-| Kotlin | `kotlin/Sesame.kt` | `kotlin-stdlib` |
-| C# | `csharp/Sesame.cs` | none (BCL) |
-| PHP | `php/sesame.php` | none (ext-json) |
-| Ruby | `ruby/sesame.rb` | none (stdlib) |
-| Dart | `dart/sesame.dart` | none (SDK) |
-
-The Java and Kotlin shims declare `package ma.del.sesame`, so they go in the
-matching directory of your source tree. FYLO's equivalents sit in the default
-package; SESAME's do not, because a default-package class cannot be imported
-by a class that has a package, which would make the shim unusable in most real
-projects.
-
-### Go is the exception
-
-Go is the one client not distributed as a file to copy. It lives inside the
-engine's own module, so the tag resolves it like any other Go package:
-
-```bash
-go get github.com/d31ma/sesame/clients/go/sesame@v26.33.02
-```
-
-Vendoring it would be strictly worse than that. The consequence worth knowing:
-importing it puts `golang.org/x/crypto` and `golang.org/x/sys` in your module
-graph.
-
-## Verifying what you downloaded
-
-Every release carries `SHA256SUMS` covering the binaries and the client
-tarball, and a signed build attestation for each:
-
-```bash
-gh attestation verify sesame-clients.tar.gz --repo d31ma/sesame
-```
-
 The release workflow verifies those attestations itself before publishing.
+`go install github.com/d31ma/sesame/cmd/sesame@<version>` builds the same
+engine from source.
+
+## HTTP through the Yon host
+
+The repository root is a Tachyon Yon project. `ty serve` answers
+`POST /api/v1/<family>/<operation>` for every operation that may safely leave
+the machine, and the OpenID provider's standard endpoints under `/oidc`.
+Callers sign in with the `Sesame-Session` header. Start with
+[the Yon operator guide](YON.md); the route families are described in
+[directory](yon/directory.md), [authentication](yon/authn.md),
+[OAuth and OpenID Connect](yon/oidc.md) and
+[federation, SAML and SCIM](yon/federation.md).
+[ADR 0007](adr/0007-sesame-ships-a-yon-host-project.md) records why the host
+works this way.
+
+`api/machine/v1/operations.json` records, for every operation, how it is
+reached over HTTP: `routed` (its RPC routes), `standard_endpoint` (served only
+by a standard protocol route), `command_line_only` (`tenant.bootstrap`,
+`admin.bootstrap`) or `not_routed_for_security`
+(`federation.login_exchange`). `test/contract` checks that record against the
+controllers' route annotations, so a route cannot appear or disappear without
+the manifest saying so.
+
+## The Go package
+
+```bash
+go get github.com/d31ma/sesame/server/packages@<commit>
+```
+
+```go
+import "github.com/d31ma/sesame/server/packages/sesame"
+```
+
+It is its own module, `github.com/d31ma/sesame/server/packages`, standard
+library only, and it is the transport the Yon controllers use. SESAME's CalVer
+tags are not semantic import versions for a nested module, so Go resolves it
+at a commit as a pseudo-version: use the commit of the release whose engine
+you run. The package's
+[README](../server/packages/README.md) covers its API.
+
+Earlier releases published it as `github.com/d31ma/sesame/clients/go/sesame`.
+Change that import path when you upgrade.
+
+## The machine protocol
+
+`sesame exec --loop` reads one NDJSON request per line on stdin and writes one
+response per line on stdout. [The protocol reference](../api/machine/v1/README.md)
+and its [RFC](rfcs/0001-machine-protocol-v1.md) define the framing, the
+startup compatibility check and every operation. A host that must run an
+operation the Yon host does not route, such as `federation.login_exchange`,
+uses this or the Go package.
+
+## Migrating from the retired language SDKs
+
+Releases up to 26.33.02 shipped `sesame-clients.tar.gz` with one copy-in file
+for Node.js, Python, Rust, Java, Kotlin, C#, PHP, Ruby and Dart. Those files are
+no longer maintained or shipped. Each language moves to one of the ways above:
+
+| Former SDK | Move to |
+| --- | --- |
+| Node.js / TypeScript (`sesame.mjs`) | HTTP through the Yon host with `fetch`, or spawn `sesame exec --loop` with `child_process` |
+| Python (`sesame.py`) | HTTP through the Yon host with `urllib.request`, or spawn `sesame exec --loop` with `subprocess` |
+| Rust (`sesame.rs`) | HTTP through the Yon host, or spawn `sesame exec --loop` with `std::process::Command` |
+| Java (`Sesame.java`) | HTTP through the Yon host with `java.net.http.HttpClient`, or spawn `sesame exec --loop` with `ProcessBuilder` |
+| Kotlin (`Sesame.kt`) | as Java |
+| C# (`Sesame.cs`) | HTTP through the Yon host with `HttpClient`, or spawn `sesame exec --loop` with `System.Diagnostics.Process` |
+| PHP (`sesame.php`) | HTTP through the Yon host with `curl` or streams, or spawn `sesame exec --loop` with `proc_open` |
+| Ruby (`sesame.rb`) | HTTP through the Yon host with `Net::HTTP`, or spawn `sesame exec --loop` with `Open3` |
+| Dart (`sesame.dart`) | HTTP through the Yon host with `dart:io` `HttpClient`, or spawn `sesame exec --loop` with `Process.start` |
+| Go (`clients/go/sesame`) | the Go package at its new import path |
+
+Over HTTP, the operation's parameters become the request body and its result
+the answer body, with the shapes of the machine protocol. Two things change:
+the caller signs in with `Sesame-Session` instead of passing identifiers the
+engine trusts, and errors arrive as an HTTP status with `{"code":"<code>"}`.
+Tenant administration needs a session whose principal holds the
+`Administrator` role in that tenant. `tenant.bootstrap` and `admin.bootstrap`
+stay on the command line.
+
+Spawning `sesame exec --loop` keeps what the old files did: one subprocess per
+host process, owning one deployment. Send `system.version` first and refuse an
+engine whose `protocol_version` you do not speak, as the old files did.
 
 ## Version matching
 
-The client tarball is built from the same commit as the binaries in the same
-release, so a client and the engine it talks to are paired by construction.
 `VERSION` at the repository root is the single source of truth, and the
-release workflow refuses to build when it disagrees with the tag.
-
-Release versions use UTC-derived CalVer in `YY.WW.DD` form. Every SDK bundle
-and the Go module tag share that SESAME release version. The machine protocol
-version is a separate number, currently `1`, and every shim checks it against
-the engine at startup and refuses a mismatch; see
-[the machine protocol](../api/machine/v1/README.md).
+release workflow refuses to build when it disagrees with the tag. Release
+versions use UTC-derived CalVer in `YY.WW.DD` form. The machine protocol
+version is a separate number, currently `1`; the Go package checks it against
+the engine at startup and refuses a mismatch.
 
 ## How this is proven
 
-```bash
-tools/package-clients.sh dist/sesame-clients.tar.gz   # what a release ships
-tools/verify-sdk-install.sh                           # prove it can be used
-```
-
-The second builds the tarball via the first, extracts it, and for each of the
-ten languages copies the shim into a throwaway project exactly as a developer
-would, then compiles and runs code against it. CI runs it on every pull
-request.
-
-Packaging is a script rather than a `tar` line in each workflow because CI and
-the release must produce identical archives, and because a naive `tar clients`
-sweeps in whatever the contract tests last compiled — a release cut after
-someone ran the C# suite would otherwise ship `.dll` and `.pdb` files inside a
-bundle advertised as source. The packager excludes build output and then fails
-if any compiled artifact survives.
-
-That check matters more here than it would with registry packages. There is no
-manifest declaring what a release contains, so nothing else stands between a
-tag and a tarball that silently lacks someone's language. The release workflow
-additionally asserts the archive contains every expected file before anything
-is attested, so the two checks cover both directions: nothing missing, and
-nothing compiled.
-
-## What this costs
-
-Being explicit about the trade:
-
-- **No dependency resolver.** You copy a file; nothing tracks its version for
-  you, and `npm outdated` will not tell you a new one exists. Upgrading means
-  re-copying from a newer release.
-- **No lockfile entry, no registry search, no registry vulnerability feed.**
-  The shims have no third-party dependencies, so the surface those feeds watch
-  is empty, but the tooling gap is real.
-- **No transitive install.** A library that wants to depend on a SESAME client
-  cannot express that as a dependency; it has to vendor the file too.
-
-What it buys: one release, one version, one provenance chain, no publishing
-credentials to hold or rotate, no package name that must keep meaning this
-thing forever, and no per-ecosystem packaging toolchain in CI. The same model
-FYLO runs, so a developer using both projects learns it once.
-
-Registry publication is not foreclosed. The shims are ordinary source files;
-adding manifests later is mechanical, and the cost of not having them is
-listed above rather than hidden.
-
-## Adding an eleventh SDK
-
-`TestEveryClientIsAccountedFor` fails if a directory appears under `clients/`
-that is neither in `distributedShims` nor the Go exception, so a new client
-cannot arrive with no distribution story. Add the shim, add it to that list,
-add a case to `tools/verify-sdk-install.sh`, add it to the release workflow's
-archive-contents check, and add the row above.
+- `go test ./test/contract` checks the operation manifest against the engine's
+  dispatch table, the protocol reference and the Yon controllers.
+- CI runs the Go package's contract scenario against a real compiled engine
+  (`cd server/packages && go test ./...`).
+- `ty test --coverage` runs the Yon host's tests against a real engine. It runs
+  in the local release gate, not in CI, until Tachyon publishes a `ty` release
+  that CI can install; [docs/YON.md](YON.md#continuous-integration) tracks
+  that.

@@ -1,17 +1,25 @@
 {
   "protocol_version": "1",
   "comment": [
-    "The canonical set of machine operations, and the operations each SDK",
-    "shim does not yet expose as a typed method.",
+    "The canonical set of machine operations, and how each one is reached over",
+    "HTTP through the Yon host in server/ (docs/YON.md, ADR 0007).",
     "",
-    "This file is asserted three ways by test/contract: against the engine's",
-    "own dispatch table (parsed from the processor, so the manifest cannot",
-    "claim an operation the engine does not route), against the protocol",
-    "README (so no operation ships undocumented), and against each SDK's",
-    "source (so a gap cannot be closed or opened without saying so here).",
+    "This file is asserted by test/contract against the engine's own dispatch",
+    "table (parsed from the processor, so the manifest cannot claim an operation",
+    "the engine does not route), against the protocol README (so no operation",
+    "ships undocumented), and against the Yon controllers in server/controllers",
+    "(so a route cannot appear, move or disappear without saying so here).",
     "",
-    "Every SDK can reach every operation through its generic request escape",
-    "hatch. A gap means no typed method, not no access."
+    "http_coverage gives every operation exactly one category:",
+    "  routed: the listed RPC routes call it (some operations have a self-service",
+    "    and an administrator route);",
+    "  standard_endpoint: served only by the listed standard protocol routes",
+    "    through standards.dispatch, named by the host-adapter endpoint;",
+    "  command_line_only: never routed; it needs local operator access;",
+    "  not_routed_for_security: never routed; its result is host-only material.",
+    "",
+    "Every operation is also reachable without HTTP through the machine protocol",
+    "(`sesame exec --loop`, api/machine/v1) and the Go package in server/packages."
   ],
   "operations": [
     "admin.bootstrap",
@@ -100,16 +108,526 @@
     "tenant.get",
     "token.jwks"
   ],
-  "sdk_gaps": {
-    "go": [],
-    "node": [],
-    "python": [],
-    "rust": [],
-    "java": [],
-    "kotlin": [],
-    "csharp": [],
-    "php": [],
-    "ruby": [],
-    "dart": []
+  "http_coverage": {
+    "admin.bootstrap": {
+      "category": "command_line_only",
+      "reason": "Creates the first administrator of a tenant before anyone can sign in, so there is no caller to check. Run `sesame admin bootstrap` with local access to the deployment."
+    },
+    "authenticator.passkey_list": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/authenticator/passkey-list",
+        "POST /api/v1/authenticator/passkey-list-for-principal"
+      ]
+    },
+    "authenticator.passkey_register_begin": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/authenticator/passkey-register-begin"
+      ]
+    },
+    "authenticator.passkey_register_finish": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/authenticator/passkey-register-finish"
+      ]
+    },
+    "authenticator.passkey_remove": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/authenticator/passkey-remove",
+        "POST /api/v1/authenticator/passkey-remove-for-principal"
+      ]
+    },
+    "authenticator.recovery_codes_issue": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/authenticator/recovery-codes-issue"
+      ]
+    },
+    "authenticator.set_password": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/authenticator/set-password",
+        "POST /api/v1/authenticator/set-password-for-principal"
+      ]
+    },
+    "authenticator.totp_activate": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/authenticator/totp-activate"
+      ]
+    },
+    "authenticator.totp_enroll": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/authenticator/totp-enroll"
+      ]
+    },
+    "authn.begin": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/authn/begin"
+      ]
+    },
+    "authn.complete": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/authn/complete"
+      ]
+    },
+    "authn.passkey_options": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/authn/passkey-options"
+      ]
+    },
+    "authn.verify_passkey": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/authn/verify-passkey"
+      ]
+    },
+    "authn.verify_password": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/authn/verify-password"
+      ]
+    },
+    "authn.verify_recovery_code": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/authn/verify-recovery-code"
+      ]
+    },
+    "authn.verify_totp": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/authn/verify-totp"
+      ]
+    },
+    "authorize.decide": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/authorize/decide"
+      ]
+    },
+    "authorize.decide_batch": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/authorize/decide-batch"
+      ]
+    },
+    "federation.login_complete": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/federation/login-complete"
+      ]
+    },
+    "federation.login_exchange": {
+      "category": "not_routed_for_security",
+      "reason": "Its result is the token request only the host may send: it carries the provider client_secret and the PKCE code_verifier (ADR 0004, docs/FEDERATION.md). Drive it through the Go package, `sesame exec --loop` or `sesame federation login-exchange`."
+    },
+    "federation.login_start": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/federation/login-start"
+      ]
+    },
+    "federation.provider_configure": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/federation/provider-configure"
+      ]
+    },
+    "federation.provider_disable": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/federation/provider-disable"
+      ]
+    },
+    "federation.provider_get": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/federation/provider-get"
+      ]
+    },
+    "federation.provider_register": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/federation/provider-register"
+      ]
+    },
+    "grant.create": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/grant/create"
+      ]
+    },
+    "grant.revoke": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/grant/revoke"
+      ]
+    },
+    "group.create": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/group/create"
+      ]
+    },
+    "group.member_add": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/group/member-add"
+      ]
+    },
+    "group.member_remove": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/group/member-remove"
+      ]
+    },
+    "oidc.authorize": {
+      "category": "standard_endpoint",
+      "endpoint": "oidc.authorization",
+      "routes": [
+        "GET /oidc/authorize"
+      ]
+    },
+    "oidc.consent_get": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/oidc/consent-get"
+      ]
+    },
+    "oidc.consent_grant": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/oidc/consent-grant"
+      ]
+    },
+    "oidc.consent_withdraw": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/oidc/consent-withdraw"
+      ]
+    },
+    "oidc.device_approve": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/oidc/device-approve"
+      ]
+    },
+    "oidc.device_authorize": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/oidc/device-authorize"
+      ]
+    },
+    "oidc.device_deny": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/oidc/device-deny"
+      ]
+    },
+    "oidc.device_lookup": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/oidc/device-lookup"
+      ]
+    },
+    "oidc.discovery": {
+      "category": "standard_endpoint",
+      "endpoint": "oidc.discovery",
+      "routes": [
+        "GET /oidc/openid-configuration"
+      ]
+    },
+    "oidc.dpop_verify": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/oidc/dpop-verify"
+      ]
+    },
+    "oidc.interaction_complete": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/oidc/interaction-complete"
+      ]
+    },
+    "oidc.interaction_get": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/oidc/interaction-get"
+      ]
+    },
+    "oidc.introspect": {
+      "category": "standard_endpoint",
+      "endpoint": "oidc.introspection",
+      "routes": [
+        "POST /oidc/introspect"
+      ]
+    },
+    "oidc.logout": {
+      "category": "standard_endpoint",
+      "endpoint": "oidc.logout",
+      "routes": [
+        "GET /oidc/logout"
+      ]
+    },
+    "oidc.pushed_authorize": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/oidc/pushed-authorize"
+      ]
+    },
+    "oidc.refresh_family_get": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/oidc/refresh-family-get"
+      ]
+    },
+    "oidc.refresh_family_revoke": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/oidc/refresh-family-revoke"
+      ]
+    },
+    "oidc.revoke": {
+      "category": "standard_endpoint",
+      "endpoint": "oidc.revocation",
+      "routes": [
+        "POST /oidc/revoke"
+      ]
+    },
+    "oidc.token": {
+      "category": "standard_endpoint",
+      "endpoint": "oidc.token",
+      "routes": [
+        "POST /oidc/token"
+      ]
+    },
+    "oidc_client.disable": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/oidc-client/disable"
+      ]
+    },
+    "oidc_client.get": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/oidc-client/get"
+      ]
+    },
+    "oidc_client.register": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/oidc-client/register"
+      ]
+    },
+    "oidc_client.rotate_secret": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/oidc-client/rotate-secret"
+      ]
+    },
+    "principal.create": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/principal/create"
+      ]
+    },
+    "principal.get": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/principal/get"
+      ]
+    },
+    "principal.suspend": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/principal/suspend"
+      ]
+    },
+    "role.create": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/role/create"
+      ]
+    },
+    "saml.login_complete": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/saml/login-complete"
+      ]
+    },
+    "saml.login_start": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/saml/login-start"
+      ]
+    },
+    "saml.provider_disable": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/saml/provider-disable"
+      ]
+    },
+    "saml.provider_get": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/saml/provider-get"
+      ]
+    },
+    "saml.provider_register": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/saml/provider-register"
+      ]
+    },
+    "scim.client_disable": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/scim/client-disable"
+      ]
+    },
+    "scim.client_register": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/scim/client-register"
+      ]
+    },
+    "scim.client_rotate_token": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/scim/client-rotate-token"
+      ]
+    },
+    "scim.group_create": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/scim/group-create"
+      ]
+    },
+    "scim.group_deprovision": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/scim/group-deprovision"
+      ]
+    },
+    "scim.group_get": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/scim/group-get"
+      ]
+    },
+    "scim.group_list": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/scim/group-list"
+      ]
+    },
+    "scim.group_patch": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/scim/group-patch"
+      ]
+    },
+    "scim.user_create": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/scim/user-create"
+      ]
+    },
+    "scim.user_deprovision": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/scim/user-deprovision"
+      ]
+    },
+    "scim.user_get": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/scim/user-get"
+      ]
+    },
+    "scim.user_list": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/scim/user-list"
+      ]
+    },
+    "scim.user_patch": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/scim/user-patch"
+      ]
+    },
+    "session.revoke": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/session/revoke",
+        "POST /api/v1/session/revoke-by-id"
+      ]
+    },
+    "session.verify": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/session/verify"
+      ]
+    },
+    "standards.dispatch": {
+      "category": "standard_endpoint",
+      "routes": [
+        "GET /oidc/authorize",
+        "GET /oidc/jwks",
+        "GET /oidc/logout",
+        "GET /oidc/openid-configuration",
+        "POST /oidc/introspect",
+        "POST /oidc/revoke",
+        "POST /oidc/token"
+      ]
+    },
+    "system.metrics": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/system/metrics"
+      ]
+    },
+    "system.ping": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/system/ping"
+      ]
+    },
+    "system.readiness": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/system/readiness"
+      ]
+    },
+    "system.version": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/system/version"
+      ]
+    },
+    "tenant.bootstrap": {
+      "category": "command_line_only",
+      "reason": "Creates a tenant: a deployment-wide capability no tenant administrator holds. Run `sesame tenant bootstrap` with local access to the deployment."
+    },
+    "tenant.get": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/tenant/get"
+      ]
+    },
+    "token.jwks": {
+      "category": "routed",
+      "routes": [
+        "POST /api/v1/token/jwks"
+      ]
+    }
   }
 }

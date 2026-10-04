@@ -30,12 +30,3 @@ graphify-out/
 .DS_Store
 .idea/
 .vscode/
-
-# SDK contract-test build artifacts
-clients/rust/sesame-rust-contract
-clients/java/build/
-clients/kotlin/*.jar
-clients/csharp/bin/
-clients/csharp/obj/
-__pycache__/
-dist/

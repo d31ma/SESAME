@@ -83,12 +83,12 @@ sesame doctor</code></pre>
         </p>
         <pre class="code-block"><code>export SESAME_BINARY=/usr/local/bin/sesame</code></pre>
         <p>
-          An explicit flag or SDK option always beats the environment — an operator
+          An explicit flag or Go package option always beats the environment — an operator
           debugging one command on a host that already exports
           <code>SESAME_DEPLOYMENT</code> can point it elsewhere without unsetting
           anything. A deployment directory that does not exist, or that was never
           initialised, is refused at startup with a message naming the remedy —
-          and the SDKs surface it, so a volume that failed to mount says so
+          and the Yon host and the Go package surface it, so a volume that failed to mount says so
           instead of reporting a dead process. See
           <a href="https://github.com/d31ma/sesame/blob/main/docs/CONFIGURATION.md" target="_blank" rel="noopener">Configuration and keys</a>.
         </p>
@@ -97,16 +97,22 @@ sesame doctor</code></pre>
       <div class="doc-section">
         <h2>5. Drive it from your application</h2>
         <p>
-          Copy the shim for your language out of <code>sesame-clients.tar.gz</code> into your
-          project. It is one file with no dependencies. It owns the subprocess, the protocol
-          handshake, timeouts, cancellation, and typed errors — and never an authentication or
-          authorization decision.
+          From any language, call the HTTP API of SESAME's Yon host: the repository root is a
+          Tachyon Yon project, and <code>ty serve</code> answers
+          <code>POST /api/v1/&lt;family&gt;/&lt;operation&gt;</code> for a caller that signs in
+          with a <code>Sesame-Session</code> header. Give it absolute paths to the engine and
+          the deployment in <code>.env</code> at the repository root.
         </p>
-        <pre class="code-block"><code>tar xzf sesame-clients.tar.gz
-cp clients/python/sesame.py yourapp/</code></pre>
+        <pre class="code-block"><code>YON_SESAME_BINARY=/usr/local/bin/sesame
+YON_SESAME_DEPLOYMENT=/var/lib/sesame/deployment</code></pre>
         <p>
-          The shim verifies the engine's protocol version at startup and refuses a mismatched
-          binary, so a partial upgrade fails loudly instead of behaving strangely.
+          A Go application can instead start the engine itself with the standard-library-only
+          package <code>github.com/d31ma/sesame/server/packages/sesame</code>. It owns the
+          subprocess, the protocol handshake, timeouts, cancellation, and typed errors — and
+          never an authentication or authorization decision. It verifies the engine's protocol
+          version at startup and refuses a mismatched binary, so a partial upgrade fails loudly
+          instead of behaving strangely. See the
+          <a href="https://github.com/d31ma/sesame/blob/main/docs/YON.md" target="_blank" rel="noopener">Yon operator guide</a>.
         </p>
       </div>
 
@@ -117,14 +123,14 @@ cp clients/python/sesame.py yourapp/</code></pre>
           the resource, and any context; the answer carries a stable reason and the policy
           version it was decided under.
         </p>
-        <pre class="code-block"><code>decision = client.decide(&#123;
-    "tenant_id": tenant_id,
-    "principal_id": principal_id,
-    "action": "doc:read",
-    "resource": "project:alpha",
-&#125;)
+        <pre class="code-block"><code>decision, err := client.Decide(ctx, sesame.DecisionRequest&#123;
+    TenantID:    tenantID,
+    PrincipalID: principalID,
+    Action:      "doc:read",
+    Resource:    "project:alpha",
+&#125;, nil)
 
-# &#123;"decision": "deny", "reason_code": "deny_no_grant", "policy_version": 4, ...&#125;</code></pre>
+// deny deny_no_grant</code></pre>
         <p>
           The same question is available from the CLI, which is the fastest way to check a
           policy without writing any code:

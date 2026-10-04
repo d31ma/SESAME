@@ -1190,9 +1190,8 @@ html[w-theme='light'] .code-table code {
 
 /* ── Touch targets ─────────────────────────────────────────────────────── */
 /*
- * A coarse pointer needs a target it can actually hit. The tab strips carry
- * ten languages, so on a phone they are both the smallest and the most-used
- * controls on the page.
+ * A coarse pointer needs a target it can actually hit. The tab strips are
+ * the smallest controls on the page, so on a phone they need the most help.
  */
 /*
  * Keyed on both pointer type and width. `pointer: coarse` is the accurate

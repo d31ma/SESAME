@@ -9,7 +9,7 @@
     <span class="eyebrow">Download</span>
     <h1>Get SESAME</h1>
     <p class="doc-lede">
-      Every release ships native binaries, the language shims, an SPDX SBOM, checksums, and
+      Every release ships native binaries, an SPDX SBOM, checksums, and
       build provenance. This is a developer preview: it is not supported for production use,
       and no release has passed an independent security review.
     </p>
@@ -43,19 +43,18 @@
     </div>
 
     <div class="doc-section">
-      <h2>Language clients</h2>
+      <h2>Reaching SESAME</h2>
       <p>
-        The shims ship as one archive beside the binaries. There is no package registry and no
-        per-ecosystem manifest — you copy the single file for your language into your project,
-        paired with the exact release whose protocol it speaks. Go is the one exception, since
-        it resolves from the module tag.
+        Any language calls the HTTP API of SESAME's Yon host, which the repository root
+        serves with <code>ty serve</code>. Go applications can start the engine themselves
+        with the standard-library-only Go package, resolved at the release commit. The
+        language shims of earlier releases are retired.
       </p>
-      <pre class="code-block"><code>tar xzf sesame-clients.tar.gz
-ls clients/
-# csharp  dart  go  java  kotlin  node  php  python  ruby  rust</code></pre>
+      <pre class="code-block"><code>go get github.com/d31ma/sesame/server/packages@&lt;commit&gt;</code></pre>
       <p>
-        <a href="https://github.com/d31ma/sesame/blob/main/docs/SDK_DISTRIBUTION.md" target="_blank" rel="noopener">SDK distribution</a>
-        records the install steps, how a release is verified, and what this model costs you.
+        <a href="https://github.com/d31ma/sesame/blob/main/docs/SDK_DISTRIBUTION.md" target="_blank" rel="noopener">Distribution</a>
+        records how each former SDK language moves to the HTTP API or the machine protocol,
+        and how a release is verified.
       </p>
     </div>
 

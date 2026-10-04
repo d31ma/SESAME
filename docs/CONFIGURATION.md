@@ -7,7 +7,7 @@ SESAME is configured in three places, and it is worth knowing which is which:
    configuration.
 2. **Environment variables** — how a process finds that deployment. They point
    at configuration; they are not configuration themselves.
-3. **Flags and SDK options** — a per-invocation override of the above.
+3. **Flags and Go package options** — a per-invocation override of the above.
 
 The runtime precedence is always the same: **an explicit flag or option wins,
 then the environment, then the built-in default.** `sesame init` may also read
@@ -22,16 +22,19 @@ the flag they just typed a lie.
 
 | Variable | Replaces | Read by |
 | --- | --- | --- |
-| `SESAME_BINARY` | the SDK's `binary` option | the SDK shim |
+| `SESAME_BINARY` | the Go package's `Binary` option | the Go package |
 | `SESAME_DEPLOYMENT` | `--deployment` | the engine and every `sesame` command |
 | `FYLO_BINARY` | `--fylo-binary` | the engine and every `sesame` command |
 | `FYLO_ROOT` | `--fylo-root` | the engine and every `sesame` command |
 | `SESAME_ISSUER` | `--issuer` | `sesame init` only; then persisted in the deployment |
 
-Only `SESAME_BINARY` is read by the shim, because the shim is what decides
-which executable to run. Everything else is read by the engine out of the
-environment it inherits, which is why all ten SDKs support it identically and
-none of them had to implement it.
+Only `SESAME_BINARY` is read by the Go package, because the package is what
+decides which executable to run. Everything else is read by the engine out of
+the environment it inherits, so any host that spawns `sesame exec --loop`
+supports it without implementing it. The Yon host is the exception: `ty` hands
+its handlers a scrubbed environment, so it takes the engine and deployment
+paths from its own configuration (`YON_SESAME_BINARY` and
+`YON_SESAME_DEPLOYMENT`, [docs/YON.md](YON.md)).
 
 Every storage-aware command reads the applicable storage variables, including
 `sesame init` and `sesame doctor`. Those two were once the exceptions and it
@@ -152,12 +155,13 @@ initialise it with: sesame init --deployment /var/lib/sesame --fylo-binary /path
 The first is usually a typo or a volume that did not mount. The second is a
 directory that exists but was never initialised.
 
-**The SDKs surface this message.** The engine writes it to stderr and exits;
-each shim captures the first 4 KiB of that stream during startup and attaches
-it to the error it raises, then stops capturing once the engine is up. Without
-that, a developer whose volume failed to mount would see only "the process
-exited" and would have no way to learn why. If you supply your own stderr
-destination, you get the stream itself and the shim does not capture.
+**The Go package surfaces this message.** The engine writes it to stderr and
+exits; the package captures the first 4 KiB of that stream during startup and
+attaches it to the error it raises, then stops capturing once the engine is up.
+Without that, a developer whose volume failed to mount would see only "the
+process exited" and would have no way to learn why. If you supply your own
+stderr destination, you get the stream itself and the package does not
+capture.
 
 ## Keys, hashing, and salting
 

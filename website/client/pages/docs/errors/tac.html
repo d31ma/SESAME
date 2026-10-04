@@ -41,7 +41,7 @@
         <h2>Protocol errors</h2>
         <p>
           Returned as <code>&#123;"ok": false, "error": &#123;"code": ..., "message": ..., "retryable": ...&#125;&#125;</code>.
-          Your SDK raises these as a typed error carrying the code.
+          The Go package raises these as a typed error carrying the code; the Yon host answers them as <code>&#123;"code": ...&#125;</code> with an HTTP status.
         </p>
         <loop :for="let group of groups">
           <h3 class="code-group">{group.title}</h3>

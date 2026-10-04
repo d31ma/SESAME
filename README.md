@@ -11,8 +11,8 @@
 <p align="center">
   A headless authentication and authorization engine for self-hosted
   applications, backed by <a href="https://fylo.del.ma">FYLO</a>.<br/>
-  It opens no port. Your application owns every listener; SESAME owns every
-  security decision.
+  The engine opens no port. Its Yon host, or your own application, owns every
+  listener; the engine owns every security decision.
 </p>
 
 <p align="center">
@@ -30,18 +30,25 @@
 ---
 
 Most identity servers ask you to run one more thing on the network and trust it
-with your users. SESAME is a binary your application starts. It speaks NDJSON
+with your users. SESAME's engine is a binary its host starts. It speaks NDJSON
 over stdin and stdout, has no listener to expose, no admin console to leak, and
 no origin to be confused about.
 
 ```text
-your application  →  SDK shim  →  sesame engine  →  FYLO
- owns every route     one file     every decision    documents are truth
+HTTP client      →  Yon host (ty)   →  sesame engine  →  FYLO
+                    routes, guards     every decision    documents are truth
+your Go host     →  Go package      ↗
 ```
 
-That architecture is enforced rather than documented: a test inspects the
-linked dependency graph of the shipped binary and fails the build if an HTTP
-package, a template engine, or an unexpected module ever appears in it.
+SESAME ships the host too: the repository root is a Tachyon Yon project whose
+controllers serve the engine's operations over HTTP
+([docs/YON.md](docs/YON.md)). A Go application can instead drive the engine
+itself through the [Go package](server/packages/README.md).
+
+The engine's side of that split is enforced rather than documented: a test
+inspects the linked dependency graph of the shipped binary and fails the build
+if an HTTP package, a template engine, or an unexpected module ever appears in
+it.
 
 ## Quick start
 
@@ -75,30 +82,33 @@ which override the file, and the file is read only by `sesame init`; it is not
 copied into the deployment or inherited by FYLO. Export `SESAME_DEPLOYMENT` or
 pass `--deployment` for later commands as usual.
 
-Your application needs one more variable — where the engine binary is — and
-then no path appears in application code:
+Serve it over HTTP with the Yon host. Tell it where the engine and the
+deployment are (absolute paths, in `.env` at the repository root), then start
+`ty`:
 
 ```bash
-export SESAME_BINARY=/usr/local/bin/sesame
+echo "YON_SESAME_BINARY=$(command -v sesame)" >> .env
+echo "YON_SESAME_DEPLOYMENT=$(cd "$SESAME_DEPLOYMENT" && pwd)" >> .env
+ty serve
 ```
 
-```python
-from sesame import Client
+A signed-in principal asks about itself with the session that
+`POST /api/v1/authn/complete` issued:
 
-with Client() as client:
-    decision = client.decide({
-        "tenant_id": tenant_id,
-        "principal_id": principal_id,
-        "action": "doc:read",
-        "resource": "project:alpha",
-    })
-    # {"decision": "deny", "reason_code": "deny_no_grant", "policy_version": 4}
+```bash
+curl -s http://127.0.0.1:8080/api/v1/authorize/decide \
+  -H 'Content-Type: application/json' \
+  -H "Sesame-Session: $SESSION_ID:$SESSION_SECRET" \
+  -d '{"action":"doc:read","resource":"project:alpha"}'
+# {"decision":"deny","reason_code":"deny_no_grant",...}
 ```
 
 Default deny: without a matching grant, that is the answer. See
-[docs/CONFIGURATION.md](docs/CONFIGURATION.md) for the environment variables
-and the key boundary, and [sesame.del.ma/docs](https://sesame.del.ma/docs) for
-working call sequences in all ten languages.
+[docs/YON.md](docs/YON.md) for running the host, signing in and the route
+families, [docs/CONFIGURATION.md](docs/CONFIGURATION.md) for the environment
+variables and the key boundary, and
+[sesame.del.ma/docs](https://sesame.del.ma/docs) for working call sequences
+with the Go package.
 
 ## What is built
 
@@ -108,13 +118,14 @@ working call sequences in all ten languages.
 | **Sessions** | Bounded, revocable contexts; the secret is stored only as a digest; revocation is durable and cascades to refresh-token families |
 | **Authorization** | Deterministic default-deny decisions over roles, grants, groups, and bounded context conditions, with stable reasons and a versioned policy snapshot |
 | **OAuth 2.0 / OIDC** | Authorization code with mandatory PKCE, rotating refresh families with reuse detection, discovery, JWKS, introspection, revocation, consent, RP-initiated logout |
-| **Host adapters** | Versioned framework-neutral dispatch for seven OIDC endpoints; duplicate-preserving inputs, redacted errors, bounded responses, and one typed method in every SDK |
+| **Host adapters** | Versioned framework-neutral dispatch for seven OIDC endpoints, served at their standard shapes by the Yon host; duplicate-preserving inputs, redacted errors, bounded responses, and one typed method in the Go package |
 | **Federation** | Inbound OIDC federation, and inbound SAML 2.0 with an in-tree XML canonicalizer that refuses every ambiguous document |
 | **Provisioning** | SCIM 2.0 users and groups, idempotent under directory reconciliation |
 | **Durability** | A hash-chained security ledger on FYLO with rebuildable projections, verified snapshots, and restart evidence run against a real FYLO runtime |
 
-85 operations across 18 families, one canonical manifest, and ten language SDKs
-that each carry a typed method for every one of them.
+85 operations across 18 families and one canonical manifest. The Yon host
+serves every operation that may leave the machine over HTTP, and the Go package
+carries a typed method for every one of them.
 
 ## What is not claimed
 
@@ -142,8 +153,8 @@ One NDJSON request per line on stdin, one response per line on stdout.
 `api/machine/v1/operations.json` is the canonical surface, and
 [`test/contract`](test/contract) asserts it four ways: against the engine's
 dispatch table (parsed from the source), against the protocol reference,
-against every SDK's source, and against the website. Adding an operation
-without updating the manifest fails the build.
+against the Yon controllers' route annotations, and against the website.
+Adding an operation or a route without updating the manifest fails the build.
 
 Error codes are a compatibility boundary — branch on the code, never the
 message. The full reference is at
@@ -154,48 +165,35 @@ Public HTTP frameworks use the independently versioned
 request validation and response mapping; adapters only preserve bounded request
 values and apply the returned instructions.
 
-## SDKs
+## HTTP API and Go package
 
-Ten thin shims, each a single standard-library-only file that spawns the engine
-and speaks the protocol. None reimplements identity, authentication, or
-authorization semantics. All ten run the same contract scenario against real
-compiled binaries in CI, so a divergence fails the language that drifted.
+| Surface | For | Start here |
+| --- | --- | --- |
+| HTTP through the Yon host | any language | [docs/YON.md](docs/YON.md) |
+| Go package | Go hosts that start the engine themselves | [`server/packages`](server/packages/README.md) — `go get github.com/d31ma/sesame/server/packages@<commit>` |
+| Machine protocol | anything that spawns `sesame exec --loop` | [api/machine/v1](api/machine/v1/README.md) |
 
-| Language | Client | Runtime dependencies | File to copy |
-| --- | --- | --- | --- |
-| Go | [`server/packages`](server/packages/README.md) | none (stdlib) | none — `go get github.com/d31ma/sesame/server/packages@<commit>` |
-| Node/TS | [`clients/node`](clients/node/README.md) | none (stdlib) | `node/sesame.mjs` |
-| Python | [`clients/python`](clients/python/README.md) | none (stdlib) | `python/sesame.py` |
-| Rust | [`clients/rust`](clients/rust/README.md) | none (std) | `rust/sesame.rs` |
-| Java | [`clients/java`](clients/java/README.md) | none (JDK) | `java/Sesame.java` |
-| Kotlin | [`clients/kotlin`](clients/kotlin/README.md) | `kotlin-stdlib` | `kotlin/Sesame.kt` |
-| C# | [`clients/csharp`](clients/csharp/README.md) | none (BCL) | `csharp/Sesame.cs` |
-| PHP | [`clients/php`](clients/php/README.md) | none (ext-json) | `php/sesame.php` |
-| Ruby | [`clients/ruby`](clients/ruby/README.md) | none (stdlib) | `ruby/sesame.rb` |
-| Dart | [`clients/dart`](clients/dart/README.md) | none (SDK) | `dart/sesame.dart` |
+The Yon host routes each operation family as
+`POST /api/v1/<family>/<operation>` and serves the OpenID provider's standard
+endpoints under `/oidc`. Callers sign in with a `Sesame-Session` header;
+tenant administration needs the `Administrator` role, which SESAME itself
+decides, and never crosses a tenant. The route families are documented in
+[directory and authorization](docs/yon/directory.md),
+[authentication](docs/yon/authn.md),
+[OAuth and OpenID Connect](docs/yon/oidc.md) and
+[federation, SAML and SCIM](docs/yon/federation.md).
+`tenant.bootstrap` and `admin.bootstrap` stay on the command line, and
+`federation.login_exchange` is never routed because its answer carries the
+identity provider's client secret.
 
-SDKs are distributed the way [FYLO](https://fylo.del.ma) distributes its own:
-each release ships `sesame-clients.tar.gz` beside the engine binaries, and you
-copy the one file for your language into your project. **There is no package
-registry and no per-ecosystem manifest** — one release, one version, one
-provenance chain, and no publishing credentials to hold. Go is the single
-exception, since it lives in the engine's module.
+Every request starts one engine, so the host is a developer preview with a
+throughput ceiling of a few requests per second;
+[ADR 0007](docs/adr/0007-sesame-ships-a-yon-host-project.md) records why.
 
-```bash
-curl -fsSL https://github.com/d31ma/sesame/releases/latest/download/sesame-clients.tar.gz | tar -xz
-```
-
-`tools/verify-sdk-install.sh` extracts that tarball and copies each shim into a
-throwaway project for all ten languages, so every install instruction in these
-READMEs is one CI executes. [docs/SDK_DISTRIBUTION.md](docs/SDK_DISTRIBUTION.md)
-covers verification and what the model costs.
-
-Kotlin and Dart are server-side clients here. FYLO ships them as on-device
-clients that embed its engine; SESAME spawns its binary instead, so the same
-languages are supported for JVM and Dart backends. There is deliberately no
-browser, iOS, Android, or Flutter client: SESAME is a supervised server-side
-process with no embeddable engine, and an on-device copy could never be
-authoritative for shared security state.
+The nine copy-in language SDKs that earlier releases shipped are retired.
+[docs/SDK_DISTRIBUTION.md](docs/SDK_DISTRIBUTION.md) shows how each former SDK
+language moves to the HTTP API or to the machine protocol, and how releases
+are verified.
 
 ## Design commitments
 
@@ -262,21 +260,23 @@ internal/
   platform/                 deployment, CLI, logging, and build metadata
 api/machine/v1/             the canonical operation manifest and reference
 api/standards/v1/           the framework-neutral public-route contract
-clients/                    ten SDK shims
+server/                     the Yon host: controllers, services, models, roles, tests
+server/packages/            the Go package (engine transport) and host errors
 test/                       contract, adversarial, and real-FYLO evidence
 docs/                       ADRs, RFCs, operations, and security guidance
 examples/hostserver/        the host side of the interaction contract
 website/                    the source for sesame.del.ma
 ```
 
-There is deliberately no `web/` tree and no standalone HTTP listener. Operators
-use the CLI; applications use SDKs; the host application maps standards
-endpoints onto versioned protocol operations. A future UI must be a separate
+There is deliberately no `web/` tree, and the engine opens no listener: `ty`
+owns the Yon host's listener. Operators use the CLI; applications use the HTTP
+API or the Go package; the host maps standards endpoints onto versioned
+protocol operations. A future UI must be a separate
 consumer of those public contracts and must never become a privileged bypass.
 
 ## Status
 
-The core identity, authorization, authentication, OIDC, SDK, inbound
+The core identity, authorization, authentication, OIDC, Yon host, inbound
 federation, SCIM, SAML, device authorization, PAR, and DPoP slices are
 implemented. The framework-neutral host contract is implemented and proven by
 the Go reference host; native examples for SvelteKit, Next.js, Nuxt, and Solid
@@ -294,7 +294,12 @@ and HA remains blocked on coordination and replication semantics from FYLO.
 [Inbound OIDC federation](docs/FEDERATION.md) ·
 [SCIM 2.0 provisioning](docs/PROVISIONING.md) ·
 [Inbound SAML 2.0](docs/SAML.md) ·
-[SDK distribution](docs/SDK_DISTRIBUTION.md)
+[Yon host](docs/YON.md) ·
+[Directory routes](docs/yon/directory.md) ·
+[Authentication routes](docs/yon/authn.md) ·
+[OAuth and OIDC routes](docs/yon/oidc.md) ·
+[Federation routes](docs/yon/federation.md) ·
+[Distribution](docs/SDK_DISTRIBUTION.md)
 
 **Reference** — [Machine protocol](api/machine/v1/README.md) ·
 [Host-adapter contract](api/standards/v1/README.md) ·
@@ -309,7 +314,9 @@ and HA remains blocked on coordination and replication semantics from FYLO.
 [FYLO persistence ADR](docs/adr/0002-fylo-persistence-boundary.md) ·
 [Headless binary ADR](docs/adr/0003-headless-binary-and-client-contract.md) ·
 [Federation egress ADR](docs/adr/0004-federation-egress-boundary.md) ·
-[SAML signature ADR](docs/adr/0005-saml-signature-verification.md)
+[SAML signature ADR](docs/adr/0005-saml-signature-verification.md) ·
+[Gateway deployables ADR](docs/adr/0006-gateway-deployables.md) ·
+[Yon host ADR](docs/adr/0007-sesame-ships-a-yon-host-project.md)
 
 **FYLO** — [Viability evidence](docs/fylo/VIABILITY.md) ·
 [Native evidence matrix](docs/fylo/NATIVE_MATRIX.md)

@@ -76,15 +76,26 @@ func TestREADMELinksResolve(t *testing.T) {
 	t.Logf("checked %d local links", checked)
 }
 
-// TestREADMEDescribesEveryShippedSDK: the table is how a developer finds the
-// file to copy, so a shipped shim missing from it is effectively unreleased.
-func TestREADMEDescribesEveryShippedSDK(t *testing.T) {
+func TestREADMELinksTheHTTPAndGoSurfaces(t *testing.T) {
 	t.Parallel()
 
-	readme, root := loadREADME(t)
-	for _, sdk := range shippedSDKs(t, root) {
-		if !strings.Contains(readme, sdkRelativeDirectory(sdk)) {
-			t.Errorf("%s ships, but the README never links it", sdkRelativeDirectory(sdk))
+	readme, _ := loadREADME(t)
+	for _, surface := range []string{
+		"docs/YON.md",
+		"docs/yon/directory.md",
+		"docs/yon/authn.md",
+		"docs/yon/oidc.md",
+		"docs/yon/federation.md",
+		"docs/adr/0007-sesame-ships-a-yon-host-project.md",
+		goPackageDirectory,
+	} {
+		if !strings.Contains(readme, "]("+surface) {
+			t.Errorf("the README never links %s", surface)
+		}
+	}
+	for _, retired := range retiredClientMarkers {
+		if strings.Contains(readme, retired) {
+			t.Errorf("the README still points at %q, which SESAME no longer ships", retired)
 		}
 	}
 }

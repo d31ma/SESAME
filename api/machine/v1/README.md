@@ -455,9 +455,8 @@ SHA-256 digest and cannot be recovered; `session.verify` never returns the
 digest. Passwords are never echoed by any operation.
 
 `api/machine/v1/decisions.golden.json` is the deterministic golden decision
-corpus. The engine test and the Go, Node, and Python SDK suites all build
-that fixture and assert its outcomes, so these semantics have exactly one
-definition.
+corpus. The engine test and the Go package's suite both build that fixture
+and assert its outcomes, so these semantics have exactly one definition.
 
 A grant names exactly one subject: a principal or a group. Group grants
 apply to present and future members, so `group.member_add` and
@@ -549,10 +548,11 @@ it cannot finish: *may I talk to you*, and *can you do what I need*. It returns
 `protocol_version` alongside the build identity, and `operations` — every
 operation this binary routes, sorted.
 
-Every SDK performs that handshake at startup and refuses an engine speaking a
-different protocol version, rather than discovering the mismatch partway
-through a login. The error names both sides, because the fix is always to
-change one of them. Each SDK also exposes `requireOperations`, for an
+The Go package performs that handshake at startup and refuses an engine
+speaking a different protocol version, rather than discovering the mismatch
+partway through a login; any other host that spawns `sesame exec --loop`
+should do the same. The error names both sides, because the fix is always to
+change one of them. The Go package also exposes `RequireOperations`, for an
 application to assert at startup that the operations it depends on exist; a
 newer client against an older engine is otherwise perfectly usable as long as
 it never calls what is missing.
@@ -573,14 +573,17 @@ client that trusts what the engine reports is trusting something checked.
   boundaries can no longer be trusted.
 
 `operations.json` beside this file is the machine-readable twin of the table
-above: the canonical operation set, plus the operations each SDK shim does not
-yet expose as a typed method. It is asserted three ways by `test/contract` —
-against the engine's own dispatch table (parsed from the processor, so the
-manifest cannot claim an operation the engine does not route), against this
-document (so no operation ships undocumented), and against each SDK's source
-(so a gap cannot be opened or closed without recording it). A gap means no
-typed method, not no access: every SDK reaches every operation through its
-generic request escape hatch.
+above: the canonical operation set, plus `http_coverage`, which records how
+the Yon host reaches each operation over HTTP — `routed` (with its routes),
+`standard_endpoint` (served only by a standard protocol route through
+`standards.dispatch`), `command_line_only` or `not_routed_for_security`. It is
+asserted three ways by `test/contract` — against the engine's own dispatch
+table (parsed from the processor, so the manifest cannot claim an operation
+the engine does not route), against this document (so no operation ships
+undocumented), and against the route annotations in `server/controllers` (so
+a route cannot appear or disappear, and a new operation cannot ship, without
+recording how it is reached). Every operation stays reachable through this
+protocol and the Go package, routed or not.
 
 `fixtures.ndjson` holds request and response pairs. A test replays each
 request and compares the response byte for byte: a pair whose response is
