@@ -140,7 +140,7 @@ joins it back to the sources it describes, and fails if:
 
 - the advertised operation count differs from `api/machine/v1/operations.json`;
 - the site names a language package other than the Go package in
-  `server/packages`, or still points at the retired `clients/` bundle;
+  `app/server/packages`, or still points at the retired `clients/` bundle;
 - a guide snippet calls a method the Go package does not define, or a guide
   card links to a route the site does not serve;
 - the error reference documents a code the engine cannot return, or omits one

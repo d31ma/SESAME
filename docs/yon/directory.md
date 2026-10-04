@@ -112,7 +112,7 @@ curl -X POST http://127.0.0.1:8080/api/v1/authorize/decide \
 
 ## Tests
 
-`server/tests/` holds one unit per controller and one for
+`app/server/tests/` holds one unit per controller and one for
 `PrincipalTenantService`. They run against a real engine and cover the happy
 paths, a tenant other than the caller's, anonymous and revoked sessions,
 malformed requests, conflicts and stale policy versions. `ty test` calls

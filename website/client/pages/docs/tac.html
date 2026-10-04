@@ -97,17 +97,17 @@ sesame doctor</code></pre>
       <div class="doc-section">
         <h2>5. Drive it from your application</h2>
         <p>
-          From any language, call the HTTP API of SESAME's Yon host: the repository root is a
-          Tachyon Yon project, and <code>ty serve</code> answers
+          From any language, call the HTTP API of SESAME's Yon host: the repository's <code>app/</code>
+          directory is a Tachyon Yon project, and <code>ty serve app</code> answers
           <code>POST /api/v1/&lt;family&gt;/&lt;operation&gt;</code> for a caller that signs in
           with a <code>Sesame-Session</code> header. Give it absolute paths to the engine and
-          the deployment in <code>.env</code> at the repository root.
+          the deployment in <code>app/.env</code>.
         </p>
         <pre class="code-block"><code>YON_SESAME_BINARY=/usr/local/bin/sesame
 YON_SESAME_DEPLOYMENT=/var/lib/sesame/deployment</code></pre>
         <p>
           A Go application can instead start the engine itself with the standard-library-only
-          package <code>github.com/d31ma/sesame/server/packages/sesame</code>. It owns the
+          package <code>github.com/d31ma/sesame/app/server/packages/sesame</code>. It owns the
           subprocess, the protocol handshake, timeouts, cancellation, and typed errors — and
           never an authentication or authorization decision. It verifies the engine's protocol
           version at startup and refuses a mismatched binary, so a partial upgrade fails loudly

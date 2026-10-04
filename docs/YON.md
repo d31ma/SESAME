@@ -1,9 +1,10 @@
 # Running SESAME as a Yon Host
 
-SESAME's repository root is also a Tachyon Yon project. `ty` serves SESAME's
-HTTP API, and every request starts the `sesame` engine for the length of that
-request. This guide covers running it, configuring it, the reverse proxy it
-requires, the route convention, signing in, errors, the command line and tests.
+SESAME's `app/` directory is a Tachyon Yon project, passed to `ty` as the
+project root (`ty serve app`). `ty` serves SESAME's HTTP API, and every
+request starts the `sesame` engine for the length of that request. This guide
+covers running it, configuring it, the reverse proxy it requires, the route
+convention, signing in, errors, the command line and tests.
 
 This is a developer preview. Read the throughput limits below before you put
 traffic on it. [ADR 0007](adr/0007-sesame-ships-a-yon-host-project.md)
@@ -12,9 +13,9 @@ records why it works this way.
 ## What you need
 
 - `ty` 26.36.01 built from Tachyon commit `bf098bfc`. This is an unreleased
-  development build: it carries Tachyon ADR 0095 (native Go code under
-  `server/packages/`), which no published Tachyon release has yet. SESAME is
-  developed and gated against exactly this build; see
+  development build: it carries Tachyon ADR 0095 (native Go code under a
+  project's `server/packages/`), which no published Tachyon release has yet.
+  SESAME is developed and gated against exactly this build; see
   [Continuous integration](#continuous-integration).
 - For the [command line](#command-line) only: a `ty` that also carries
   Tachyon's `ty handler invoke` argument-binding fix (commit `d070022f`, not
@@ -73,11 +74,12 @@ authenticator routes.
 ## Configure
 
 `ty` hands handlers one private configuration snapshot built from
-`server/application.json`, an optional `server/application-<profile>.json`
-selected with `YON_PROFILE`, and `YON_` names from `.env` at the project root
-(`.env.example` lists them). Handlers see no other configuration. Their
-environment holds only `PATH`, `LANG`, `LC_ALL` and `TMPDIR` (when set) from
-the process that started `ty`, the snapshot in `YON_APPLICATION_JSON`, Tachyon's own
+`app/server/application.json`, an optional
+`app/server/application-<profile>.json` selected with `YON_PROFILE`, and
+`YON_` names from `app/.env`, the project root's `.env` (`app/.env.example`
+lists them). Handlers see no other configuration. Their environment holds only
+`PATH`, `LANG`, `LC_ALL` and `TMPDIR` (when set) from the process that started
+`ty`, the snapshot in `YON_APPLICATION_JSON`, Tachyon's own
 `YON_HANDLER_PROTOCOL`, and, under `ty serve`, the outgoing proxy variables
 `ty` sets (`YON_OUTGOING_PROXY`, `HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY` and
 their lowercase forms, `NODE_USE_ENV_PROXY`). There is no `HOME`. The working
@@ -91,7 +93,7 @@ directory is temporary, so every path must be absolute.
 | `sesame.samlconsumerurls` | none: set it in a JSON file | Every `consumer_url` that `saml/login-start` accepts, matched exactly: absolute `https`, no fragment. Default empty, which refuses every SAML login start with `400 {"code":"redirect_not_allowed"}`. See [docs/yon/federation.md](yon/federation.md#allowed-redirect-targets). |
 | `sesame.federationredirecturis` | none: set it in a JSON file | Every `redirect_uri` that `federation/login-start` accepts, with the same rules. Default empty (every OIDC federation login start is refused). |
 
-Set the two paths either in `.env` at the project root or in a profile file:
+Set the two paths either in `app/.env` or in a profile file:
 
 ```json
 {
@@ -112,11 +114,11 @@ and the engine is not started.
 ## Run
 
 ```bash
-ty serve                 # development server, rebuilds on change
-ty bundle && ty start    # build, then serve the built bundle
+ty serve app                     # development server, rebuilds on change
+ty bundle app && ty start app    # build, then serve the built bundle
 ```
 
-`server.host` and `server.port` in `server/application.json` choose the
+`server.host` and `server.port` in `app/server/application.json` choose the
 address (`127.0.0.1:8080`). `ty` serves plain HTTP. Keep it on loopback,
 behind the reverse proxy below. The `sesame` executable itself never opens a
 port.
@@ -238,7 +240,7 @@ standard route that serves it, `command_line_only`, or
 records, under `access`, the guard every one of its routes declares
 (`public`, `signed_in` or `administrator`; a method annotation wins over the
 controller's). `go test ./test/contract` compares that record with the
-`@PostRoute` and `@GetRoute` annotations in `server/controllers`, so a new
+`@PostRoute` and `@GetRoute` annotations in `app/server/controllers`, so a new
 route, a new engine operation, a route with no guard or two guards, or a
 changed guard fails the build until the manifest describes it.
 
@@ -281,7 +283,7 @@ revoke a session on the command line with `sesame session revoke`.
 
 An error answer comes from one of three places, with different shapes.
 
-**SESAME's own refusals** (the engine and the host code in `server/`) answer
+**SESAME's own refusals** (the engine and the host code in `app/server/`) answer
 JSON `{"code":"<code>"}` through one code-to-status table:
 
 | Status | When |
@@ -350,22 +352,22 @@ Recommend it only to operators on a single-user host:
   (`403 {"code":"administrator_required"}` for anyone else). Tenant checks and
   recent sign-in apply as over HTTP.
 
-One example per access level (run from the project root, with the
-configuration above):
+One example per access level (run from the repository root, with the
+configuration above; `--project app` names the project root):
 
 ```bash
 # anyone
-ty handler invoke server/controllers/SystemController.go \
+ty handler invoke --project app server/controllers/SystemController.go \
   --route /api/v1/system/version --method post
 
 # a signed-in principal, about itself
-ty handler invoke server/controllers/AuthorizeController.go \
+ty handler invoke --project app server/controllers/AuthorizeController.go \
   --route /api/v1/authorize/decide --method post \
   --header "Sesame-Session=$SESAME_SESSION" \
   --body '{"action":"doc:read","resource":"file:a"}'
 
 # an administrator of the tenant
-ty handler invoke server/controllers/PrincipalController.go \
+ty handler invoke --project app server/controllers/PrincipalController.go \
   --route /api/v1/principal/create --method post \
   --header "Sesame-Session=$SESAME_SESSION" \
   --body '{"tenant_id":"tnt_...","kind":"human","identifier_namespace":"email","identifier_value":"new@acme.example"}'
@@ -380,14 +382,14 @@ operator CLI against the deployment instead.
 
 ## Tests
 
-`ty test --coverage` runs the units in `server/tests/`. Each case creates a
+`ty test app --coverage` runs the units in `app/server/tests/`. Each case creates a
 disposable deployment with `sesame init`. Test units do not see the parent
 environment, so the setup finds `sesame` and `fylo` on `PATH`. Put the engine
 built from this tree first:
 
 ```bash
 go build -trimpath -o /tmp/sesame-test/sesame ./cmd/sesame
-PATH=/tmp/sesame-test:$PATH ty test --coverage
+PATH=/tmp/sesame-test:$PATH ty test app --coverage
 ```
 
 `ty test` calls controllers directly, so it cannot reach the route guard; the
@@ -397,7 +399,7 @@ guard's `401` and `403` answers are checked against `ty serve` by the
 The Go SDK and the host errors have ordinary Go tests:
 
 ```bash
-(cd server/packages && go test ./...)
+(cd app/server/packages && go test ./...)
 ```
 
 ### Smoke test
@@ -412,15 +414,15 @@ tools/yon-smoke/smoke.sh /tmp/sesame-smoke/sesame /absolute/path/to/fylo
 ```
 
 The second argument may be left out when `FYLO_BINARY` is set. The script
-works only inside a new temporary directory and never changes the
-repository. It creates a deployment with `sesame init`, bootstraps the tenants
-`acme` and `globex` with an administrator each and an `acme` member on the
-command line, copies `server/` and `package.json` next to it with the
-deployment in that copy's `server/application.json`, starts `ty serve` on a
-free port and signs everyone in through `authn/*`. It then asserts exact
-status codes for each kind of route: public, signed in and administrator; a
-missing or malformed session; a member on an administrator route; another
-tenant's id in a body (`tenant_mismatch`) or in a reference
+works only inside a new temporary directory and never changes the repository.
+It creates a deployment with `sesame init`, bootstraps the tenants `acme` and
+`globex` with an administrator each and an `acme` member on the command line,
+copies `app/server/` and `app/package.json` into a project root next to it
+with the deployment in that copy's `server/application.json`, starts
+`ty serve` on that copy at a free port and signs everyone in through `authn/*`. It
+then asserts exact status codes for each kind of route: public, signed in and
+administrator; a missing or malformed session; a member on an administrator
+route; another tenant's id in a body (`tenant_mismatch`) or in a reference
 (`actor_tenant_mismatch`); an undeclared body field; the unrouted
 `federation/login-exchange`; and `503` with `Retry-After` while a second
 `sesame exec --loop` holds the deployment. Last, it checks that no password or
@@ -434,16 +436,16 @@ command arguments.
 
 ## Continuous integration
 
-GitHub Actions does not run the Yon tests yet. `ty test --coverage` and
-`ty bundle` need a `ty` build that includes Tachyon ADR 0095 (native Go code
-under `server/packages/`) and the `ty handler invoke` argument-binding fix,
-and no published Tachyon release carries both. Until one does, the release
-gate runs them locally with the pinned development build `bf098bfc`, and CI
-runs everything else: the engine tests, the Go package tests in
-`server/packages` and the `test/contract` checks that tie
-`api/machine/v1/operations.json` to the routes in `server/controllers`.
+GitHub Actions does not run the Yon tests yet. `ty test app --coverage` and
+`ty bundle app` need a `ty` build that includes Tachyon ADR 0095 (native Go
+code under a project's `server/packages/`) and the `ty handler invoke`
+argument-binding fix, and no published Tachyon release carries both. Until one
+does, the release gate runs them locally with the pinned development build
+`bf098bfc`, and CI runs everything else: the engine tests, the Go package
+tests in `app/server/packages` and the `test/contract` checks that tie
+`api/machine/v1/operations.json` to the routes in `app/server/controllers`.
 
 When Tachyon publishes a release with both changes, CI gains a job that
 installs that pinned release, builds the engine from this tree, puts it first
-on `PATH` and runs `ty bundle` and `ty test --coverage`, and this section is
+on `PATH` and runs `ty bundle app` and `ty test app --coverage`, and this section is
 removed.

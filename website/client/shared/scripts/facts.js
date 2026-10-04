@@ -6,7 +6,7 @@
 // here so a change lands in one place, and so a claim can be checked against
 // the repository rather than against another page.
 
-// The one language package SESAME ships: the Go package in server/packages.
+// The one language package SESAME ships: the Go package in app/server/packages.
 // Every other language reaches SESAME over HTTP through the Yon host, or by
 // spawning `sesame exec --loop` itself.
 export const SDK_LANGUAGES = ['Go']

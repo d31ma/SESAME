@@ -189,7 +189,7 @@ makes no SCIM conformance claim.
 
 ## Allowed redirect targets
 
-The operator lists every URL a login may return to, in `server/application.json`
+The operator lists every URL a login may return to, in `app/server/application.json`
 or a profile file:
 
 ```json
@@ -260,7 +260,7 @@ login.
 Completing an OpenID Connect federated login therefore needs a host that
 drives SESAME directly and performs the token request itself, as
 [ADR 0004](../adr/0004-federation-egress-boundary.md) describes: the Go package
-`github.com/d31ma/sesame/server/packages/sesame` (`FederatedLoginExchange`),
+`github.com/d31ma/sesame/app/server/packages/sesame` (`FederatedLoginExchange`),
 the machine protocol (`sesame exec --loop`), or `sesame federation
 login-exchange`. Through the Yon host alone, an operator can register and
 disable providers, but an OpenID Connect federated login does not work at all:
@@ -281,7 +281,7 @@ request. That makes the Yon host an egress client, so it needs its own ADR.
 
 ## Tests
 
-`server/tests/` holds `FederationControllerTest` and `FederationLoginTest`,
+`app/server/tests/` holds `FederationControllerTest` and `FederationLoginTest`,
 `SamlControllerTest` and `SamlLoginTest`, `ScimControllerTest`,
 `ScimBearerTest`, `ScimUserTest` and `ScimGroupTest`, and
 `FederationRedirectAllowlistTest`, `SamlConsumerAllowlistTest` and

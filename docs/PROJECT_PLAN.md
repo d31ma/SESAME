@@ -9,8 +9,8 @@ Build SESAME as a headless Go modular monolith backed by FYLO. The product is:
 - an operator CLI in the same executable;
 - versioned management, authorization, standards-dispatch, and local machine
   interfaces;
-- a Yon host project (`server/`, served by Tachyon's `ty`) that exposes the
-  engine over HTTP, and a standard-library Go package (`server/packages`) for
+- a Yon host project (`app/`, served by Tachyon's `ty`) that exposes the
+  engine over HTTP, and a standard-library Go package (`app/server/packages`) for
   Go hosts ([ADR 0007](adr/0007-sesame-ships-a-yon-host-project.md)). The thin
   SDK shims for ten languages that preceded them were retired on 2026-10-04.
 
@@ -182,7 +182,7 @@ types are not.
 **Superseded 2026-10-04 ([ADR 0007](adr/0007-sesame-ships-a-yon-host-project.md)).**
 The language SDKs below were delivered and then retired. Every language now
 reaches SESAME over the Yon host's HTTP API, and Go hosts use the Go package in
-`server/packages`. The shim rules at the end of this section now apply to that
+`app/server/packages`. The shim rules at the end of this section now apply to that
 Go package and to the Yon controllers. The rest of this subsection is kept as
 the record of the earlier plan.
 
@@ -262,7 +262,7 @@ flowchart LR
     A["Applications and resource servers"] --> H["Yon host (ty) or a Go host"]
     B["Browsers and protocol clients"] --> P["Rate-limiting TLS reverse proxy"]
     P --> H
-    H --> GO["Go package (server/packages)"]
+    H --> GO["Go package (app/server/packages)"]
     GO --> M["Local NDJSON machine edge"]
     CLI --> APP["Application commands and queries"]
     M --> APP
@@ -426,15 +426,17 @@ internal/
 api/
   schema/
   machine/v1/
-server/
-  controllers/
-  services/
-  models/
-  roles/
-  tests/
-  packages/
-    sesame/
-    host/
+app/
+  package.json
+  server/
+    controllers/
+    services/
+    models/
+    roles/
+    tests/
+    packages/
+      sesame/
+      host/
 conformance/
 test/
   blackbox/
@@ -928,7 +930,7 @@ resolver, no lockfile entry, and no transitive install.
 `tools/verify-sdk-install.sh` are retired. SESAME ships a Yon host instead
 ([ADR 0007](adr/0007-sesame-ships-a-yon-host-project.md),
 [docs/YON.md](YON.md)): every language reaches SESAME over HTTP, and the Go
-package moved to `server/packages`. `operations.json` now records how each
+package moved to `app/server/packages`. `operations.json` now records how each
 operation is reached over HTTP instead of per-SDK gaps, and `test/contract`
 checks it against the controllers' routes.
 [docs/SDK_DISTRIBUTION.md](SDK_DISTRIBUTION.md) gives the migration path for

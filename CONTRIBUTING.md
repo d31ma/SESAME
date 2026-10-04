@@ -34,7 +34,7 @@ tests, and cross-compilation checks.
   paths, documentation, and migration behavior.
 - Do not add an empty package or speculative abstraction.
 - Update JSON Schema, machine fixtures, framework adapters, the Go package in
-  `server/packages`, the Yon controllers and `api/machine/v1/operations.json`
+  `app/server/packages`, the Yon controllers and `api/machine/v1/operations.json`
   together when a public contract changes.
 - Preserve public API and stored-data compatibility unless an accepted ADR/RFC
   defines the break and migration.

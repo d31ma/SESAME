@@ -40,7 +40,7 @@ HTTP client      →  Yon host (ty)   →  sesame engine  →  FYLO
 your Go host     →  Go package      ↗
 ```
 
-SESAME ships the host too: the repository root is a Tachyon Yon project whose
+SESAME ships the host too: `app/` is a Tachyon Yon project whose
 controllers serve the engine's operations over HTTP
 ([docs/YON.md](docs/YON.md)). A Go application can instead drive the engine
 itself through the [Go package](app/server/packages/README.md).

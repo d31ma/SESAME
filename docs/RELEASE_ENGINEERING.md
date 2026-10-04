@@ -180,8 +180,8 @@ supported version range.
 
 ## Go Package and Yon Host Releases
 
-The Go package (`github.com/d31ma/sesame/server/packages`) and the Yon host
-(`server/`) share the SESAME release version and provenance chain: both are
+The Go package (`github.com/d31ma/sesame/app/server/packages`) and the Yon host
+(`app/`) share the SESAME release version and provenance chain: both are
 taken from the release commit. The Go package is its own module; CalVer tags
 are not semantic import versions for a nested module, so consumers resolve it
 at the release commit as a pseudo-version. Releases up to 26.33.02 also shipped

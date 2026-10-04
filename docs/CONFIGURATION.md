@@ -83,9 +83,9 @@ creates those directly in the deployment's private key directory.
 
 The repository's [`sesame.env.example`](../sesame.env.example) is safe to
 copy. `sesame.env` and `.env` files are ignored by Git; the examples are the
-deliberate tracked exceptions. Use `sesame.env`, not `.env`: the repository
-root is also a Yon project, and `ty` reserves the project-root `.env` for
-`YON_` names (it refuses any other name with `TY2010`). Any path passed to
+deliberate tracked exceptions. Use `sesame.env`, not `.env`: `.env` belongs
+to the Yon project in `app/`, and `ty` reserves the project-root `.env`
+(`app/.env`) for `YON_` names (it refuses any other name with `TY2010`). Any path passed to
 `--env-file` keeps working.
 
 `SESAME_DEPLOYMENT` and the `FYLO_*` pair are alternatives, exactly as their

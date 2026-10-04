@@ -4,7 +4,7 @@
 
 This document covers the planned single-owner SESAME v1 engine, its host
 application, FYLO child process and local data root, operator CLI, local machine
-interface, the Yon host (`server/`), the Go package and framework adapters,
+interface, the Yon host (`app/server/`), the Go package and framework adapters,
 external interaction clients,
 protocol endpoints exposed by the host, connectors, key-management boundary,
 release artifacts, and audit export.

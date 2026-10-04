@@ -40,15 +40,19 @@ and releases use UTC-derived CalVer in `YY.WW.DD` form.
   send `system.version` first and refuse a `protocol_version` other than `1`,
   as the old SDKs did.
 - **The Go SDK moved.** Its import path is now
-  `github.com/d31ma/sesame/server/packages/sesame`, in its own
-  standard-library-only module `github.com/d31ma/sesame/server/packages`
+  `github.com/d31ma/sesame/app/server/packages/sesame`, in its own
+  standard-library-only module `github.com/d31ma/sesame/app/server/packages`
   (history kept). Change the import from `github.com/d31ma/sesame/clients/go/sesame`
   and resolve the module at the release commit
-  (`go get github.com/d31ma/sesame/server/packages@<commit>`): CalVer tags are
+  (`go get github.com/d31ma/sesame/app/server/packages@<commit>`): CalVer tags are
   not semantic import versions for a nested module. Importing it no longer adds
   `golang.org/x/crypto` or `golang.org/x/sys` to your module graph. It gains
   `ErrDeploymentLocked`, `StartWhenAvailable`, `ProtocolError.ErrorCode()`,
   `RequireActor`, and audit attribution through `sesame.WithActor(ctx, actor)`.
+- The Go package import path is now `github.com/d31ma/sesame/app/server/packages/sesame`;
+  the Yon project root is `app/` (`app/package.json`, `app/server/`,
+  `app/.env.example`), so run `ty serve app`, `ty bundle app` and
+  `ty test app --coverage` from the repository root.
 - `api/machine/v1/operations.json` replaces `sdk_gaps` with `http_coverage`:
   every operation records how it is reached over HTTP (`routed` with its
   routes, `standard_endpoint`, `command_line_only`, `not_routed_for_security`).
@@ -138,7 +142,7 @@ and releases use UTC-derived CalVer in `YY.WW.DD` form.
   `actor_tenant_mismatch`. The Yon host sends the verified caller on every
   engine call of a signed-in request.
 - `test/contract` ties `operations.json` to the `@PostRoute`/`@GetRoute`
-  annotations in `server/controllers`: a new engine operation or route without
+  annotations in `app/server/controllers`: a new engine operation or route without
   an `http_coverage` entry fails the build. Each entry also records the
   route's access (`public`, `signed_in` or `administrator`), and the check
   fails when a controller's effective access annotation differs, so changing
@@ -157,7 +161,7 @@ and releases use UTC-derived CalVer in `YY.WW.DD` form.
   protocol routes under `/api/v1/oidc`, and models with the same shape and
   meaning were merged (`AuthnIssuedSession`, `DisableOutcome`, `RevokeOutcome`,
   `OidcClientReference`, `AuthorizeSessionQuestion`). No JSON field changed.
-- CI runs the Go package tests in `server/packages` instead of nine SDK
+- CI runs the Go package tests in `app/server/packages` instead of nine SDK
   contract jobs and the client-bundle job, and checks formatting of the Go
   module sources only (Yon handler files are checked by `ty`). The Yon host's
   `ty bundle` and `ty test --coverage` run in the local release gate until a

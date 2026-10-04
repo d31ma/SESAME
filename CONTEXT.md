@@ -30,10 +30,11 @@ in-memory views, compiled policies, and snapshots are rebuildable projections.
   transition and its audit evidence.
 - **Projection**: rebuildable current state derived from ordered security events.
 - **Connector**: an outbound integration with a separately administered system.
-- **Go package**: the standard-library-only transport in `server/packages`
+- **Go package**: the standard-library-only transport in `app/server/packages`
   that owns one engine subprocess and maps its typed errors. It never
   reimplements identity, authentication, or authorization decisions.
-- **Yon host**: the Tachyon project in `server/` that `ty` serves over HTTP.
+- **Yon host**: the Tachyon project in `app/` (sources in `app/server/`) that
+  `ty` serves over HTTP.
   Its controllers start one engine per request through the Go package, check
   the caller's `Sesame-Session` and tenant, and leave every decision to the
   engine.

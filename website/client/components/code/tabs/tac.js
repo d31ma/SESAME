@@ -4,7 +4,7 @@
 // FYLO runtime before it was written down, including the outputs shown in
 // comments. A guide that teaches a call the engine does not accept is worse
 // than no guide. `test/contract/website_test.go` resolves every method named
-// here against the Go package in server/packages. Over HTTP, each call is the
+// here against the Go package in app/server/packages. Over HTTP, each call is the
 // Yon route of the same operation (docs/YON.md).
 export const LANGUAGES = ["Go"]
 

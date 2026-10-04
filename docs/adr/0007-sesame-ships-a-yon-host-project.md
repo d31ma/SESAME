@@ -6,6 +6,7 @@
 - Revised: 2026-10-04, after the security and quality reviews (administrator
   re-decision, recent sign-in for privileged changes, error shapes, metrics
   scope, command line, reverse proxy, Tachyon gaps)
+- Revised: 2026-10-04, the Yon project moved into `app/` (see Location)
 - Amends: [ADR 0003](0003-headless-binary-and-client-contract.md)
 
 ## Context
@@ -15,8 +16,8 @@ listener, TLS boundary, route and middleware chain, and talks to the engine
 through a language SDK over stdin and stdout. SESAME shipped ten thin SDKs and
 no host of its own, so every adopter wrote the same HTTP layer again.
 
-The project now asks for one host that SESAME ships itself: the repository root
-becomes a Tachyon **Yon** project, and the SDKs are replaced by Yon
+The project now asks for one host that SESAME ships itself: the repository
+gains a Tachyon **Yon** project, and the SDKs are replaced by Yon
 controllers that answer HTTP requests and, once Tachyon binds arguments for
 `ty handler invoke`, the command line.
 
@@ -35,33 +36,45 @@ verified on `ty` 26.36.01 (`bf098bfc`):
   parent variable. The working directory is a temporary directory, so paths
   must be absolute. The engine inherits this environment.
 - Go handlers compile offline with the standard library only. Native code
-  comes from one module under `server/packages/` (Tachyon ADR 0095).
+  comes from one module under the project's `server/packages/` (Tachyon ADR
+  0095).
 - FYLO gives one process exclusive ownership of a root. A second engine
   started against the same deployment fails with `EROOTLOCKED`.
 
 ## Decision
+
+### Location
+
+The Yon project root is `app/` (`app/package.json`, `app/.env.example`,
+`app/server/`), by Samuel's direction on 2026-10-04. Tachyon has no `app/`
+convention, but every `ty` command takes the project root as an argument
+(default `.`), so SESAME passes it explicitly: `ty serve app`,
+`ty bundle app`, `ty test app --coverage` and
+`ty handler invoke --project app ...`. HEIMDALL does the same. The engine
+module, `sesame.env.example` (read by `sesame init`, not by `ty`) and the
+website stay at the repository root.
 
 ### Layout
 
 The engine module `github.com/d31ma/sesame` keeps its place at the root. The
 Yon project lives beside it:
 
-- `server/go.mod` is a sentinel module (`github.com/d31ma/sesame/server`). It
+- `app/server/go.mod` is a sentinel module (`github.com/d31ma/sesame/app/server`). It
   keeps Yon sources out of the engine's `go test ./...` and `go vet ./...`;
   `ty` tolerates it.
-- `server/packages/` is the native Go module
-  `github.com/d31ma/sesame/server/packages`, standard library only. It holds
+- `app/server/packages/` is the native Go module
+  `github.com/d31ma/sesame/app/server/packages`, standard library only. It holds
   the Go SDK (moved from `clients/go/sesame` with its history) and the `host`
   package of errors the Yon host raises.
-- `go.work` at the root (`use .` and `use ./server/packages`) lets engine-module
+- `go.work` at the root (`use .` and `use ./app/server/packages`) lets engine-module
   code that drives the engine through the SDK resolve it: `test/adversarial`,
   `internal/proving/qualification` and `examples/hostserver`. Building those
   three with `GOWORK=off` is unsupported. `cmd/sesame` does not import the SDK,
   so `go install github.com/d31ma/sesame/cmd/sesame@<version>` and
   `GOWORK=off go build ./cmd/sesame` keep working. Nothing in the engine's
-  `cmd/` or production `internal/` code depends on `server/`.
+  `cmd/` or production `internal/` code depends on `app/server/`.
 - Controllers, services, models and roles follow Tachyon's role folders.
-  `server/errors/` stays empty for the reason in "Tachyon gaps" below.
+  `app/server/errors/` stays empty for the reason in "Tachyon gaps" below.
 
 ### Listener ownership (amends ADR 0003)
 
@@ -90,7 +103,7 @@ the client may retry.
 The Go package starts the engine as the leader of its own process group, so a
 request that gives up on a start, a cancelled call, or a `Close` that has to
 kill the engine ends and reaps the engine's FYLO runtime too. This holds on
-Unix only. On Windows (`server/packages/sesame/process_group_other.go`) the
+Unix only. On Windows (`app/server/packages/sesame/process_group_other.go`) the
 package kills only the `sesame` process, and an engine killed that way can
 leave its FYLO child holding the deployment until that child exits, so later
 requests answer `503` meanwhile. The Yon host has not been tested on Windows.
@@ -194,7 +207,7 @@ operator access to the deployment.
 Routes are RPC style, one controller per operation family:
 `POST /api/v1/<family>/<operation>`, with `_` in the operation name written as
 `-` (`principal.create` is `POST /api/v1/principal/create`). Requests and
-results are typed models in `server/models/`; `ty` refuses undeclared fields
+results are typed models in `app/server/models/`; `ty` refuses undeclared fields
 with `400`. Standards protocol endpoints keep their standard HTTP shapes.
 
 `SesameErrorHandler` has one catch-all method. It reads the stable code of any
@@ -212,7 +225,7 @@ check (`500`) as plain text, and `ty`'s request checks answer `400` as
 
 ### Command-line invocation
 
-`ty handler invoke server/controllers/<Family>Controller.go --route
+`ty handler invoke --project app server/controllers/<Family>Controller.go --route
 /api/v1/<family>/<operation> --method post --body '<json>' --header
 'Sesame-Session=<session_id>:<session_secret>'` runs one controller in the
 same scrubbed environment. Binding the body, headers and path values needs
@@ -267,7 +280,7 @@ of its engine requests, so the hash-chained security ledger records
   routes rely on it because SESAME cannot report the target's tenant first:
   `grant/revoke` and `session/revoke-by-id`. Grant and session IDs are random,
   and an unknown ID answers `404` in every tenant.
-- **Evidence.** `server/tests/ActorAttributionTest.go` performs writes over the
+- **Evidence.** `app/server/tests/ActorAttributionTest.go` performs writes over the
   controllers, closes the invocation's engine, and reads the actor of each
   event from the FYLO `sesame-security-events` collection with
   `fylo sql ... --root <deployment>/fylo-root`.
@@ -285,10 +298,10 @@ proposed fixes, in a draft Tachyon feature request that has not been filed.
 1. An `@IdentityProvider` gets no injected fields: both `@NeedsAll` and
    per-field `@Needs` arrive nil under `ty serve`. The provider builds its
    services itself.
-2. The `@IdentityProvider` unit does not compose `server/errors/`, so an error
+2. The `@IdentityProvider` unit does not compose `app/server/errors/`, so an error
    type there is undefined in the identity check. Host errors live in
-   `server/packages/host`.
-3. An `@HandlesError` parameter typed from a `server/packages` import does not
+   `app/server/packages/host`.
+3. An `@HandlesError` parameter typed from an `app/server/packages` import does not
    compile (the generated `errors.go` lacks the import). The handler takes the
    catch-all `error` and reads `host.CodedError`.
 4. Any Go `@Service` with `@OnStop` makes every Go test unit fail with
@@ -321,10 +334,10 @@ proposed fixes, in a draft Tachyon feature request that has not been filed.
 13. `ty test` cannot exercise the route guard, so the guard's `401`, `403` and
     `500` answers are only testable end to end against `ty serve`. The host
     decides the role again in the service, so `ty test` covers that refusal.
-14. Go test units cannot share helpers: a helper file in `server/tests` is not
+14. Go test units cannot share helpers: a helper file in `app/server/tests` is not
     composed (`TY2004`), `@Test` takes one setup (`TY1308`), and a top-level
     function in a test file is refused (`TY1310`). Every fixture lives on
-    `SesameTestSetup`, and a type only tests need lives in `server/models`
+    `SesameTestSetup`, and a type only tests need lives in `app/server/models`
     (see "Test seams" below).
 15. The plain-English name check splits initialisms wrongly: `IDs` becomes the
     non-word `ds`, and `URLs`/`URIs` become `ur` (`TY1328`). Fields are named
@@ -364,10 +377,10 @@ proposed fixes, in a draft Tachyon feature request that has not been filed.
 
 Two pieces of production code exist for tests. Both are kept deliberately:
 
-- `server/models/SecurityEventActor.go` (`{"actor"}`) is used only by
-  `server/tests/ActorAttributionTest.go`, which reads the actor of each ledger
-  event with `fylo sql`. It lives in `server/models` because Tachyon composes
-  no type declared in `server/tests` (gap 14). No route takes or returns it; it
+- `app/server/models/SecurityEventActor.go` (`{"actor"}`) is used only by
+  `app/server/tests/ActorAttributionTest.go`, which reads the actor of each ledger
+  event with `fylo sql`. It lives in `app/server/models` because Tachyon composes
+  no type declared in `app/server/tests` (gap 14). No route takes or returns it; it
   holds no secret, and its only exposure is the `/api.json` listing (gap 24).
 - `RecentSignInService.clockShift` is a duration added to the current time
   before the 10-minute recent sign-in check. No configuration sets it, so it
@@ -381,7 +394,7 @@ Two pieces of production code exist for tests. Both are kept deliberately:
 - SESAME ships a runnable host. Adopters configure two absolute paths and run
   `ty serve`.
 - The Go SDK changes its import path to
-  `github.com/d31ma/sesame/server/packages/sesame`; release notes must say so.
+  `github.com/d31ma/sesame/app/server/packages/sesame`; release notes must say so.
 - Every request pays an engine start. The preview is not for high request
   rates, and one anonymous client can starve every other caller. A
   TLS-terminating, rate-limiting reverse proxy in front of `ty` is therefore
@@ -391,8 +404,8 @@ Two pieces of production code exist for tests. Both are kept deliberately:
 - The project root's `.env` belongs to `ty` (it accepts only `YON_` names), so
   the `sesame init` example file is `sesame.env.example`.
 - Tachyon's build-time design rules (one decision per helper, no unused public
-  methods, no repeated literals) apply to everything under `server/` except
-  `server/packages/`.
+  methods, no repeated literals) apply to everything under `app/server/` except
+  `app/server/packages/`.
 
 ## Rejected alternatives
 
@@ -405,4 +418,4 @@ Two pieces of production code exist for tests. Both are kept deliberately:
 - **A cookie.** It is ambient authority and would need cross-site request
   forgery defenses that a programmatic API does not otherwise need.
 - **Keeping `clients/go` in the engine module.** Yon handlers can import native
-  Go code only from `server/packages`.
+  Go code only from `app/server/packages`.

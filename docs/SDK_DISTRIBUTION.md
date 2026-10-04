@@ -8,8 +8,8 @@ decision.
 
 | Way | For | What you take from SESAME |
 | --- | --- | --- |
-| HTTP through the Yon host | any language that can send an HTTP request | the engine binary and this repository's Yon project (`server/`), served by `ty` |
-| The Go package | Go applications that host the engine themselves | `github.com/d31ma/sesame/server/packages/sesame` |
+| HTTP through the Yon host | any language that can send an HTTP request | the engine binary and this repository's Yon project (`app/`), served by `ty` |
+| The Go package | Go applications that host the engine themselves | `github.com/d31ma/sesame/app/server/packages/sesame` |
 | The machine protocol | any language that spawns the engine itself | the engine binary; you write the NDJSON transport |
 
 ## Get the engine
@@ -27,7 +27,7 @@ engine from source.
 
 ## HTTP through the Yon host
 
-The repository root is a Tachyon Yon project. `ty serve` answers
+`app/` is a Tachyon Yon project. `ty serve app` answers
 `POST /api/v1/<family>/<operation>` for every operation that may safely leave
 the machine, and the OpenID provider's standard endpoints under `/oidc`.
 Callers sign in with the `Sesame-Session` header. Start with
@@ -49,19 +49,19 @@ the manifest saying so.
 ## The Go package
 
 ```bash
-go get github.com/d31ma/sesame/server/packages@<commit>
+go get github.com/d31ma/sesame/app/server/packages@<commit>
 ```
 
 ```go
-import "github.com/d31ma/sesame/server/packages/sesame"
+import "github.com/d31ma/sesame/app/server/packages/sesame"
 ```
 
-It is its own module, `github.com/d31ma/sesame/server/packages`, standard
+It is its own module, `github.com/d31ma/sesame/app/server/packages`, standard
 library only, and it is the transport the Yon controllers use. SESAME's CalVer
 tags are not semantic import versions for a nested module, so Go resolves it
 at a commit as a pseudo-version: use the commit of the release whose engine
 you run. The package's
-[README](../server/packages/README.md) covers its API.
+[README](../app/server/packages/README.md) covers its API.
 
 Earlier releases published it as `github.com/d31ma/sesame/clients/go/sesame`.
 Change that import path when you upgrade.
@@ -119,8 +119,8 @@ the engine at startup and refuses a mismatch.
 - `go test ./test/contract` checks the operation manifest against the engine's
   dispatch table, the protocol reference and the Yon controllers.
 - CI runs the Go package's contract scenario against a real compiled engine
-  (`cd server/packages && go test ./...`).
-- `ty test --coverage` runs the Yon host's tests against a real engine. It runs
+  (`cd app/server/packages && go test ./...`).
+- `ty test app --coverage` runs the Yon host's tests against a real engine. It runs
   in the local release gate, not in CI, until Tachyon publishes a `ty` release
   that CI can install; [docs/YON.md](YON.md#continuous-integration) tracks
   that.

@@ -1,7 +1,7 @@
 # Go Client
 
 This folder is the native Go module of SESAME's Yon host project
-([ADR 0007](../../docs/adr/0007-sesame-ships-a-yon-host-project.md)). The Yon
+([ADR 0007](../../../docs/adr/0007-sesame-ships-a-yon-host-project.md)). The Yon
 controllers use it as their engine transport, and Go host applications import
 it directly. The Go client starts one local SESAME executable in persistent NDJSON
 mode:
@@ -21,7 +21,7 @@ if err := client.Ping(ctx); err != nil {
 Import path:
 
 ```text
-github.com/d31ma/sesame/server/packages/sesame
+github.com/d31ma/sesame/app/server/packages/sesame
 ```
 
 The client exposes typed methods for the complete machine-operation manifest,
@@ -31,9 +31,9 @@ Security and protocol semantics remain in the SESAME executable.
 
 Host frameworks translate their request object into `StandardsRequest` and
 apply the returned `StandardsResponse`; see the
-[host-adapter contract](../../api/standards/v1/README.md). The Go reference
+[host-adapter contract](../../../api/standards/v1/README.md). The Go reference
 translation is under
-[`examples/hostserver`](../../examples/hostserver/standards.go).
+[`examples/hostserver`](../../../examples/hostserver/standards.go).
 
 A client owns its subprocess. In the initial topology, one host application
 process owns one client, one SESAME subprocess, and one authoritative FYLO data
@@ -68,21 +68,21 @@ The client sends it only when the engine lists `"actor"` in
 `actor_session_invalid`, or `actor_tenant_mismatch` (a write into another
 tenant); none is retryable and the client retries nothing. The actor never
 grants access. See
-[Actor attribution](../../api/machine/v1/README.md#actor-attribution).
+[Actor attribution](../../../api/machine/v1/README.md#actor-attribution).
 
 ## Installing
 
 ```bash
-go get github.com/d31ma/sesame/server/packages@<commit>
+go get github.com/d31ma/sesame/app/server/packages@<commit>
 ```
 
-It is its own module, `github.com/d31ma/sesame/server/packages`, and Go
+It is its own module, `github.com/d31ma/sesame/app/server/packages`, and Go
 resolves it at a commit as a pseudo-version: use the commit of the release
 whose engine you run. The module uses the Go standard library only, so
 importing it adds nothing else to your module graph.
 Earlier releases published it as `github.com/d31ma/sesame/clients/go/sesame`;
 change that import path when you upgrade.
-[docs/SDK_DISTRIBUTION.md](../../docs/SDK_DISTRIBUTION.md) covers verification
+[docs/SDK_DISTRIBUTION.md](../../../docs/SDK_DISTRIBUTION.md) covers verification
 and how other languages reach SESAME (the Yon host's HTTP API or the machine
 protocol).
 

@@ -9,7 +9,7 @@ import { SDK_LANGUAGES } from '../../../shared/scripts/facts.js'
 // omits the flag when the option is absent, so the engine resolves
 // SESAME_DEPLOYMENT out of the environment it inherits.
 const SNIPPETS = {
-  HTTP: `# ty serve runs the Yon host. The session comes from
+  HTTP: `# ty serve app runs the Yon host. The session comes from
 # POST /api/v1/authn/complete.
 curl -s http://127.0.0.1:8080/api/v1/authorize/decide \\
   -H 'Content-Type: application/json' \\
