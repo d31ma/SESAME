@@ -1,6 +1,7 @@
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"github.com/d31ma/sesame/server/packages/sesame"
 )
@@ -35,6 +36,11 @@ func (service *InteractionCookieService) Cookie(action sesame.StandardsInteracti
 		Secure:   true,
 		SameSite: http.SameSiteLaxMode,
 	}
+}
+
+func (service *InteractionCookieService) Handle(value string) OidcInteractionHandle {
+	interactionID, secret, _ := strings.Cut(value, service.separator())
+	return OidcInteractionHandle{InteractionID: interactionID, InteractionSecret: secret}
 }
 
 func (service *InteractionCookieService) headers(engineHeaders map[string]string) map[string]string {
