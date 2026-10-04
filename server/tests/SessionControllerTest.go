@@ -69,11 +69,14 @@ func (test *SessionControllerTest) TestRevokeEndsOnlyTheCallersSession() {
 	defer setup.Remove()
 	issued := setup.SignIn("acme", false)
 	other := setup.SignIn("globex", false)
-	controller := test.controller()
 
-	revocation, err := controller.PostRevoke(test.request(setup.Credential(issued)), SessionRevokeReason{Reason: "signed_out"})
-	_, revokedErr := controller.PostVerify(SessionCredential{SessionID: issued.SessionID, SessionSecret: issued.Secret})
-	still, otherErr := controller.PostVerify(SessionCredential{SessionID: other.SessionID, SessionSecret: other.Secret})
+	revoking := test.controller()
+	checking := test.controller()
+
+	revocation, err := revoking.PostRevoke(test.request(setup.Credential(issued)), SessionRevokeReason{Reason: "signed_out"})
+	test.finish(revoking)
+	_, revokedErr := checking.PostVerify(SessionCredential{SessionID: issued.SessionID, SessionSecret: issued.Secret})
+	still, otherErr := checking.PostVerify(SessionCredential{SessionID: other.SessionID, SessionSecret: other.Secret})
 
 	Assert.IsTrue(err == nil)
 	Assert.IsTrue(revocation.Revoked)
@@ -122,6 +125,12 @@ func (test *SessionControllerTest) answer(err error) string {
 func (test *SessionControllerTest) json(value any) string {
 	encoded, _ := json.Marshal(value)
 	return string(encoded)
+}
+
+func (test *SessionControllerTest) finish(controller *SessionController) {
+	if controller.engineService.client != nil {
+		controller.engineService.client.Close()
+	}
 }
 
 func (test *SessionControllerTest) controller() *SessionController {

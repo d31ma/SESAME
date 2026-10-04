@@ -17,7 +17,8 @@ type CallerService struct {
 func (service *CallerService) Resolve(request *http.Request) (Caller, error) {
 	credential, failure := service.credential(request.Header.Get(service.headerName()))
 	session, failure := service.verify(credential, failure)
-	return service.caller(credential, session, service.rejection(failure))
+	caller, failure := service.caller(credential, session, service.rejection(failure))
+	return caller, service.actAs(caller, failure)
 }
 
 func (service *CallerService) RequireTenant(caller Caller, tenantID string) error {
@@ -53,6 +54,13 @@ func (service *CallerService) caller(credential SessionCredential, session Verif
 		SessionID:     session.SessionID,
 		SessionSecret: credential.SessionSecret,
 	}, nil
+}
+
+func (service *CallerService) actAs(caller Caller, failure error) error {
+	if failure == nil {
+		service.engineService.ActAs(caller)
+	}
+	return failure
 }
 
 func (service *CallerService) rejection(failure error) error {

@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -279,4 +280,28 @@ func signInToNewTenant(t *testing.T, client *Client, ctx context.Context, tenant
 		t.Fatalf("AuthenticationComplete() error = %v", err)
 	}
 	return session
+}
+
+func TestRequireActorAcceptsAnEngineThatListsIt(t *testing.T) {
+	t.Parallel()
+	client := startActorProbe(t, "actor", Options{})
+
+	if err := client.RequireActor(); err != nil {
+		t.Fatalf("RequireActor() error = %v", err)
+	}
+}
+
+func TestRequireActorNamesTheMissingField(t *testing.T) {
+	t.Parallel()
+	client := startActorProbe(t, "", Options{})
+
+	err := client.RequireActor()
+
+	var incompatible *IncompatibleEngineError
+	if !errors.As(err, &incompatible) || len(incompatible.MissingRequestFields) != 1 || incompatible.MissingRequestFields[0] != "actor" {
+		t.Fatalf("RequireActor() error = %#v", err)
+	}
+	if incompatible.EngineVersion != "probe" || !strings.Contains(err.Error(), `"actor"`) {
+		t.Fatalf("RequireActor() error = %v", err)
+	}
 }

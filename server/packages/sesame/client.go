@@ -101,7 +101,8 @@ type Client struct {
 	done    chan error
 	closed  bool
 
-	acceptsActor bool
+	acceptsActor  bool
+	engineVersion string
 }
 
 // Start launches a SESAME subprocess in persistent machine mode.
@@ -240,6 +241,7 @@ type IncompatibleEngineError struct {
 	EngineProtocolVersion string
 	EngineVersion         string
 	MissingOperations     []string
+	MissingRequestFields  []string
 }
 
 func (e *IncompatibleEngineError) Error() string {
@@ -247,6 +249,11 @@ func (e *IncompatibleEngineError) Error() string {
 		return fmt.Sprintf(
 			"sesame engine %s speaks machine protocol %q; this client speaks %q",
 			e.EngineVersion, e.EngineProtocolVersion, e.ClientProtocolVersion)
+	}
+	if len(e.MissingRequestFields) != 0 {
+		return fmt.Sprintf(
+			"sesame engine %s does not accept request field(s) this client requires: %q",
+			e.EngineVersion, e.MissingRequestFields)
 	}
 	return fmt.Sprintf(
 		"sesame engine %s does not support %d operation(s) this client requires: %s",
@@ -274,7 +281,26 @@ func (c *Client) checkCompatibility(ctx context.Context) error {
 		}
 	}
 	c.acceptsActor = slices.Contains(version.RequestFields, actorRequestField)
+	c.engineVersion = version.Version
 	return nil
+}
+
+// RequireActor fails unless the engine accepts actor attribution. Without
+// it, WithActor has no effect and writes are recorded as operator:machine, so
+// a host that must name the principal in the audit ledger, or that relies on
+// the engine refusing writes into another tenant with actor_tenant_mismatch,
+// calls it first. A client started with SkipCompatibilityCheck never
+// qualifies.
+func (c *Client) RequireActor() error {
+	if c.acceptsActor {
+		return nil
+	}
+	return &IncompatibleEngineError{
+		ClientProtocolVersion: protocolVersion,
+		EngineProtocolVersion: protocolVersion,
+		EngineVersion:         c.engineVersion,
+		MissingRequestFields:  []string{actorRequestField},
+	}
 }
 
 // RequireOperations fails unless the engine routes every named operation.

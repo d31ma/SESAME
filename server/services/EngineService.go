@@ -15,6 +15,11 @@ type EngineService struct {
 	opening               sync.Once
 	client                *sesame.Client
 	failure               error
+	actor                 *sesame.Actor
+}
+
+func (service *EngineService) ActAs(caller Caller) {
+	service.actor = &sesame.Actor{TenantID: caller.TenantID, PrincipalID: caller.PrincipalID, SessionID: caller.SessionID}
 }
 
 func (service *EngineService) Call(operation string, parameters any, result any) error {
@@ -46,7 +51,17 @@ func (service *EngineService) send(operation string, parameters any, result any)
 	if service.failure != nil {
 		return service.failure
 	}
-	return service.client.Request(context.Background(), operation, parameters, result)
+	if service.actor == nil {
+		return service.client.Request(context.Background(), operation, parameters, result)
+	}
+	return service.sendAsActor(operation, parameters, result)
+}
+
+func (service *EngineService) sendAsActor(operation string, parameters any, result any) error {
+	if failure := service.client.RequireActor(); failure != nil {
+		return failure
+	}
+	return service.client.Request(sesame.WithActor(context.Background(), *service.actor), operation, parameters, result)
 }
 
 func (service *EngineService) busyWhenOutOfTime(failure error) error {
