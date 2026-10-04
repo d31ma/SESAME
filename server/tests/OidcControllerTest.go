@@ -494,11 +494,9 @@ func (test *OidcControllerTest) engine() *EngineService {
 }
 
 func (test *OidcControllerTest) controller(engine *EngineService) *OidcController {
-	callers := &CallerService{engineService: engine}
 	return &OidcController{
 		engineService:            engine,
-		callerCallService:        &CallerCallService{callerService: callers, engineService: engine},
-		tenantRecordService:      &TenantRecordService{callerService: callers, engineService: engine},
+		tenantCallService:        test.tenantCalls(engine),
 		interactionCookieService: &InteractionCookieService{},
 	}
 }
@@ -511,5 +509,14 @@ func (test *OidcControllerTest) standards(engine *EngineService) *StandardsContr
 			standardsRefusalService:  refusals,
 			interactionCookieService: &InteractionCookieService{},
 		},
+	}
+}
+
+func (test *OidcControllerTest) tenantCalls(engine *EngineService) *TenantCallService {
+	return &TenantCallService{
+		callerService:        &CallerService{engineService: engine},
+		engineService:        engine,
+		administratorService: &AdministratorService{engineService: engine},
+		recentSignInService:  &RecentSignInService{},
 	}
 }

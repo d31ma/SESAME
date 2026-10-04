@@ -24,7 +24,7 @@ func (test *AuthenticatorPasskeyTest) TestRegisteredPasskeySignsTheCallerInWithM
 	session := setup.SignIn("acme", false)
 	key := test.key()
 	controller := test.controller()
-	authn := &AuthnController{engineService: controller.engineService}
+	authn := &AuthnController{engineService: controller.tenantCallService.engineService}
 
 	stored := test.register(controller, test.request(setup, session), key)
 	listed, listErr := controller.PostPasskeyList(test.request(setup, session))
@@ -63,7 +63,7 @@ func (test *AuthenticatorPasskeyTest) TestRemovedPasskeyNoLongerSignsIn() {
 	session := setup.SignIn("acme", false)
 	key := test.key()
 	controller := test.controller()
-	authn := &AuthnController{engineService: controller.engineService}
+	authn := &AuthnController{engineService: controller.tenantCallService.engineService}
 	stored := test.register(controller, test.request(setup, session), key)
 
 	removal, err := controller.PostPasskeyRemove(
@@ -328,13 +328,14 @@ func (test *AuthenticatorPasskeyTest) check(err error) {
 
 func (test *AuthenticatorPasskeyTest) controller() *AuthenticatorController {
 	engine := &EngineService{engineSettingsService: &EngineSettingsService{}}
+	calls := &TenantCallService{
+		callerService:        &CallerService{engineService: engine},
+		engineService:        engine,
+		administratorService: &AdministratorService{engineService: engine},
+		recentSignInService:  &RecentSignInService{},
+	}
 	return &AuthenticatorController{
-		callerService:       &CallerService{engineService: engine},
-		engineService:       engine,
-		recentSignInService: &RecentSignInService{engineService: engine},
-		principalTenantService: &PrincipalTenantService{
-			callerService: &CallerService{engineService: engine},
-			engineService: engine,
-		},
+		tenantCallService:      calls,
+		principalTenantService: &PrincipalTenantService{tenantCallService: calls},
 	}
 }

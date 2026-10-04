@@ -14,7 +14,14 @@ func (controller *GroupController) PostMemberAdd(
 	// @FromBody
 	body GroupMemberRequest,
 ) (GroupMembership, error) {
-	return controller.membership(request, "group.member_add", body)
+	var result GroupMembership
+	err := controller.principalTenantService.Call(request, body.PrincipalID, EngineCall{
+		Operation:  "group.member_add",
+		Parameters: body,
+		Result:     &result,
+		Privileged: true,
+	})
+	return result, err
 }
 
 // @PostRoute("/member-remove")
@@ -23,17 +30,9 @@ func (controller *GroupController) PostMemberRemove(
 	// @FromBody
 	body GroupMemberRequest,
 ) (GroupMembership, error) {
-	return controller.membership(request, "group.member_remove", body)
-}
-
-func (controller *GroupController) membership(
-	request *http.Request,
-	operation string,
-	body GroupMemberRequest,
-) (GroupMembership, error) {
 	var result GroupMembership
 	err := controller.principalTenantService.Call(request, body.PrincipalID, EngineCall{
-		Operation:  operation,
+		Operation:  "group.member_remove",
 		Parameters: body,
 		Result:     &result,
 	})

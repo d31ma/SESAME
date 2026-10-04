@@ -1,3 +1,11 @@
+import (
+	"errors"
+	"net/http"
+	"net/http/httptest"
+
+	"github.com/d31ma/sesame/server/packages/host"
+)
+
 // @Test(SesameTestSetup, {"partition":"tests"})
 type SystemControllerTest struct {
 	behaviors *BehaviorContext
@@ -41,10 +49,11 @@ func (test *SystemControllerTest) TestReadinessReportsStorageReady() {
 func (test *SystemControllerTest) TestMetricsCountRequestsOfTheSameEngine() {
 	setup := SesameTestSetup{}.Provision()
 	defer setup.Remove()
+	administrator := setup.SignIn("acme", true)
 	controller := test.controller()
 	_, pingErr := controller.PostPing()
 
-	metrics, err := controller.PostMetrics()
+	metrics, err := controller.PostMetrics(test.request(setup.Credential(administrator)))
 
 	Assert.IsTrue(pingErr == nil)
 	Assert.IsTrue(err == nil)
@@ -52,6 +61,30 @@ func (test *SystemControllerTest) TestMetricsCountRequestsOfTheSameEngine() {
 	Assert.Equals(int64(1), metrics.RequestsTotal["system.ping"])
 }
 
+func (test *SystemControllerTest) TestMetricsRefuseAMemberEvenWithoutTheRouteGuard() {
+	setup := SesameTestSetup{}.Provision()
+	defer setup.Remove()
+	member := setup.SignInMember("acme", "member")
+
+	metrics, err := test.controller().PostMetrics(test.request(setup.Credential(member)))
+
+	var refused *host.AdministratorRequiredError
+	Assert.IsTrue(errors.As(err, &refused))
+	Assert.Equals(0, len(metrics.RequestsTotal))
+}
+
+func (test *SystemControllerTest) request(credential string) *http.Request {
+	request := httptest.NewRequest(http.MethodPost, "/", nil)
+	request.Header.Set("Sesame-Session", credential)
+	return request
+}
+
 func (test *SystemControllerTest) controller() *SystemController {
-	return &SystemController{engineService: &EngineService{engineSettingsService: &EngineSettingsService{}}}
+	engine := &EngineService{engineSettingsService: &EngineSettingsService{}}
+	return &SystemController{engineService: engine, tenantCallService: &TenantCallService{
+		callerService:        &CallerService{engineService: engine},
+		engineService:        engine,
+		administratorService: &AdministratorService{engineService: engine},
+		recentSignInService:  &RecentSignInService{},
+	}}
 }

@@ -6,32 +6,19 @@ import (
 
 // @Service
 type RecentSignInService struct {
-	// @Needs
-	engineService *EngineService
-	clockShift    time.Duration
+	clockShift time.Duration
 }
 
 func (service *RecentSignInService) Require(caller Caller, failure error) error {
-	session, failure := service.session(caller, failure)
-	issuedAt, failure := service.issuedAt(session, failure)
+	issuedAt, failure := service.issuedAt(caller, failure)
 	return service.withinWindow(issuedAt, failure)
 }
 
-func (service *RecentSignInService) session(caller Caller, failure error) (Session, error) {
-	if failure != nil {
-		return Session{}, failure
-	}
-	session := Session{}
-	credential := SessionCredential{SessionID: caller.SessionID, SessionSecret: caller.SessionSecret}
-	failure = service.engineService.Call("session.verify", credential, &session)
-	return session, failure
-}
-
-func (service *RecentSignInService) issuedAt(session Session, failure error) (time.Time, error) {
+func (service *RecentSignInService) issuedAt(caller Caller, failure error) (time.Time, error) {
 	if failure != nil {
 		return time.Time{}, failure
 	}
-	return time.Parse(time.RFC3339Nano, session.IssuedAt)
+	return time.Parse(time.RFC3339Nano, caller.IssuedAt)
 }
 
 func (service *RecentSignInService) withinWindow(issuedAt time.Time, failure error) error {

@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"time"
 
 	"github.com/d31ma/sesame/server/packages/host"
 	"github.com/d31ma/sesame/server/packages/sesame"
@@ -83,6 +84,21 @@ func (test *OidcClientControllerTest) TestRotateSecretReplacesTheSecretOnce() {
 	Assert.IsTrue(!strings.Contains(test.encoded(fetched), rotated.ClientSecret))
 	Assert.Equals("client_not_found", test.authenticationCode(engine, registered.Client.ClientID, registered.ClientSecret))
 	Assert.Equals("", test.authenticationCode(engine, registered.Client.ClientID, rotated.ClientSecret))
+}
+
+func (test *OidcClientControllerTest) TestRotateSecretNeedsARecentSignIn() {
+	setup := SesameTestSetup{}.Provision()
+	defer setup.Remove()
+	session := setup.SignIn("acme", true)
+	engine := test.engine()
+	request := test.request(setup.Credential(session))
+	registered, _ := test.controller(engine).PostRegister(request, test.registration(session.TenantID, "confidential"))
+
+	rotated, err := test.controllerAfter(engine, 11*time.Minute).PostRotateSecret(request, OidcClientReference{ClientID: registered.Client.ClientID})
+
+	Assert.IsTrue(test.reauthenticationRequired(err))
+	Assert.Equals("", rotated.ClientSecret)
+	Assert.Equals("", test.authenticationCode(engine, registered.Client.ClientID, registered.ClientSecret))
 }
 
 func (test *OidcClientControllerTest) TestDisableStopsTheClient() {
@@ -198,9 +214,27 @@ func (test *OidcClientControllerTest) engine() *EngineService {
 }
 
 func (test *OidcClientControllerTest) controller(engine *EngineService) *OidcClientController {
-	callers := &CallerService{engineService: engine}
-	return &OidcClientController{
-		tenantCallService:   &TenantCallService{callerService: callers, engineService: engine},
-		tenantRecordService: &TenantRecordService{callerService: callers, engineService: engine},
+	return test.controllerAfter(engine, 0)
+}
+
+func (test *OidcClientControllerTest) controllerAfter(engine *EngineService, elapsed time.Duration) *OidcClientController {
+	return &OidcClientController{tenantCallService: test.tenantCallsAfter(engine, elapsed)}
+}
+
+func (test *OidcClientControllerTest) tenantCalls(engine *EngineService) *TenantCallService {
+	return test.tenantCallsAfter(engine, 0)
+}
+
+func (test *OidcClientControllerTest) tenantCallsAfter(engine *EngineService, elapsed time.Duration) *TenantCallService {
+	return &TenantCallService{
+		callerService:        &CallerService{engineService: engine},
+		engineService:        engine,
+		administratorService: &AdministratorService{engineService: engine},
+		recentSignInService:  &RecentSignInService{clockShift: elapsed},
 	}
+}
+
+func (test *OidcClientControllerTest) reauthenticationRequired(err error) bool {
+	var required *host.ReauthenticationRequiredError
+	return errors.As(err, &required)
 }

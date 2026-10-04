@@ -189,7 +189,7 @@ func (test *AuthorizeControllerTest) TestDecideBatchRejectsAnAnonymousCaller() {
 }
 
 func (test *AuthorizeControllerTest) grantReader(engine *EngineService, request *http.Request, member sesame.IssuedSession) {
-	calls := &TenantCallService{callerService: &CallerService{engineService: engine}, engineService: engine}
+	calls := test.tenantCalls(engine)
 	role, err := (&RoleController{tenantCallService: calls}).PostCreate(request, RoleCreateRequest{
 		TenantID:    member.TenantID,
 		Name:        "reader",
@@ -239,5 +239,14 @@ func (test *AuthorizeControllerTest) engine() *EngineService {
 }
 
 func (test *AuthorizeControllerTest) controller(engine *EngineService) *AuthorizeController {
-	return &AuthorizeController{callerService: &CallerService{engineService: engine}, engineService: engine}
+	return &AuthorizeController{tenantCallService: test.tenantCalls(engine)}
+}
+
+func (test *AuthorizeControllerTest) tenantCalls(engine *EngineService) *TenantCallService {
+	return &TenantCallService{
+		callerService:        &CallerService{engineService: engine},
+		engineService:        engine,
+		administratorService: &AdministratorService{engineService: engine},
+		recentSignInService:  &RecentSignInService{},
+	}
 }

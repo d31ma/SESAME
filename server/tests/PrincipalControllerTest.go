@@ -2,6 +2,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"time"
 
 	"github.com/d31ma/sesame/server/packages/host"
 	"github.com/d31ma/sesame/server/packages/sesame"
@@ -51,6 +52,22 @@ func (test *PrincipalControllerTest) TestCreateRefusesAClaimedIdentifier() {
 
 	Assert.IsTrue(first == nil)
 	Assert.Equals("identifier_conflict", test.code(err))
+}
+
+func (test *PrincipalControllerTest) TestCreateRefusesAMemberEvenWithoutTheRouteGuard() {
+	setup := SesameTestSetup{}.Provision()
+	defer setup.Remove()
+	administrator := setup.SignIn("acme", true)
+	member := setup.SignInMember("acme", "member")
+	controller := test.controller()
+
+	principal, err := controller.PostCreate(test.request(setup.Credential(member)), test.creation(member.TenantID))
+	_, lookup := controller.PostGet(test.request(setup.Credential(administrator)), test.lookupService(administrator.TenantID, "builder"))
+
+	Assert.Equals(http.StatusForbidden, (&SesameErrorHandler{}).Answer(err).StatusCode)
+	Assert.Equals("administrator_required", test.publicCode(err))
+	Assert.Equals("", principal.PrincipalID)
+	Assert.Equals("principal_not_found", test.publicCode(lookup))
 }
 
 func (test *PrincipalControllerTest) TestCreateRejectsAnAnonymousCaller() {
@@ -170,6 +187,22 @@ func (test *PrincipalControllerTest) TestSuspendSuspendsAPrincipalOfTheCallersTe
 	Assert.Equals("suspended", principal.Status)
 }
 
+func (test *PrincipalControllerTest) TestSuspendNeedsARecentSignIn() {
+	setup := SesameTestSetup{}.Provision()
+	defer setup.Remove()
+	administrator := setup.SignIn("acme", true)
+	member := setup.SignInMember("acme", "member")
+	engine := test.engine()
+	request := test.request(setup.Credential(administrator))
+
+	_, err := test.controllerWith(engine, 11*time.Minute).PostSuspend(request, PrincipalReference{PrincipalID: member.PrincipalID})
+	untouched, check := test.controllerWith(engine, 0).PostGet(request, PrincipalGetRequest{PrincipalID: member.PrincipalID})
+
+	Assert.IsTrue(test.reauthenticationRequired(err))
+	Assert.IsTrue(check == nil)
+	Assert.Equals("active", untouched.Status)
+}
+
 func (test *PrincipalControllerTest) TestSuspendRefusesAPrincipalOfAnotherTenantAndLeavesItActive() {
 	setup := SesameTestSetup{}.Provision()
 	defer setup.Remove()
@@ -199,6 +232,10 @@ func (test *PrincipalControllerTest) lookup(tenantID string, value string) Princ
 	return PrincipalGetRequest{TenantID: tenantID, IdentifierNamespace: "email", IdentifierValue: value}
 }
 
+func (test *PrincipalControllerTest) lookupService(tenantID string, value string) PrincipalGetRequest {
+	return PrincipalGetRequest{TenantID: tenantID, IdentifierNamespace: "service", IdentifierValue: value}
+}
+
 func (test *PrincipalControllerTest) code(err error) string {
 	protocolError := &sesame.ProtocolError{}
 	errors.As(err, &protocolError)
@@ -225,10 +262,35 @@ func (test *PrincipalControllerTest) request(credential string) *http.Request {
 }
 
 func (test *PrincipalControllerTest) controller() *PrincipalController {
-	engine := &EngineService{engineSettingsService: &EngineSettingsService{}}
-	callers := &CallerService{engineService: engine}
+	return test.controllerWith(test.engine(), 0)
+}
+
+func (test *PrincipalControllerTest) engine() *EngineService {
+	return &EngineService{engineSettingsService: &EngineSettingsService{}}
+}
+
+func (test *PrincipalControllerTest) controllerWith(engine *EngineService, elapsed time.Duration) *PrincipalController {
+	calls := test.tenantCallsAfter(engine, elapsed)
 	return &PrincipalController{
-		tenantCallService:      &TenantCallService{callerService: callers, engineService: engine},
-		principalTenantService: &PrincipalTenantService{callerService: callers, engineService: engine},
+		tenantCallService:      calls,
+		principalTenantService: &PrincipalTenantService{tenantCallService: calls},
 	}
+}
+
+func (test *PrincipalControllerTest) tenantCalls(engine *EngineService) *TenantCallService {
+	return test.tenantCallsAfter(engine, 0)
+}
+
+func (test *PrincipalControllerTest) tenantCallsAfter(engine *EngineService, elapsed time.Duration) *TenantCallService {
+	return &TenantCallService{
+		callerService:        &CallerService{engineService: engine},
+		engineService:        engine,
+		administratorService: &AdministratorService{engineService: engine},
+		recentSignInService:  &RecentSignInService{clockShift: elapsed},
+	}
+}
+
+func (test *PrincipalControllerTest) reauthenticationRequired(err error) bool {
+	var required *host.ReauthenticationRequiredError
+	return errors.As(err, &required)
 }

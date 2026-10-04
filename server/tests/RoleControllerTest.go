@@ -101,6 +101,14 @@ func (test *RoleControllerTest) request(credential string) *http.Request {
 
 func (test *RoleControllerTest) controller() *RoleController {
 	engine := &EngineService{engineSettingsService: &EngineSettingsService{}}
-	callers := &CallerService{engineService: engine}
-	return &RoleController{tenantCallService: &TenantCallService{callerService: callers, engineService: engine}}
+	return &RoleController{tenantCallService: test.tenantCalls(engine)}
+}
+
+func (test *RoleControllerTest) tenantCalls(engine *EngineService) *TenantCallService {
+	return &TenantCallService{
+		callerService:        &CallerService{engineService: engine},
+		engineService:        engine,
+		administratorService: &AdministratorService{engineService: engine},
+		recentSignInService:  &RecentSignInService{},
+	}
 }

@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"time"
 )
 
 // @Test(SesameTestSetup, {"partition":"tests"})
@@ -124,6 +125,20 @@ func (test *SessionControllerTest) TestRevokeByIDEndsASessionOfTheCallersTenant(
 	Assert.Equals(`{"code":"session_inactive"}`, test.answer(revokedErr))
 }
 
+func (test *SessionControllerTest) TestRevokeByIDDoesNotNeedARecentSignIn() {
+	setup := SesameTestSetup{}.Provision()
+	defer setup.Remove()
+	administrator := setup.SignIn("acme", true)
+	member := setup.SignInMember("acme", "member")
+	engine := &EngineService{engineSettingsService: &EngineSettingsService{}}
+	revoking := &SessionController{engineService: engine, tenantCallService: test.tenantCallsAfter(engine, 11*time.Minute)}
+
+	revocation, err := revoking.PostRevokeByID(test.request(setup.Credential(administrator)), SessionRevokeRequest{SessionID: member.SessionID, Reason: "compromised"})
+
+	Assert.IsTrue(err == nil)
+	Assert.IsTrue(revocation.Revoked)
+}
+
 func (test *SessionControllerTest) TestRevokeByIDRefusesASessionOfAnotherTenant() {
 	setup := SesameTestSetup{}.Provision()
 	defer setup.Remove()
@@ -205,5 +220,18 @@ func (test *SessionControllerTest) finish(controller *SessionController) {
 
 func (test *SessionControllerTest) controller() *SessionController {
 	engine := &EngineService{engineSettingsService: &EngineSettingsService{}}
-	return &SessionController{callerService: &CallerService{engineService: engine}, engineService: engine}
+	return &SessionController{engineService: engine, tenantCallService: test.tenantCalls(engine)}
+}
+
+func (test *SessionControllerTest) tenantCalls(engine *EngineService) *TenantCallService {
+	return test.tenantCallsAfter(engine, 0)
+}
+
+func (test *SessionControllerTest) tenantCallsAfter(engine *EngineService, elapsed time.Duration) *TenantCallService {
+	return &TenantCallService{
+		callerService:        &CallerService{engineService: engine},
+		engineService:        engine,
+		administratorService: &AdministratorService{engineService: engine},
+		recentSignInService:  &RecentSignInService{clockShift: elapsed},
+	}
 }

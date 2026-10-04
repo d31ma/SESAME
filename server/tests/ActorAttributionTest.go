@@ -36,7 +36,7 @@ func (test *ActorAttributionTest) TestSelfServiceWriteRecordsTheCallingPrincipal
 	defer setup.Remove()
 	member := setup.SignInMember("acme", "member")
 	engine := test.engine()
-	sessions := &SessionController{callerService: &CallerService{engineService: engine}, engineService: engine}
+	sessions := &SessionController{engineService: engine, tenantCallService: test.tenantCalls(engine)}
 
 	_, err := sessions.PostRevoke(test.request(setup.Credential(member)), SessionRevokeReason{Reason: "signed_out"})
 	test.finish(engine)
@@ -51,9 +51,8 @@ func (test *ActorAttributionTest) TestGrantRevokeRecordsTheCallingPrincipal() {
 	administrator := setup.SignIn("acme", true)
 	member := setup.SignInMember("acme", "member")
 	engine := test.engine()
-	callers := &CallerService{engineService: engine}
-	calls := &TenantCallService{callerService: callers, engineService: engine}
-	grants := &GrantController{tenantCallService: calls, callerService: callers, engineService: engine}
+	calls := test.tenantCalls(engine)
+	grants := &GrantController{tenantCallService: calls}
 	request := test.request(setup.Credential(administrator))
 	role, _ := (&RoleController{tenantCallService: calls}).PostCreate(request, RoleCreateRequest{
 		TenantID: administrator.TenantID, Name: "reader", Permissions: []RolePermission{{Action: "doc:read", Resource: "file:*"}},
@@ -73,7 +72,7 @@ func (test *ActorAttributionTest) TestRefusedCrossTenantRevokeRecordsNothing() {
 	administrator := setup.SignIn("acme", true)
 	other := setup.SignInMember("globex", "member")
 	engine := test.engine()
-	sessions := &SessionController{callerService: &CallerService{engineService: engine}, engineService: engine}
+	sessions := &SessionController{engineService: engine, tenantCallService: test.tenantCalls(engine)}
 
 	_, err := sessions.PostRevokeByID(test.request(setup.Credential(administrator)), SessionRevokeRequest{SessionID: other.SessionID})
 	test.finish(engine)
@@ -87,10 +86,8 @@ func (test *ActorAttributionTest) TestTenantRecordCallRecordsTheCallingPrincipal
 	defer setup.Remove()
 	administrator := setup.SignIn("acme", true)
 	engine := test.engine()
-	callers := &CallerService{engineService: engine}
 	clients := &OidcClientController{
-		tenantCallService:   &TenantCallService{callerService: callers, engineService: engine},
-		tenantRecordService: &TenantRecordService{callerService: callers, engineService: engine},
+		tenantCallService: test.tenantCalls(engine),
 	}
 	request := test.request(setup.Credential(administrator))
 	registered, _ := clients.PostRegister(request, OidcClientRegisterRequest{
@@ -110,11 +107,9 @@ func (test *ActorAttributionTest) TestCallerCallRecordsTheCallingPrincipal() {
 	defer setup.Remove()
 	member := setup.SignInMember("acme", "member")
 	engine := test.engine()
-	callers := &CallerService{engineService: engine}
 	oidc := &OidcController{
 		engineService:            engine,
-		callerCallService:        &CallerCallService{callerService: callers, engineService: engine},
-		tenantRecordService:      &TenantRecordService{callerService: callers, engineService: engine},
+		tenantCallService:        test.tenantCalls(engine),
 		interactionCookieService: &InteractionCookieService{},
 	}
 	registered := sesame.ClientRegistration{}
@@ -247,13 +242,21 @@ func (test *ActorAttributionTest) finish(engine *EngineService) {
 }
 
 func (test *ActorAttributionTest) principals(engine *EngineService) *PrincipalController {
-	callers := &CallerService{engineService: engine}
 	return &PrincipalController{
-		tenantCallService:      &TenantCallService{callerService: callers, engineService: engine},
-		principalTenantService: &PrincipalTenantService{callerService: callers, engineService: engine},
+		tenantCallService:      test.tenantCalls(engine),
+		principalTenantService: &PrincipalTenantService{tenantCallService: test.tenantCalls(engine)},
 	}
 }
 
 func (test *ActorAttributionTest) engine() *EngineService {
 	return &EngineService{engineSettingsService: &EngineSettingsService{}}
+}
+
+func (test *ActorAttributionTest) tenantCalls(engine *EngineService) *TenantCallService {
+	return &TenantCallService{
+		callerService:        &CallerService{engineService: engine},
+		engineService:        engine,
+		administratorService: &AdministratorService{engineService: engine},
+		recentSignInService:  &RecentSignInService{},
+	}
 }

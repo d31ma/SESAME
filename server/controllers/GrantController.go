@@ -5,8 +5,6 @@ import "net/http"
 // @NeedsAll
 type GrantController struct {
 	tenantCallService *TenantCallService
-	callerService     *CallerService
-	engineService     *EngineService
 }
 
 // @PostRoute("/create")
@@ -20,6 +18,7 @@ func (controller *GrantController) PostCreate(
 		Operation:  "grant.create",
 		Parameters: body,
 		Result:     &result,
+		Privileged: true,
 	})
 	return result, err
 }
@@ -31,14 +30,10 @@ func (controller *GrantController) PostRevoke(
 	body GrantRevokeRequest,
 ) (GrantRevocation, error) {
 	var result GrantRevocation
-	_, err := controller.callerService.Resolve(request)
-	err = controller.revoke(body, &result, err)
+	err := controller.tenantCallService.CallAsAdministrator(request, EngineCall{
+		Operation:  "grant.revoke",
+		Parameters: body,
+		Result:     &result,
+	})
 	return result, err
-}
-
-func (controller *GrantController) revoke(body GrantRevokeRequest, result *GrantRevocation, failure error) error {
-	if failure != nil {
-		return failure
-	}
-	return controller.engineService.Call("grant.revoke", body, result)
 }

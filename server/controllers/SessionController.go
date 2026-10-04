@@ -3,8 +3,8 @@ import "net/http"
 // @RequestRoute("/api/v1/session")
 // @NeedsAll
 type SessionController struct {
-	callerService *CallerService
-	engineService *EngineService
+	engineService     *EngineService
+	tenantCallService *TenantCallService
 }
 
 // @PostRoute("/verify")
@@ -26,8 +26,10 @@ func (controller *SessionController) PostRevoke(
 	body SessionRevokeReason,
 ) (SessionRevocation, error) {
 	var result SessionRevocation
-	caller, err := controller.callerService.Resolve(request)
-	err = controller.send(controller.ownSession(caller, body), &result, err)
+	err := controller.tenantCallService.CallAsCaller(request, func(caller Caller) EngineCall {
+		order := SessionRevokeRequest{SessionID: caller.SessionID, Reason: body.Reason}
+		return EngineCall{Operation: controller.revokeOperation(), Parameters: order, Result: &result}
+	})
 	return result, err
 }
 
@@ -39,18 +41,14 @@ func (controller *SessionController) PostRevokeByID(
 	body SessionRevokeRequest,
 ) (SessionRevocation, error) {
 	var result SessionRevocation
-	_, err := controller.callerService.Resolve(request)
-	err = controller.send(body, &result, err)
+	err := controller.tenantCallService.CallAsAdministrator(request, EngineCall{
+		Operation:  controller.revokeOperation(),
+		Parameters: body,
+		Result:     &result,
+	})
 	return result, err
 }
 
-func (controller *SessionController) ownSession(caller Caller, body SessionRevokeReason) SessionRevokeRequest {
-	return SessionRevokeRequest{SessionID: caller.SessionID, Reason: body.Reason}
-}
-
-func (controller *SessionController) send(order SessionRevokeRequest, result *SessionRevocation, failure error) error {
-	if failure != nil {
-		return failure
-	}
-	return controller.engineService.Call("session.revoke", order, result)
+func (controller *SessionController) revokeOperation() string {
+	return "session.revoke"
 }

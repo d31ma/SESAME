@@ -4,8 +4,7 @@ import "net/http"
 // @SignedIn
 // @NeedsAll
 type AuthorizeController struct {
-	callerService *CallerService
-	engineService *EngineService
+	tenantCallService *TenantCallService
 }
 
 // @PostRoute("/decide")
@@ -14,8 +13,11 @@ func (controller *AuthorizeController) PostDecide(
 	// @FromBody
 	body AuthorizeDecideRequest,
 ) (AuthorizeDecision, error) {
-	caller, failure := controller.callerService.Resolve(request)
-	return controller.decide(controller.sessionDecide(caller, body), failure)
+	var result AuthorizeDecision
+	err := controller.tenantCallService.CallAsCaller(request, func(caller Caller) EngineCall {
+		return EngineCall{Operation: "authorize.decide", Parameters: controller.sessionDecide(caller, body), Result: &result}
+	})
+	return result, err
 }
 
 // @PostRoute("/decide-batch")
@@ -24,26 +26,11 @@ func (controller *AuthorizeController) PostDecideBatch(
 	// @FromBody
 	body AuthorizeDecideBatchRequest,
 ) (AuthorizeDecisions, error) {
-	caller, failure := controller.callerService.Resolve(request)
-	return controller.decideBatch(controller.sessionBatch(caller, body), failure)
-}
-
-func (controller *AuthorizeController) decide(question AuthorizeSessionDecide, failure error) (AuthorizeDecision, error) {
-	if failure != nil {
-		return AuthorizeDecision{}, failure
-	}
-	var result AuthorizeDecision
-	failure = controller.engineService.Call("authorize.decide", question, &result)
-	return result, failure
-}
-
-func (controller *AuthorizeController) decideBatch(batch AuthorizeSessionBatch, failure error) (AuthorizeDecisions, error) {
-	if failure != nil {
-		return AuthorizeDecisions{}, failure
-	}
 	var result AuthorizeDecisions
-	failure = controller.engineService.Call("authorize.decide_batch", batch, &result)
-	return result, failure
+	err := controller.tenantCallService.CallAsCaller(request, func(caller Caller) EngineCall {
+		return EngineCall{Operation: "authorize.decide_batch", Parameters: controller.sessionBatch(caller, body), Result: &result}
+	})
+	return result, err
 }
 
 func (controller *AuthorizeController) sessionDecide(caller Caller, body AuthorizeDecideRequest) AuthorizeSessionDecide {

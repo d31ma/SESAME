@@ -191,13 +191,35 @@ func (test *AuthenticatorControllerTest) TestSessionInsideTheWindowMayChangeAuth
 	Assert.IsTrue(set.PasswordSet)
 }
 
-func (test *AuthenticatorControllerTest) TestAdministratorResetsAMembersPasswordWithAnOlderSession() {
+func (test *AuthenticatorControllerTest) TestAdministratorCredentialChangesNeedARecentSignIn() {
 	setup := SesameTestSetup{}.Provision()
 	defer setup.Remove()
 	administrator := setup.SignIn("acme", true)
 	member := setup.SignInMember("acme", "member")
 	password := rand.Text()
 	controller := test.controllerAfter(11 * time.Minute)
+	request := test.request(setup, administrator)
+
+	_, setErr := controller.PostSetPasswordForPrincipal(request, AuthenticatorSetPasswordRequest{PrincipalID: member.PrincipalID, Password: password})
+	_, removeErr := controller.PostPasskeyRemoveForPrincipal(request, AuthenticatorPasskeyRemoveForPrincipalRequest{PrincipalID: member.PrincipalID, CredentialID: "AAAA"})
+	listed, listErr := controller.PostPasskeyListForPrincipal(request, PrincipalReference{PrincipalID: member.PrincipalID})
+	authn := test.authn(controller)
+	begun, _ := authn.PostBegin(AuthnBeginRequest{TenantID: member.TenantID, IdentifierNamespace: "email", IdentifierValue: "member@acme.test"})
+	login, _ := authn.PostVerifyPassword(AuthnVerifyPasswordRequest{TransactionID: begun.TransactionID, Password: password})
+
+	Assert.IsTrue(test.allAnswer(`{"code":"reauthentication_required"}`, []error{setErr, removeErr}))
+	Assert.IsTrue(listErr == nil)
+	Assert.Equals(0, len(listed.Passkeys))
+	Assert.Equals("", login.Assurance)
+}
+
+func (test *AuthenticatorControllerTest) TestAdministratorResetsAMembersPasswordWithARecentSession() {
+	setup := SesameTestSetup{}.Provision()
+	defer setup.Remove()
+	administrator := setup.SignIn("acme", true)
+	member := setup.SignInMember("acme", "member")
+	password := rand.Text()
+	controller := test.controllerAfter(9 * time.Minute)
 
 	set, err := controller.PostSetPasswordForPrincipal(
 		test.request(setup, administrator),
@@ -338,19 +360,20 @@ func (test *AuthenticatorControllerTest) controller() *AuthenticatorController {
 
 func (test *AuthenticatorControllerTest) controllerAfter(elapsed time.Duration) *AuthenticatorController {
 	engine := test.engine()
+	calls := &TenantCallService{
+		callerService:        &CallerService{engineService: engine},
+		engineService:        engine,
+		administratorService: &AdministratorService{engineService: engine},
+		recentSignInService:  &RecentSignInService{clockShift: elapsed},
+	}
 	return &AuthenticatorController{
-		callerService:       &CallerService{engineService: engine},
-		engineService:       engine,
-		recentSignInService: &RecentSignInService{engineService: engine, clockShift: elapsed},
-		principalTenantService: &PrincipalTenantService{
-			callerService: &CallerService{engineService: engine},
-			engineService: engine,
-		},
+		tenantCallService:      calls,
+		principalTenantService: &PrincipalTenantService{tenantCallService: calls},
 	}
 }
 
 func (test *AuthenticatorControllerTest) authn(controller *AuthenticatorController) *AuthnController {
-	return &AuthnController{engineService: controller.engineService}
+	return &AuthnController{engineService: controller.tenantCallService.engineService}
 }
 
 func (test *AuthenticatorControllerTest) engine() *EngineService {

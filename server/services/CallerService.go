@@ -35,16 +35,16 @@ func (service *CallerService) credential(value string) (SessionCredential, error
 	return SessionCredential{SessionID: sessionID, SessionSecret: secret}, nil
 }
 
-func (service *CallerService) verify(credential SessionCredential, failure error) (VerifiedSession, error) {
+func (service *CallerService) verify(credential SessionCredential, failure error) (Session, error) {
 	if failure != nil {
-		return VerifiedSession{}, failure
+		return Session{}, failure
 	}
-	session := VerifiedSession{}
+	session := Session{}
 	failure = service.engineService.Call("session.verify", credential, &session)
 	return session, failure
 }
 
-func (service *CallerService) caller(credential SessionCredential, session VerifiedSession, failure error) (Caller, error) {
+func (service *CallerService) caller(credential SessionCredential, session Session, failure error) (Caller, error) {
 	if failure != nil {
 		return Caller{}, failure
 	}
@@ -53,6 +53,7 @@ func (service *CallerService) caller(credential SessionCredential, session Verif
 		PrincipalID:   session.PrincipalID,
 		SessionID:     session.SessionID,
 		SessionSecret: credential.SessionSecret,
+		IssuedAt:      session.IssuedAt,
 	}, nil
 }
 

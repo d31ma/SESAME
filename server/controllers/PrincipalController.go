@@ -34,21 +34,26 @@ func (controller *PrincipalController) PostGet(
 	// @FromBody
 	body PrincipalGetRequest,
 ) (Principal, error) {
-	return controller.get(request, body)
+	failure := controller.oneLookupForm(body)
+	lookup := controller.lookupFor(body)
+	return lookup(request, body, failure)
 }
 
-func (controller *PrincipalController) get(request *http.Request, body PrincipalGetRequest) (Principal, error) {
-	if !controller.namesIdentifier(body) {
-		return controller.principalTenantService.Require(request, body.PrincipalID)
+func (controller *PrincipalController) oneLookupForm(body PrincipalGetRequest) error {
+	forms := []bool{body.PrincipalID != "", controller.namesIdentifier(body)}
+	if !slices.Contains(forms, false) {
+		return &host.MixedPrincipalLookupError{}
 	}
-	return controller.getByIdentifier(request, body)
+	return nil
 }
 
-func (controller *PrincipalController) getByIdentifier(request *http.Request, body PrincipalGetRequest) (Principal, error) {
-	if body.PrincipalID != "" {
-		return Principal{}, &host.MixedPrincipalLookupError{}
+func (controller *PrincipalController) lookupFor(
+	body PrincipalGetRequest,
+) func(request *http.Request, body PrincipalGetRequest, failure error) (Principal, error) {
+	if controller.namesIdentifier(body) {
+		return controller.getInTenant
 	}
-	return controller.getInTenant(request, body)
+	return controller.getByID
 }
 
 func (controller *PrincipalController) namesIdentifier(body PrincipalGetRequest) bool {
@@ -56,7 +61,17 @@ func (controller *PrincipalController) namesIdentifier(body PrincipalGetRequest)
 	return slices.Contains(named, true)
 }
 
-func (controller *PrincipalController) getInTenant(request *http.Request, body PrincipalGetRequest) (Principal, error) {
+func (controller *PrincipalController) getByID(request *http.Request, body PrincipalGetRequest, failure error) (Principal, error) {
+	if failure != nil {
+		return Principal{}, failure
+	}
+	return controller.principalTenantService.Require(request, body.PrincipalID)
+}
+
+func (controller *PrincipalController) getInTenant(request *http.Request, body PrincipalGetRequest, failure error) (Principal, error) {
+	if failure != nil {
+		return Principal{}, failure
+	}
 	var result Principal
 	err := controller.tenantCallService.Call(request, body.TenantID, EngineCall{
 		Operation:  "principal.get",
@@ -77,6 +92,7 @@ func (controller *PrincipalController) PostSuspend(
 		Operation:  "principal.suspend",
 		Parameters: body,
 		Result:     &result,
+		Privileged: true,
 	})
 	return result, err
 }

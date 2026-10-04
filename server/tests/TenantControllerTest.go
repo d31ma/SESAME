@@ -56,6 +56,15 @@ func (test *TenantControllerTest) request(credential string) *http.Request {
 
 func (test *TenantControllerTest) controller() *TenantController {
 	engine := &EngineService{engineSettingsService: &EngineSettingsService{}}
-	calls := &TenantCallService{callerService: &CallerService{engineService: engine}, engineService: engine}
+	calls := test.tenantCalls(engine)
 	return &TenantController{tenantCallService: calls}
+}
+
+func (test *TenantControllerTest) tenantCalls(engine *EngineService) *TenantCallService {
+	return &TenantCallService{
+		callerService:        &CallerService{engineService: engine},
+		engineService:        engine,
+		administratorService: &AdministratorService{engineService: engine},
+		recentSignInService:  &RecentSignInService{},
+	}
 }

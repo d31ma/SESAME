@@ -1,7 +1,10 @@
+import "net/http"
+
 // @RequestRoute("/api/v1/system")
 // @NeedsAll
 type SystemController struct {
-	engineService *EngineService
+	engineService     *EngineService
+	tenantCallService *TenantCallService
 }
 
 // @PostRoute("/ping")
@@ -30,8 +33,12 @@ func (controller *SystemController) PostReadiness() (SystemReadiness, error) {
 
 // @PostRoute("/metrics")
 // @Allow(Administrator)
-func (controller *SystemController) PostMetrics() (SystemMetrics, error) {
+func (controller *SystemController) PostMetrics(request *http.Request) (SystemMetrics, error) {
 	var result SystemMetrics
-	err := controller.engineService.Call("system.metrics", struct{}{}, &result)
+	err := controller.tenantCallService.CallAsAdministrator(request, EngineCall{
+		Operation:  "system.metrics",
+		Parameters: struct{}{},
+		Result:     &result,
+	})
 	return result, err
 }

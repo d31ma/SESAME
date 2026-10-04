@@ -2,6 +2,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"time"
 
 	"github.com/d31ma/sesame/server/packages/host"
 	"github.com/d31ma/sesame/server/packages/sesame"
@@ -71,6 +72,30 @@ func (test *GroupControllerTest) TestMemberAddAndRemoveChangeMembership() {
 	Assert.IsTrue(removeFailure == nil)
 	Assert.IsTrue(!removed.Member)
 	Assert.Equals("group_member_not_found", test.code(repeated))
+}
+
+func (test *GroupControllerTest) TestMemberAddNeedsARecentSignInAndMemberRemoveDoesNot() {
+	setup := SesameTestSetup{}.Provision()
+	defer setup.Remove()
+	administrator := setup.SignIn("acme", true)
+	member := setup.SignInMember("acme", "member")
+	other := setup.SignInMember("acme", "other")
+	engine := test.engine()
+	fresh := test.controllerWith(engine, 0)
+	stale := test.controllerWith(engine, 11*time.Minute)
+	request := test.request(setup.Credential(administrator))
+	group, _ := fresh.PostCreate(request, test.creation(administrator.TenantID))
+	_, _ = fresh.PostMemberAdd(request, GroupMemberRequest{GroupID: group.GroupID, PrincipalID: other.PrincipalID})
+
+	added, err := stale.PostMemberAdd(request, GroupMemberRequest{GroupID: group.GroupID, PrincipalID: member.PrincipalID})
+	removed, removeErr := stale.PostMemberRemove(request, GroupMemberRequest{GroupID: group.GroupID, PrincipalID: other.PrincipalID})
+	_, notMember := fresh.PostMemberRemove(request, GroupMemberRequest{GroupID: group.GroupID, PrincipalID: member.PrincipalID})
+
+	Assert.IsTrue(test.reauthenticationRequired(err))
+	Assert.IsTrue(!added.Member)
+	Assert.IsTrue(removeErr == nil)
+	Assert.IsTrue(!removed.Member)
+	Assert.Equals("group_member_not_found", test.code(notMember))
 }
 
 func (test *GroupControllerTest) TestMemberAddRefusesARepeatedMember() {
@@ -168,10 +193,35 @@ func (test *GroupControllerTest) request(credential string) *http.Request {
 }
 
 func (test *GroupControllerTest) controller() *GroupController {
-	engine := &EngineService{engineSettingsService: &EngineSettingsService{}}
-	callers := &CallerService{engineService: engine}
+	return test.controllerWith(test.engine(), 0)
+}
+
+func (test *GroupControllerTest) engine() *EngineService {
+	return &EngineService{engineSettingsService: &EngineSettingsService{}}
+}
+
+func (test *GroupControllerTest) controllerWith(engine *EngineService, elapsed time.Duration) *GroupController {
+	calls := test.tenantCallsAfter(engine, elapsed)
 	return &GroupController{
-		tenantCallService:      &TenantCallService{callerService: callers, engineService: engine},
-		principalTenantService: &PrincipalTenantService{callerService: callers, engineService: engine},
+		tenantCallService:      calls,
+		principalTenantService: &PrincipalTenantService{tenantCallService: calls},
 	}
+}
+
+func (test *GroupControllerTest) tenantCalls(engine *EngineService) *TenantCallService {
+	return test.tenantCallsAfter(engine, 0)
+}
+
+func (test *GroupControllerTest) tenantCallsAfter(engine *EngineService, elapsed time.Duration) *TenantCallService {
+	return &TenantCallService{
+		callerService:        &CallerService{engineService: engine},
+		engineService:        engine,
+		administratorService: &AdministratorService{engineService: engine},
+		recentSignInService:  &RecentSignInService{clockShift: elapsed},
+	}
+}
+
+func (test *GroupControllerTest) reauthenticationRequired(err error) bool {
+	var required *host.ReauthenticationRequiredError
+	return errors.As(err, &required)
 }

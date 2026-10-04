@@ -4,8 +4,7 @@ import "net/http"
 // @NeedsAll
 type OidcController struct {
 	engineService            *EngineService
-	callerCallService        *CallerCallService
-	tenantRecordService      *TenantRecordService
+	tenantCallService        *TenantCallService
 	interactionCookieService *InteractionCookieService
 }
 
@@ -17,7 +16,7 @@ func (controller *OidcController) PostInteractionGet(
 	interaction string,
 ) (result OidcInteraction, err error) {
 	handle := controller.interactionCookieService.Handle(interaction)
-	err = controller.tenantRecordService.Load(request, EngineCall{
+	err = controller.tenantCallService.LoadAsCaller(request, EngineCall{
 		Operation:  "oidc.interaction_get",
 		Parameters: OidcInteractionReference{InteractionID: handle.InteractionID},
 		Result:     &result,
@@ -33,7 +32,7 @@ func (controller *OidcController) PostInteractionComplete(
 	interaction string,
 ) (result OidcAuthorizationCode, err error) {
 	handle := controller.interactionCookieService.Handle(interaction)
-	err = controller.callerCallService.Call(request, controller.completionFor(handle, &result))
+	err = controller.tenantCallService.CallAsCaller(request, controller.completionFor(handle, &result))
 	return
 }
 
@@ -44,7 +43,7 @@ func (controller *OidcController) PostConsentGrant(
 	// @FromBody
 	body OidcConsentGrantRequest,
 ) (result OidcConsent, err error) {
-	err = controller.callerCallService.Call(request, controller.grantFor(body, &result))
+	err = controller.tenantCallService.CallAsCaller(request, controller.grantFor(body, &result))
 	return
 }
 
@@ -55,7 +54,7 @@ func (controller *OidcController) PostConsentGet(
 	// @FromBody
 	body OidcConsentRequest,
 ) (result OidcConsent, err error) {
-	err = controller.callerCallService.Call(request, controller.consentFor("oidc.consent_get", body.ClientID, &result))
+	err = controller.tenantCallService.CallAsCaller(request, controller.consentFor("oidc.consent_get", body.ClientID, &result))
 	return
 }
 
@@ -66,7 +65,7 @@ func (controller *OidcController) PostConsentWithdraw(
 	// @FromBody
 	body OidcConsentRequest,
 ) (result OidcConsentWithdrawn, err error) {
-	err = controller.callerCallService.Call(request, controller.consentFor("oidc.consent_withdraw", body.ClientID, &result))
+	err = controller.tenantCallService.CallAsCaller(request, controller.consentFor("oidc.consent_withdraw", body.ClientID, &result))
 	return
 }
 
@@ -77,7 +76,7 @@ func (controller *OidcController) PostDeviceLookup(
 	// @FromBody
 	body OidcUserCodeRequest,
 ) (result OidcDeviceRequest, err error) {
-	err = controller.callerCallService.Call(request, controller.userCodeFor("oidc.device_lookup", body.UserCode, &result))
+	err = controller.tenantCallService.CallAsCaller(request, controller.userCodeFor("oidc.device_lookup", body.UserCode, &result))
 	return
 }
 
@@ -88,7 +87,7 @@ func (controller *OidcController) PostDeviceApprove(
 	// @FromBody
 	body OidcUserCodeRequest,
 ) (result OidcDeviceRequest, err error) {
-	err = controller.callerCallService.Call(request, controller.approvalFor(body.UserCode, &result))
+	err = controller.tenantCallService.CallAsCaller(request, controller.approvalFor(body.UserCode, &result))
 	return
 }
 
@@ -99,7 +98,7 @@ func (controller *OidcController) PostDeviceDeny(
 	// @FromBody
 	body OidcUserCodeRequest,
 ) (result OidcDeviceDenied, err error) {
-	err = controller.callerCallService.Call(request, controller.userCodeFor("oidc.device_deny", body.UserCode, &result))
+	err = controller.tenantCallService.CallAsCaller(request, controller.userCodeFor("oidc.device_deny", body.UserCode, &result))
 	return
 }
 
@@ -140,7 +139,7 @@ func (controller *OidcController) PostRefreshFamilyGet(
 	// @FromBody
 	body OidcRefreshFamilyReference,
 ) (result OidcRefreshFamily, err error) {
-	err = controller.tenantRecordService.Load(request, controller.familyLookup(body.FamilyID, &result))
+	err = controller.tenantCallService.Load(request, controller.familyLookup(body.FamilyID, &result))
 	return
 }
 
@@ -152,7 +151,7 @@ func (controller *OidcController) PostRefreshFamilyRevoke(
 	body OidcRefreshFamilyRevokeRequest,
 ) (result OidcRefreshFamilyRevoked, err error) {
 	revoke := EngineCall{Operation: "oidc.refresh_family_revoke", Parameters: body, Result: &result}
-	err = controller.tenantRecordService.Call(request, controller.familyLookup(body.FamilyID, &OidcRefreshFamily{}), revoke)
+	err = controller.tenantCallService.CallOwned(request, controller.familyLookup(body.FamilyID, &OidcRefreshFamily{}), revoke)
 	return
 }
 

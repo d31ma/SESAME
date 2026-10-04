@@ -8,6 +8,7 @@ import (
 
 func TestEveryHostErrorNamesItsCode(t *testing.T) {
 	cases := map[string]CodedError{
+		"administrator_required":    &AdministratorRequiredError{},
 		"engine_busy":               &EngineBusyError{},
 		"engine_not_configured":     &EngineNotConfiguredError{},
 		"invalid_request":           &MixedPrincipalLookupError{},

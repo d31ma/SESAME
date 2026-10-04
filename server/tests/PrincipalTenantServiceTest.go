@@ -111,5 +111,14 @@ func (test *PrincipalTenantServiceTest) request(credential string) *http.Request
 
 func (test *PrincipalTenantServiceTest) service() *PrincipalTenantService {
 	engine := &EngineService{engineSettingsService: &EngineSettingsService{}}
-	return &PrincipalTenantService{callerService: &CallerService{engineService: engine}, engineService: engine}
+	return &PrincipalTenantService{tenantCallService: test.tenantCalls(engine)}
+}
+
+func (test *PrincipalTenantServiceTest) tenantCalls(engine *EngineService) *TenantCallService {
+	return &TenantCallService{
+		callerService:        &CallerService{engineService: engine},
+		engineService:        engine,
+		administratorService: &AdministratorService{engineService: engine},
+		recentSignInService:  &RecentSignInService{},
+	}
 }

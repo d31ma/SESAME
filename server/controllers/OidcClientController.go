@@ -4,8 +4,7 @@ import "net/http"
 // @Allow(Administrator)
 // @NeedsAll
 type OidcClientController struct {
-	tenantCallService   *TenantCallService
-	tenantRecordService *TenantRecordService
+	tenantCallService *TenantCallService
 }
 
 // @PostRoute("/register")
@@ -30,7 +29,7 @@ func (controller *OidcClientController) PostGet(
 	body OidcClientReference,
 ) (OidcClient, error) {
 	var result OidcClient
-	err := controller.tenantRecordService.Load(request, controller.lookup(body.ClientID, &result))
+	err := controller.tenantCallService.Load(request, controller.lookup(body.ClientID, &result))
 	return result, err
 }
 
@@ -41,10 +40,11 @@ func (controller *OidcClientController) PostRotateSecret(
 	body OidcClientReference,
 ) (OidcClientSecret, error) {
 	var result OidcClientSecret
-	err := controller.tenantRecordService.Call(request, controller.lookup(body.ClientID, &OidcClient{}), EngineCall{
+	err := controller.tenantCallService.CallOwned(request, controller.lookup(body.ClientID, &OidcClient{}), EngineCall{
 		Operation:  "oidc_client.rotate_secret",
 		Parameters: body,
 		Result:     &result,
+		Privileged: true,
 	})
 	return result, err
 }
@@ -56,7 +56,7 @@ func (controller *OidcClientController) PostDisable(
 	body OidcClientDisableRequest,
 ) (OidcClientDisabled, error) {
 	var result OidcClientDisabled
-	err := controller.tenantRecordService.Call(request, controller.lookup(body.ClientID, &OidcClient{}), EngineCall{
+	err := controller.tenantCallService.CallOwned(request, controller.lookup(body.ClientID, &OidcClient{}), EngineCall{
 		Operation:  "oidc_client.disable",
 		Parameters: body,
 		Result:     &result,

@@ -2,6 +2,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"time"
 
 	"github.com/d31ma/sesame/server/packages/host"
 	"github.com/d31ma/sesame/server/packages/sesame"
@@ -28,6 +29,27 @@ func (test *GrantControllerTest) TestCreateGrantsARoleToAPrincipal() {
 	Assert.Equals(administrator.TenantID, grant.TenantID)
 	Assert.Equals(member.PrincipalID, grant.PrincipalID)
 	Assert.Equals(role.RoleID, grant.RoleID)
+}
+
+func (test *GrantControllerTest) TestCreateNeedsARecentSignInAndRevokeDoesNot() {
+	setup := SesameTestSetup{}.Provision()
+	defer setup.Remove()
+	administrator := setup.SignIn("acme", true)
+	member := setup.SignInMember("acme", "member")
+	engine := test.engine()
+	grants, roles, _ := test.controllersWith(engine, 0)
+	stale, _, _ := test.controllersWith(engine, 11*time.Minute)
+	request := test.request(setup.Credential(administrator))
+	role, _ := roles.PostCreate(request, test.role(administrator.TenantID))
+	grant, _ := grants.PostCreate(request, GrantCreateRequest{TenantID: administrator.TenantID, RoleID: role.RoleID, PrincipalID: member.PrincipalID})
+
+	refused, err := stale.PostCreate(request, GrantCreateRequest{TenantID: administrator.TenantID, RoleID: role.RoleID, GroupID: test.group(engine, request, administrator.TenantID)})
+	revocation, revokeErr := stale.PostRevoke(request, GrantRevokeRequest{GrantID: grant.GrantID})
+
+	Assert.IsTrue(test.reauthenticationRequired(err))
+	Assert.Equals("", refused.GrantID)
+	Assert.IsTrue(revokeErr == nil)
+	Assert.IsTrue(revocation.Revoked)
 }
 
 func (test *GrantControllerTest) TestCreateGrantsARoleToAGroup() {
@@ -232,11 +254,44 @@ func (test *GrantControllerTest) request(credential string) *http.Request {
 }
 
 func (test *GrantControllerTest) controllers() (*GrantController, *RoleController, *GroupController) {
-	engine := &EngineService{engineSettingsService: &EngineSettingsService{}}
-	callers := &CallerService{engineService: engine}
-	calls := &TenantCallService{callerService: callers, engineService: engine}
-	principals := &PrincipalTenantService{callerService: callers, engineService: engine}
+	return test.controllersWith(test.engine(), 0)
+}
+
+func (test *GrantControllerTest) engine() *EngineService {
+	return &EngineService{engineSettingsService: &EngineSettingsService{}}
+}
+
+func (test *GrantControllerTest) group(engine *EngineService, request *http.Request, tenantID string) string {
+	_, _, groups := test.controllersWith(engine, 0)
+	group, _ := groups.PostCreate(request, GroupCreateRequest{TenantID: tenantID, Name: "editors"})
+	return group.GroupID
+}
+
+func (test *GrantControllerTest) controllersWith(
+	engine *EngineService,
+	elapsed time.Duration,
+) (*GrantController, *RoleController, *GroupController) {
+	calls := test.tenantCallsAfter(engine, elapsed)
+	principals := &PrincipalTenantService{tenantCallService: calls}
 	groups := &GroupController{tenantCallService: calls, principalTenantService: principals}
-	grants := &GrantController{tenantCallService: calls, callerService: callers, engineService: engine}
+	grants := &GrantController{tenantCallService: calls}
 	return grants, &RoleController{tenantCallService: calls}, groups
+}
+
+func (test *GrantControllerTest) tenantCalls(engine *EngineService) *TenantCallService {
+	return test.tenantCallsAfter(engine, 0)
+}
+
+func (test *GrantControllerTest) tenantCallsAfter(engine *EngineService, elapsed time.Duration) *TenantCallService {
+	return &TenantCallService{
+		callerService:        &CallerService{engineService: engine},
+		engineService:        engine,
+		administratorService: &AdministratorService{engineService: engine},
+		recentSignInService:  &RecentSignInService{clockShift: elapsed},
+	}
+}
+
+func (test *GrantControllerTest) reauthenticationRequired(err error) bool {
+	var required *host.ReauthenticationRequiredError
+	return errors.As(err, &required)
 }
