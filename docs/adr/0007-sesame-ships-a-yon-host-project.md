@@ -157,10 +157,46 @@ ships, the `sesame` operator CLI remains the command-line interface.
 
 ### Audit
 
-Until the engine accepts actor attribution on machine requests, changes made
-through HTTP are audited as `operator:machine`, like changes made through any
-SDK. Wiring the calling principal into the audit record is a follow-up that
-changes `EngineService` only.
+Every route that acts for a signed-in caller names that caller as the actor
+of its engine requests, so the hash-chained security ledger records
+`principal:<tenant>/<principal>/<session>` instead of `operator:machine`
+(machine protocol RFC 0001, "Actor Attribution").
+
+- **Where the actor comes from.** Only `CallerService.Resolve`, after SESAME
+  has verified the `Sesame-Session` credential with `session.verify`, binds the
+  caller to the invocation's `EngineService` (`ActAs`). No body, query or
+  header field names an actor: a body that adds `actor` is refused with `400`
+  as an undeclared field. Every caller-aware service (`TenantCallService`,
+  `PrincipalTenantService`, `TenantRecordService`, `CallerCallService`) and
+  every controller that resolves the caller itself therefore attributes all
+  of its later engine calls, without passing the actor by hand.
+- **What stays `operator:machine`.** Public routes (`authn/*`,
+  `session/verify`, OIDC protocol endpoints, discovery, JWKS, SCIM with its
+  bearer token, system routes) resolve no caller and send no actor. So do the
+  command-line tools and any SDK use without `sesame.WithActor`.
+  `standards.dispatch` never carries an actor: the Go client drops it there.
+- **Fail closed.** The Go client sends `actor` only to an engine whose
+  `system.version` lists it in `request_fields`. When a caller is bound and the
+  engine does not list it, `EngineService` refuses the call
+  (`sesame.IncompatibleEngineError`, `500`) rather than record the write as
+  `operator:machine`.
+- **Isolation by the engine.** The actor never grants access; the
+  `@Allow(Administrator)` guard and the host's tenant checks stay. It adds one
+  refusal: SESAME answers `actor_tenant_mismatch` (`403`) for any write into
+  another tenant, and for any write aimed at another tenant's record whatever
+  state that record is in, before anything is appended. Two administrator
+  routes rely on it because SESAME cannot report the target's tenant first:
+  `grant/revoke` and `session/revoke-by-id`. Grant and session IDs are random,
+  and an unknown ID answers `404` in every tenant.
+- **Evidence.** `server/tests/ActorAttributionTest.go` performs writes over the
+  controllers, closes the invocation's engine, and reads the actor of each
+  event from the FYLO `sesame-security-events` collection with
+  `fylo sql ... --root <deployment>/fylo-root`.
+- **One invocation, one caller.** A `ty` invocation serves one request, so the
+  bound caller lives exactly as long as that request. A test that drives
+  several requests through one `EngineService` rebinds the caller each time it
+  resolves one, and must close the engine before the next invocation opens
+  the deployment.
 
 ## Tachyon gaps
 
