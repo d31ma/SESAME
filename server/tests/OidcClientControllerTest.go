@@ -3,6 +3,8 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -100,6 +102,27 @@ func (test *OidcClientControllerTest) TestRotateSecretNeedsARecentSignIn() {
 	Assert.Equals("", test.authenticationCode(engine, registered.Client.ClientID, registered.ClientSecret))
 }
 
+func (test *OidcClientControllerTest) TestRegisterNeedsARecentSignIn() {
+	setup := SesameTestSetup{}.Provision()
+	defer setup.Remove()
+	session := setup.SignIn("acme", true)
+	engine := setup.Engine()
+	request := setup.SignedIn(session)
+
+	stale, staleErr := test.controllerAfter(engine, 11*time.Minute).PostRegister(request, test.registration(session.TenantID, "confidential"))
+	registeredWhileStale := test.registrations(setup)
+	fresh, freshErr := test.controller(engine).PostRegister(request, test.registration(session.TenantID, "confidential"))
+
+	Assert.Equals(http.StatusForbidden, setup.Status(staleErr))
+	Assert.IsTrue(setup.ReauthenticationRequired(staleErr))
+	Assert.Equals("", stale.Client.ClientID)
+	Assert.Equals("", stale.ClientSecret)
+	Assert.Equals(0, registeredWhileStale)
+	Assert.IsTrue(freshErr == nil)
+	Assert.IsTrue(fresh.Client.ClientID != "")
+	Assert.Equals(1, test.registrations(setup))
+}
+
 func (test *OidcClientControllerTest) TestDisableStopsTheClient() {
 	setup := SesameTestSetup{}.Provision()
 	defer setup.Remove()
@@ -173,6 +196,17 @@ func (test *OidcClientControllerTest) authenticationCode(engine *EngineService, 
 		"token": "not-a-token", "client_id": clientID, "client_secret": secret,
 	}, &map[string]any{})
 	return SesameTestSetup{}.ProtocolCode(err)
+}
+
+func (test *OidcClientControllerTest) registrations(setup *SesameTestSetup) int {
+	events := filepath.Join(setup.deployment, "fylo-root", ".collections", "sesame-security-events", "docs")
+	count := 0
+	_ = filepath.WalkDir(events, func(path string, entry os.DirEntry, err error) error {
+		data, _ := os.ReadFile(path)
+		count += strings.Count(string(data), "oidc_client.registered")
+		return nil
+	})
+	return count
 }
 
 func (test *OidcClientControllerTest) mismatch(err error) bool {
