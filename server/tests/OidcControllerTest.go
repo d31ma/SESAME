@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -155,6 +156,27 @@ func (test *OidcControllerTest) TestAForgedInteractionCookieIsRefused() {
 	Assert.Equals("", forged.Code)
 	Assert.IsTrue(forgedErr != nil)
 	Assert.IsTrue(garbageErr != nil)
+}
+
+func (test *OidcControllerTest) TestInteractionGetAnswersAWrongOrMissingSecretLikeAnUnknownInteraction() {
+	setup := SesameTestSetup{}.Provision()
+	defer setup.Remove()
+	session := setup.SignIn("acme", true)
+	engine := test.engine()
+	registered := test.register(engine, session.TenantID, "first_party")
+	identifier, _, _ := strings.Cut(test.authorize(engine, registered), ":")
+	controller := test.controller(engine)
+	signedIn := test.request(setup.Credential(session))
+
+	forged, forgedErr := controller.PostInteractionGet(signedIn, identifier+":not-the-secret")
+	bare, bareErr := controller.PostInteractionGet(signedIn, identifier)
+	_, unknownErr := controller.PostInteractionGet(signedIn, "int_00000000000000000000000000000000:not-the-secret")
+
+	Assert.Equals("", forged.ClientID)
+	Assert.Equals("", bare.ClientID)
+	Assert.Equals("interaction_not_found", test.protocolCode(unknownErr))
+	Assert.Equals(test.answer(unknownErr), test.answer(forgedErr))
+	Assert.Equals(test.answer(unknownErr), test.answer(bareErr))
 }
 
 func (test *OidcControllerTest) TestADeviceIsApprovedByTheCallerAndRedeemedAtTheTokenEndpoint() {
@@ -460,6 +482,12 @@ func (test *OidcControllerTest) object(response *http.Response) map[string]any {
 	body, _ := io.ReadAll(response.Body)
 	_ = json.Unmarshal(body, &decoded)
 	return decoded
+}
+
+func (test *OidcControllerTest) answer(err error) string {
+	answer := (&SesameErrorHandler{}).Answer(err)
+	body, _ := io.ReadAll(answer.Body)
+	return fmt.Sprint(answer.StatusCode, " ", string(body))
 }
 
 func (test *OidcControllerTest) protocolCode(err error) string {

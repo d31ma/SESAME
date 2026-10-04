@@ -18,7 +18,7 @@ func (controller *OidcController) PostInteractionGet(
 	handle := controller.interactionCookieService.Handle(interaction)
 	err = controller.tenantCallService.LoadAsCaller(request, EngineCall{
 		Operation:  "oidc.interaction_get",
-		Parameters: OidcInteractionReference{InteractionID: handle.InteractionID},
+		Parameters: handle,
 		Result:     &result,
 	})
 	return
