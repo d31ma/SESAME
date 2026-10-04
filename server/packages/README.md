@@ -44,13 +44,13 @@ routing, and middleware.
 ## Installing
 
 ```bash
-go get github.com/d31ma/sesame/server/packages@v<version>
+go get github.com/d31ma/sesame/server/packages@<commit>
 ```
 
 Go is the one SESAME client not distributed as a file to copy. It is its own
-module, `github.com/d31ma/sesame/server/packages`, tagged
-`server/packages/v<version>` next to each release tag. The module uses the Go
-standard library only, so importing it adds nothing else to your module graph.
+module, `github.com/d31ma/sesame/server/packages`, and Go resolves it at a
+commit as a pseudo-version. The module uses the Go standard library only, so
+importing it adds nothing else to your module graph.
 Earlier releases published it as `github.com/d31ma/sesame/clients/go/sesame`;
 change that import path when you upgrade.
 [docs/SDK_DISTRIBUTION.md](../../docs/SDK_DISTRIBUTION.md) covers verification

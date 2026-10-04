@@ -163,7 +163,7 @@ compiled binaries in CI, so a divergence fails the language that drifted.
 
 | Language | Client | Runtime dependencies | File to copy |
 | --- | --- | --- | --- |
-| Go | [`clients/go`](clients/go/README.md) | none (stdlib) | none — `go get` at the tag |
+| Go | [`server/packages`](server/packages/README.md) | none (stdlib) | none — `go get github.com/d31ma/sesame/server/packages@<commit>` |
 | Node/TS | [`clients/node`](clients/node/README.md) | none (stdlib) | `node/sesame.mjs` |
 | Python | [`clients/python`](clients/python/README.md) | none (stdlib) | `python/sesame.py` |
 | Rust | [`clients/rust`](clients/rust/README.md) | none (std) | `rust/sesame.rs` |

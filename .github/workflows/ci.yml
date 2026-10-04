@@ -88,7 +88,8 @@ jobs:
           python-version: "3.12"
 
       - name: Run Go SDK contract corpus
-        run: go test -count=1 -run TestSDKContractScenario ./clients/go/sesame
+        working-directory: server/packages
+        run: go test -count=1 -run TestSDKContractScenario ./sesame
 
       - name: Run Node SDK contract corpus
         working-directory: clients/node
