@@ -10,9 +10,7 @@ func (controller *AuthnController) PostBegin(
 	// @FromBody
 	body AuthnBeginRequest,
 ) (AuthnTransaction, error) {
-	var result AuthnTransaction
-	err := controller.engineService.Call("authn.begin", body, &result)
-	return result, err
+	return controller.advance("authn.begin", body)
 }
 
 // @PostRoute("/verify-password")
@@ -20,9 +18,7 @@ func (controller *AuthnController) PostVerifyPassword(
 	// @FromBody
 	body AuthnVerifyPasswordRequest,
 ) (AuthnTransaction, error) {
-	var result AuthnTransaction
-	err := controller.engineService.Call("authn.verify_password", body, &result)
-	return result, err
+	return controller.advance("authn.verify_password", body)
 }
 
 // @PostRoute("/verify-totp")
@@ -30,9 +26,7 @@ func (controller *AuthnController) PostVerifyTotp(
 	// @FromBody
 	body AuthnCodeRequest,
 ) (AuthnTransaction, error) {
-	var result AuthnTransaction
-	err := controller.engineService.Call("authn.verify_totp", body, &result)
-	return result, err
+	return controller.advance("authn.verify_totp", body)
 }
 
 // @PostRoute("/verify-recovery-code")
@@ -40,9 +34,7 @@ func (controller *AuthnController) PostVerifyRecoveryCode(
 	// @FromBody
 	body AuthnCodeRequest,
 ) (AuthnTransaction, error) {
-	var result AuthnTransaction
-	err := controller.engineService.Call("authn.verify_recovery_code", body, &result)
-	return result, err
+	return controller.advance("authn.verify_recovery_code", body)
 }
 
 // @PostRoute("/passkey-options")
@@ -60,9 +52,7 @@ func (controller *AuthnController) PostVerifyPasskey(
 	// @FromBody
 	body AuthnVerifyPasskeyRequest,
 ) (AuthnTransaction, error) {
-	var result AuthnTransaction
-	err := controller.engineService.Call("authn.verify_passkey", body, &result)
-	return result, err
+	return controller.advance("authn.verify_passkey", body)
 }
 
 // @PostRoute("/complete")
@@ -72,5 +62,11 @@ func (controller *AuthnController) PostComplete(
 ) (AuthnIssuedSession, error) {
 	var result AuthnIssuedSession
 	err := controller.engineService.Call("authn.complete", body, &result)
+	return result, err
+}
+
+func (controller *AuthnController) advance(operation string, parameters any) (AuthnTransaction, error) {
+	var result AuthnTransaction
+	err := controller.engineService.Call(operation, parameters, &result)
 	return result, err
 }

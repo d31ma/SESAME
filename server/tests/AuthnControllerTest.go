@@ -75,9 +75,7 @@ func (test *AuthnControllerTest) TestTransactionClosesAfterItsAttemptsAreSpent()
 	controller := test.controller()
 	begun, _ := controller.PostBegin(login)
 	wrong := test.password(begun, password+"-wrong")
-	for attempt := 0; attempt < begun.AttemptsLeft; attempt++ {
-		controller.PostVerifyPassword(wrong)
-	}
+	test.spendAttempts(controller, wrong, begun.AttemptsLeft)
 
 	_, err := controller.PostVerifyPassword(test.password(begun, password))
 
@@ -178,10 +176,10 @@ func (test *AuthnControllerTest) TestPasskeyOptionsCarryAChallengeForEveryTransa
 
 	Assert.IsTrue(err == nil)
 	Assert.IsTrue(options.Challenge != "")
-	Assert.Equals(0, len(options.CredentialIDs))
+	Assert.Equals(0, len(options.CredentialIdentifiers))
 }
 
-func (test *AuthnControllerTest) TestUnknownPasskeyAssertionIsRejected() {
+func (test *AuthnControllerTest) TestUnknownPasskeyAssertionSpendsAnAttempt() {
 	setup := SesameTestSetup{}.Provision()
 	defer setup.Remove()
 	login, _ := test.login(setup, "acme")
@@ -196,8 +194,9 @@ func (test *AuthnControllerTest) TestUnknownPasskeyAssertionIsRejected() {
 		Signature:         "AAAA",
 	})
 
-	Assert.Equals(http.StatusBadRequest, test.status(err))
+	Assert.IsTrue(err == nil)
 	Assert.Equals("", verified.Assurance)
+	Assert.Equals(begun.AttemptsLeft-1, verified.AttemptsLeft)
 }
 
 func (test *AuthnControllerTest) login(setup *SesameTestSetup, tenantName string) (AuthnBeginRequest, string) {
@@ -226,6 +225,12 @@ func (test *AuthnControllerTest) check(err error) {
 
 func (test *AuthnControllerTest) password(transaction AuthnTransaction, password string) AuthnVerifyPasswordRequest {
 	return AuthnVerifyPasswordRequest{TransactionID: transaction.TransactionID, Password: password}
+}
+
+func (test *AuthnControllerTest) spendAttempts(controller *AuthnController, wrong AuthnVerifyPasswordRequest, attempts int) {
+	for range attempts {
+		controller.PostVerifyPassword(wrong)
+	}
 }
 
 func (test *AuthnControllerTest) status(err error) int {
