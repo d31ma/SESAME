@@ -140,7 +140,8 @@ class SesameTransportHelper {
     }
 
     private function status(array $headers): int {
-        $matched = preg_match(self::STATUS_PATTERN, (string) ($headers[0] ?? ''), $parts) === 1;
+        $statusLines = preg_grep(self::STATUS_PATTERN, $headers);
+        $matched = preg_match(self::STATUS_PATTERN, (string) end($statusLines), $parts) === 1;
         $status = $matched ? (int) $parts[1] : 0;
         if (!$matched || ($status >= self::FIRST_REDIRECT_STATUS && $status < self::FIRST_OTHER_STATUS)) {
             throw new RuntimeException($matched ? self::REDIRECT_RULE : self::NETWORK_RULE);
