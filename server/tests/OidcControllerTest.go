@@ -188,17 +188,13 @@ func (test *OidcControllerTest) TestAMalformedInteractionCookieAnswersLikeAnUnkn
 	identifier, secret, _ := strings.Cut(test.authorize(engine, registered), ":")
 	controller := test.controller(engine)
 	signedIn := test.request(setup.Credential(session))
-	unknown := test.unknownInteraction(secret)
-	_, unknownGetErr := controller.PostInteractionGet(signedIn, unknown)
-	_, unknownCompleteErr := controller.PostInteractionComplete(signedIn, unknown)
+	malformed := []string{"", "garbage", identifier + "%3A" + secret, identifier[1:] + ":" + secret}
 
-	for _, cookie := range []string{"", "garbage", identifier + "%3A" + secret, identifier[1:] + ":" + secret} {
-		_, getErr := controller.PostInteractionGet(signedIn, cookie)
-		_, completeErr := controller.PostInteractionComplete(signedIn, cookie)
-		Assert.Equals(test.answer(unknownGetErr), test.answer(getErr))
-		Assert.Equals(test.answer(unknownCompleteErr), test.answer(completeErr))
-	}
-	Assert.Equals("404 {\"code\":\"interaction_not_found\"}", test.answer(unknownGetErr))
+	unknown := test.interactionAnswers(controller, signedIn, []string{test.unknownInteraction(secret)})
+	answers := test.interactionAnswers(controller, signedIn, malformed)
+
+	Assert.Equals("404 {\"code\":\"interaction_not_found\"} 404 {\"code\":\"interaction_not_found\"}\n", unknown)
+	Assert.Equals(strings.Repeat(unknown, len(malformed)), answers)
 }
 
 func (test *OidcControllerTest) TestADeviceIsApprovedByTheCallerAndRedeemedAtTheTokenEndpoint() {
@@ -498,6 +494,16 @@ func (test *OidcControllerTest) object(response *http.Response) map[string]any {
 	body, _ := io.ReadAll(response.Body)
 	_ = json.Unmarshal(body, &decoded)
 	return decoded
+}
+
+func (test *OidcControllerTest) interactionAnswers(controller *OidcController, request *http.Request, cookies []string) string {
+	answers := ""
+	for _, cookie := range cookies {
+		_, getErr := controller.PostInteractionGet(request, cookie)
+		_, completeErr := controller.PostInteractionComplete(request, cookie)
+		answers += test.answer(getErr) + " " + test.answer(completeErr) + "\n"
+	}
+	return answers
 }
 
 func (test *OidcControllerTest) unknownInteraction(secret string) string {
