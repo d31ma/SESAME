@@ -1,0 +1,12 @@
+#[HTTPClient({"path":"{{.Family.Path}}","adapter":"sesame","setup":"SesameSetup"})]
+trait {{.Family.ClassName}} {
+{{- range $index, $method := .Family.Methods}}
+{{- if $index}}
+{{end}}
+    #[{{$method.Verb.Pascal}}Request("{{$method.Path}}")]
+    fn {{if eq $method.Words.Camel "suspend"}}suspend_{{$.Family.Words.Snake}}{{else}}{{$method.Words.Snake}}{{end}}(&self
+{{- if $method.Header}}, #[RequestHeader("{{$method.Header}}")] {{$method.HeaderParameter.Snake}}: BehaviorValue{{end}}
+{{- if $method.HasBody}}, #[RequestBody] body: BehaviorValue{{end -}}
+    ) -> BehaviorResult<BehaviorValue>;
+{{- end}}
+}

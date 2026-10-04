@@ -21,6 +21,9 @@ const (
 	remoteSessionHeader     = "Sesame-Session"
 	remoteBearerHeader      = "Authorization"
 	remoteProvisioningRoute = "/api/v1/scim/"
+	remoteSameHostLanguage  = "rust"
+	remoteSameHostNotice    = "**Same-host / development only:"
+	remoteSameHostRule      = "sesame.origin must be http on localhost, 127.0.0.1 or [::1]: this Rust transport has no TLS"
 )
 
 var (
@@ -84,6 +87,27 @@ func TestRemoteLanguagesAreTheTemplateFolders(t *testing.T) {
 		if _, err := os.Stat(readme); err != nil {
 			t.Errorf("remotes/%s needs a %s: %v", language, remoteReadme, err)
 		}
+	}
+}
+
+func TestTheRustRemotesStaySameHostOnly(t *testing.T) {
+	t.Parallel()
+
+	_, root := loadManifest(t)
+	folder := filepath.Join(root, remotesDirectory, remoteSameHostLanguage)
+	readme, err := os.ReadFile(filepath.Join(folder, remoteReadme))
+	if err != nil {
+		t.Fatalf("read the Rust remotes README: %v", err)
+	}
+	if !strings.HasPrefix(strings.SplitN(string(readme), "\n\n", 3)[1], remoteSameHostNotice) {
+		t.Errorf("remotes/%s/%s must open with %q", remoteSameHostLanguage, remoteReadme, remoteSameHostNotice)
+	}
+	helper, err := os.ReadFile(filepath.Join(folder, "server", "helpers", "SesameTransportHelper.rs"))
+	if err != nil {
+		t.Fatalf("read the Rust transport helper: %v", err)
+	}
+	if !strings.Contains(string(helper), remoteSameHostRule) || strings.Contains(string(helper), "https://") {
+		t.Errorf("the Rust transport helper must refuse every origin except loopback http")
 	}
 }
 
