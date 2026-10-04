@@ -55,8 +55,14 @@ holds, for each language, one `@HTTPClient` contract per route family
 `SesameTransportHelper`, which owns SESAME's HTTPS origin (`sesame.origin`).
 Each language's README covers copying them in, `outgoing.hosts`, the
 authentication headers and the `{"status", "body"}` answer:
-[Go](../remotes/go/README.md) and [TypeScript](../remotes/typescript/README.md).
-The other former SDK languages follow as template sets.
+[Go](../remotes/go/README.md), [TypeScript](../remotes/typescript/README.md),
+[Python](../remotes/python/README.md), [Java](../remotes/java/README.md),
+[Kotlin](../remotes/kotlin/README.md), [C#](../remotes/csharp/README.md),
+[PHP](../remotes/php/README.md), [Ruby](../remotes/ruby/README.md) and
+[Dart](../remotes/dart/README.md). [Rust](../remotes/rust/README.md) is
+same-host / development only: Rust Yon handlers have no TLS-capable HTTP
+dependency at Tachyon a7ccbfff, so its transport accepts only a loopback `http`
+origin. It is not a production-supported client.
 
 `go run ./tools/remotes/generate` writes them from
 `api/machine/v1/operations.json` and the templates in

@@ -172,6 +172,7 @@ values and apply the returned instructions.
 | Surface | For | Start here |
 | --- | --- | --- |
 | HTTP through the Yon host | any language | [docs/YON.md](docs/YON.md) |
+| Tachyon remotes | Tachyon Yon applications in Go, TypeScript, Python, Java, Kotlin, C#, PHP, Ruby or Dart (Rust: same-host only) | copy `remotes/<language>/server/` — [docs/SDK_DISTRIBUTION.md](docs/SDK_DISTRIBUTION.md#sdk-clients-tachyon-remotes) |
 | Go package | Go hosts that start the engine themselves | [`app/server/packages`](app/server/packages/README.md) — `go get github.com/d31ma/sesame/app/server/packages@<commit>` |
 | Machine protocol | anything that spawns `sesame exec --loop` | [api/machine/v1](api/machine/v1/README.md) |
 
@@ -265,8 +266,10 @@ internal/
   platform/                 deployment, CLI, logging, and build metadata
 api/machine/v1/             the canonical operation manifest and reference
 api/standards/v1/           the framework-neutral public-route contract
+remotes/<language>/         generated Tachyon remotes (SDK clients) for Yon applications
+tools/remotes/              the remotes generator and its per-language templates
 app/                        the Yon project root (package.json, .env.example), passed to ty
-app/server/                 the Yon host: controllers, services, models, roles, tests
+app/server/                 the Yon host: controllers, services, helpers, utils, models, roles, tests
 app/server/packages/        the Go package (engine transport) and host errors
 test/                       contract, adversarial, and real-FYLO evidence
 docs/                       ADRs, RFCs, operations, and security guidance

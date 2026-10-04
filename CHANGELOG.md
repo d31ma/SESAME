@@ -64,6 +64,28 @@ and releases use UTC-derived CalVer in `YY.WW.DD` form.
 
 ### Added
 
+- **SDK clients are generated Tachyon remotes.** `remotes/<language>/server/`
+  holds one `@HTTPClient` contract per HTTP route family, a `SesameSetup` and a
+  `SesameTransportHelper` for Go, TypeScript, Python, Java, Kotlin, C#, PHP,
+  Ruby and Dart: HTTPS origin from `sesame.origin` (plain http only on
+  loopback), Tachyon's egress guard, no redirects, the request deadline, 1 MiB
+  answers, and `{"status","body"}` answers so callers see SESAME's status.
+  `remotes/rust` is same-host / development only (Rust Yon handlers have no
+  TLS-capable HTTP dependency at Tachyon a7ccbfff; every non-loopback origin is
+  refused before connecting). `go run ./tools/remotes/generate` regenerates
+  them from `api/machine/v1/operations.json`; `test/contract/remotes_test.go`
+  fails when they drift from the routes. Standard endpoints covered: discovery
+  and JWKS only (form-encoded and cookie-bound endpoints cannot be remotes).
+  Python controllers that use them must import `time`, `urllib.parse` and
+  `urllib.request`; in Java, Kotlin and Rust `principal.suspend` is
+  `suspendPrincipal` / `suspend_principal`.
+- **Layered Yon host.** `app/server` is organized as controllers (bind, one
+  service call, return), services (every authorization, tenant-isolation and
+  privileged-operation decision; one privileged-operation table in
+  `RecentSignInService`), helpers (`EngineHelper`, `EngineSettingsHelper`) and
+  utils. `app/server/stores` is intentionally empty: the `sesame` engine stays
+  SESAME's only FYLO store (single writer, hash-chained ledger). No route,
+  guard, request or response shape, status or error code changed.
 - **SESAME ships a Yon host project**
   ([ADR 0007](docs/adr/0007-sesame-ships-a-yon-host-project.md),
   [docs/YON.md](docs/YON.md)). The repository root is a Tachyon Yon project:
