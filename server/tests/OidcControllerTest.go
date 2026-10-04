@@ -170,13 +170,35 @@ func (test *OidcControllerTest) TestInteractionGetAnswersAWrongOrMissingSecretLi
 
 	forged, forgedErr := controller.PostInteractionGet(signedIn, identifier+":not-the-secret")
 	bare, bareErr := controller.PostInteractionGet(signedIn, identifier)
-	_, unknownErr := controller.PostInteractionGet(signedIn, "int_00000000000000000000000000000000:not-the-secret")
+	_, unknownErr := controller.PostInteractionGet(signedIn, test.unknownInteraction("not-the-secret"))
 
 	Assert.Equals("", forged.ClientID)
 	Assert.Equals("", bare.ClientID)
 	Assert.Equals("interaction_not_found", setup.ProtocolCode(unknownErr))
 	Assert.Equals(test.answer(unknownErr), test.answer(forgedErr))
 	Assert.Equals(test.answer(unknownErr), test.answer(bareErr))
+}
+
+func (test *OidcControllerTest) TestAMalformedInteractionCookieAnswersLikeAnUnknownInteraction() {
+	setup := SesameTestSetup{}.Provision()
+	defer setup.Remove()
+	session := setup.SignIn("acme", true)
+	engine := test.engine()
+	registered := test.register(engine, session.TenantID, "first_party")
+	identifier, secret, _ := strings.Cut(test.authorize(engine, registered), ":")
+	controller := test.controller(engine)
+	signedIn := test.request(setup.Credential(session))
+	unknown := test.unknownInteraction(secret)
+	_, unknownGetErr := controller.PostInteractionGet(signedIn, unknown)
+	_, unknownCompleteErr := controller.PostInteractionComplete(signedIn, unknown)
+
+	for _, cookie := range []string{"", "garbage", identifier + "%3A" + secret, identifier[1:] + ":" + secret} {
+		_, getErr := controller.PostInteractionGet(signedIn, cookie)
+		_, completeErr := controller.PostInteractionComplete(signedIn, cookie)
+		Assert.Equals(test.answer(unknownGetErr), test.answer(getErr))
+		Assert.Equals(test.answer(unknownCompleteErr), test.answer(completeErr))
+	}
+	Assert.Equals("404 {\"code\":\"interaction_not_found\"}", test.answer(unknownGetErr))
 }
 
 func (test *OidcControllerTest) TestADeviceIsApprovedByTheCallerAndRedeemedAtTheTokenEndpoint() {
@@ -476,6 +498,10 @@ func (test *OidcControllerTest) object(response *http.Response) map[string]any {
 	body, _ := io.ReadAll(response.Body)
 	_ = json.Unmarshal(body, &decoded)
 	return decoded
+}
+
+func (test *OidcControllerTest) unknownInteraction(secret string) string {
+	return "int_00000000000000000000000000000000:" + secret
 }
 
 func (test *OidcControllerTest) answer(err error) string {
