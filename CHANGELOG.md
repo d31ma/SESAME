@@ -123,7 +123,11 @@ and releases use UTC-derived CalVer in `YY.WW.DD` form.
   `scim/client-{register,rotate-token,disable}` for tenant administrators and
   `scim/{user,group}-*` authenticated by `Authorization: Bearer`.
   `federation.login_exchange` is never routed: its answer carries the
-  provider's client secret and the PKCE verifier.
+  provider's client secret and the PKCE verifier. OpenID Connect federated
+  login does not work through `ty serve`: provider configuration lives only in
+  the engine's memory and each request starts a new engine, so `login-start`
+  answers `409 provider_not_configured`. Use a host that keeps one engine
+  running (the Go package or `sesame exec --loop`) for OIDC federation.
 - Optional `actor` attribution on machine-protocol v1 requests: a host names
   the calling principal (`tenant_id`, `principal_id`, `session_id`); the engine
   checks the session is live and belongs to that principal and tenant, refuses

@@ -262,8 +262,15 @@ drives SESAME directly and performs the token request itself, as
 [ADR 0004](../adr/0004-federation-egress-boundary.md) describes: the Go package
 `github.com/d31ma/sesame/server/packages/sesame` (`FederatedLoginExchange`),
 the machine protocol (`sesame exec --loop`), or `sesame federation
-login-exchange`. Through the Yon host alone, an operator can register,
-configure and disable providers and start a login, but cannot finish one.
+login-exchange`. Through the Yon host alone, an operator can register and
+disable providers, but an OpenID Connect federated login does not work at all:
+the engine keeps validated provider configuration only in memory
+([docs/FEDERATION.md](../FEDERATION.md), "Validated metadata is not
+snapshotted"), and `ty serve` starts a new engine for every request. So
+`provider-configure` answers `200`, and the next `login-start` answers
+`409 provider_not_configured`. Configure providers and run OpenID Connect
+federated logins through a host that keeps one engine running: the Go package
+or `sesame exec --loop`.
 
 A future design can route the whole callback: a public route that runs
 `login_exchange`, sends the token request from the Yon host with the egress
