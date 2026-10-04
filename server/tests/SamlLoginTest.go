@@ -159,7 +159,7 @@ func (test *SamlLoginTest) TestLoginCompleteDoesNotFindAnotherTenantsLogin() {
 
 func (test *SamlLoginTest) controller() *SamlController {
 	engine := &EngineService{engineSettingsService: &EngineSettingsService{}}
-	calls := &TenantCallService{callerService: &CallerService{engineService: engine}, engineService: engine}
+	calls := &TenantCallService{callerService: &CallerService{engineService: engine}, engineService: engine, administratorService: &AdministratorService{engineService: engine}, recentSignInService: &RecentSignInService{}}
 	return &SamlController{engineService: engine, tenantCallService: calls}
 }
 

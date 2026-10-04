@@ -178,7 +178,7 @@ func (test *FederationControllerTest) TestNoRouteAnswersATokenRequest() {
 
 func (test *FederationControllerTest) controller() *FederationController {
 	engine := &EngineService{engineSettingsService: &EngineSettingsService{}}
-	calls := &TenantCallService{callerService: &CallerService{engineService: engine}, engineService: engine}
+	calls := &TenantCallService{callerService: &CallerService{engineService: engine}, engineService: engine, administratorService: &AdministratorService{engineService: engine}, recentSignInService: &RecentSignInService{}}
 	return &FederationController{engineService: engine, tenantCallService: calls}
 }
 

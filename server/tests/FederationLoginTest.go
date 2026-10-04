@@ -124,7 +124,7 @@ func (test *FederationLoginTest) TestLoginCompleteDoesNotFindAnotherTenantsLogin
 
 func (test *FederationLoginTest) controller() *FederationController {
 	engine := &EngineService{engineSettingsService: &EngineSettingsService{}}
-	calls := &TenantCallService{callerService: &CallerService{engineService: engine}, engineService: engine}
+	calls := &TenantCallService{callerService: &CallerService{engineService: engine}, engineService: engine, administratorService: &AdministratorService{engineService: engine}, recentSignInService: &RecentSignInService{}}
 	return &FederationController{engineService: engine, tenantCallService: calls}
 }
 

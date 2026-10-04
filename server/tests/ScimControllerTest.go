@@ -130,7 +130,7 @@ func (test *ScimControllerTest) TestClientOfAnotherTenantIsNotFoundInTheCallersT
 
 func (test *ScimControllerTest) controller() *ScimController {
 	engine := &EngineService{engineSettingsService: &EngineSettingsService{}}
-	calls := &TenantCallService{callerService: &CallerService{engineService: engine}, engineService: engine}
+	calls := &TenantCallService{callerService: &CallerService{engineService: engine}, engineService: engine, administratorService: &AdministratorService{engineService: engine}, recentSignInService: &RecentSignInService{}}
 	return &ScimController{engineService: engine, tenantCallService: calls}
 }
 
