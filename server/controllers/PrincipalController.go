@@ -1,0 +1,70 @@
+import "net/http"
+
+// @RequestRoute("/api/v1/principal")
+// @Allow(Administrator)
+// @NeedsAll
+type PrincipalController struct {
+	tenantCallService      *TenantCallService
+	principalTenantService *PrincipalTenantService
+	engineService          *EngineService
+}
+
+// @PostRoute("/create")
+func (controller *PrincipalController) PostCreate(
+	request *http.Request,
+	// @FromBody
+	body PrincipalCreateRequest,
+) (Principal, error) {
+	var result Principal
+	err := controller.tenantCallService.Call(request, body.TenantID, EngineCall{
+		Operation:  "principal.create",
+		Parameters: body,
+		Result:     &result,
+	})
+	return result, err
+}
+
+// @PostRoute("/get")
+func (controller *PrincipalController) PostGet(
+	request *http.Request,
+	// @FromBody
+	body PrincipalGetRequest,
+) (Principal, error) {
+	return controller.get(request, body)
+}
+
+func (controller *PrincipalController) get(request *http.Request, body PrincipalGetRequest) (Principal, error) {
+	if body.TenantID == "" {
+		return controller.principalTenantService.Require(request, body.PrincipalID)
+	}
+	return controller.getInTenant(request, body)
+}
+
+func (controller *PrincipalController) getInTenant(request *http.Request, body PrincipalGetRequest) (Principal, error) {
+	var result Principal
+	err := controller.tenantCallService.Call(request, body.TenantID, EngineCall{
+		Operation:  "principal.get",
+		Parameters: body,
+		Result:     &result,
+	})
+	return result, err
+}
+
+// @PostRoute("/suspend")
+func (controller *PrincipalController) PostSuspend(
+	request *http.Request,
+	// @FromBody
+	body PrincipalReference,
+) (Principal, error) {
+	_, failure := controller.principalTenantService.Require(request, body.PrincipalID)
+	return controller.suspend(body, failure)
+}
+
+func (controller *PrincipalController) suspend(body PrincipalReference, failure error) (Principal, error) {
+	if failure != nil {
+		return Principal{}, failure
+	}
+	var result Principal
+	failure = controller.engineService.Call("principal.suspend", body, &result)
+	return result, failure
+}
