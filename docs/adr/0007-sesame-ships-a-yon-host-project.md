@@ -353,11 +353,11 @@ proposed fixes, in a draft Tachyon feature request that has not been filed.
 24. `GET /api.json` publishes every model, including internal ones such as
     `EngineCall`, `EngineSettings`, `ApplicationSnapshot` and
     `SecurityEventActor`.
-25. `ty serve` starts `ty` again by name from `PATH`. A `PATH` that puts a
-    directory holding an older `ty` first (for example the directory that
-    holds `fylo` and `chex`) runs that `ty` instead, which fails with
-    `TY1002`. Operators put a directory holding only `fylo` and `chex` on
-    `PATH`.
+25. `ty serve`, started by name, looks `ty` up on `PATH` again. A `PATH`
+    that puts a directory holding an older `ty` first (for example the
+    directory that holds `fylo` and `chex`) runs that `ty` instead, which
+    fails with `TY1002`. Operators start `ty` by its absolute path or put a
+    directory holding only `fylo` and `chex` on `PATH`.
 
 ## Test seams
 

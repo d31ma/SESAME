@@ -25,9 +25,10 @@ records why it works this way.
   starts with. A handler inherits that `PATH` and nothing else, so an engine
   that cannot find `chex` refuses to start
   (`FYLO runtime identity mismatch for dependencies.chex.available`). Put a
-  directory that holds only `fylo` and `chex` on that `PATH`: `ty serve`
-  starts `ty` again by name, so a directory that also holds another `ty`
-  makes the server run that one instead.
+  directory that holds only `fylo` and `chex` on that `PATH`: `ty serve`,
+  started by name, looks `ty` up on `PATH` again, so a directory that also
+  holds another `ty` makes the server run that one instead (starting `ty` by
+  its absolute path avoids it).
 - A reverse proxy in front of `ty` that terminates TLS and limits request
   rates. It is not optional; see [Reverse proxy](#reverse-proxy-required).
 - A Unix host; the Yon host is developed and tested on macOS. It has not
