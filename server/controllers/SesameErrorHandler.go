@@ -108,7 +108,7 @@ func (handler *SesameErrorHandler) badRequestCodes() []string {
 		"assertion_rejected", "saml_assertion_rejected", "provider_document_rejected",
 		"federated_login_expired", "dpop_proof_invalid", "dpop_proof_not_bound", "dpop_proof_expired",
 		"dpop_proof_replayed", "dpop_key_mismatch", "dpop_foreign_origin", "dpop_required",
-		"authorization_pending", "slow_down", "scim_unsupported",
+		"authorization_pending", "slow_down", "scim_unsupported", "redirect_not_allowed",
 	}
 }
 

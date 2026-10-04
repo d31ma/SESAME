@@ -151,7 +151,7 @@ func (test *FederationControllerTest) TestProviderOfAnotherTenantIsNotFoundInThe
 }
 
 func (test *FederationControllerTest) TestProviderDisableStopsNewLogins() {
-	setup := SesameTestSetup{}.Provision()
+	setup := test.provision()
 	defer setup.Remove()
 	session := setup.SignIn("acme", true)
 	controller := test.controller()
@@ -177,9 +177,18 @@ func (test *FederationControllerTest) TestNoRouteAnswersATokenRequest() {
 }
 
 func (test *FederationControllerTest) controller() *FederationController {
-	engine := &EngineService{engineSettingsService: &EngineSettingsService{}}
-	calls := &TenantCallService{callerService: &CallerService{engineService: engine}, engineService: engine, administratorService: &AdministratorService{engineService: engine}, recentSignInService: &RecentSignInService{}}
-	return &FederationController{engineService: engine, tenantCallService: calls}
+	settings := &EngineSettingsService{}
+	engine := &EngineService{engineSettingsService: settings}
+	return &FederationController{
+		engineService:         engine,
+		engineSettingsService: settings,
+		tenantCallService: &TenantCallService{
+			callerService:        &CallerService{engineService: engine},
+			engineService:        engine,
+			administratorService: &AdministratorService{engineService: engine},
+			recentSignInService:  &RecentSignInService{},
+		},
+	}
 }
 
 func (test *FederationControllerTest) request(setup *SesameTestSetup, session sesame.IssuedSession) *http.Request {
@@ -257,7 +266,7 @@ func (test *FederationControllerTest) startRequest(tenantID string, providerID s
 	return FederationLoginStartRequest{
 		TenantID:    tenantID,
 		ProviderID:  providerID,
-		RedirectURI: "https://app.example/federation/callback",
+		RedirectURI: test.redirectURI(),
 	}
 }
 
@@ -377,4 +386,19 @@ func (test *FederationControllerTest) check(err error) {
 	if err != nil {
 		panic(err)
 	}
+}
+
+func (test *FederationControllerTest) provision() *SesameTestSetup {
+	setup := SesameTestSetup{}.Provision()
+	setup.UseSettings(map[string]any{
+		"binary":                 setup.binary,
+		"deployment":             setup.deployment,
+		"waitmilliseconds":       2000,
+		"federationredirecturis": []string{test.redirectURI()},
+	})
+	return setup
+}
+
+func (test *FederationControllerTest) redirectURI() string {
+	return "https://app.example/federation/callback"
 }

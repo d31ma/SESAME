@@ -76,8 +76,15 @@ func (test *ScimGroupTest) TestGroupDeprovisionRemovesEveryMemberAndKeepsTheGrou
 
 func (test *ScimGroupTest) controller() *ScimController {
 	engine := &EngineService{engineSettingsService: &EngineSettingsService{}}
-	calls := &TenantCallService{callerService: &CallerService{engineService: engine}, engineService: engine, administratorService: &AdministratorService{engineService: engine}, recentSignInService: &RecentSignInService{}}
-	return &ScimController{engineService: engine, tenantCallService: calls}
+	return &ScimController{
+		engineService: engine,
+		tenantCallService: &TenantCallService{
+			callerService:        &CallerService{engineService: engine},
+			engineService:        engine,
+			administratorService: &AdministratorService{engineService: engine},
+			recentSignInService:  &RecentSignInService{},
+		},
+	}
 }
 
 func (test *ScimGroupTest) administrator(setup *SesameTestSetup, session sesame.IssuedSession) *http.Request {

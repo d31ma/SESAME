@@ -22,7 +22,9 @@
     ]
   },
   "sesame": {
-    "waitmilliseconds": 5000
+    "waitmilliseconds": 5000,
+    "samlconsumerurls": [],
+    "federationredirecturis": []
   },
   "duplication": {
     "check": false

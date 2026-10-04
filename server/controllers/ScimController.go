@@ -22,6 +22,7 @@ func (controller *ScimController) PostClientRegister(
 		Operation:  "scim.client_register",
 		Parameters: body,
 		Result:     &result,
+		Privileged: true,
 	})
 	return result, err
 }
@@ -38,6 +39,7 @@ func (controller *ScimController) PostClientRotateToken(
 		Operation:  "scim.client_rotate_token",
 		Parameters: body,
 		Result:     &result,
+		Privileged: true,
 	})
 	return result, err
 }

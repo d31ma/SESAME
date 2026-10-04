@@ -24,7 +24,7 @@ type FederationLoginTest struct {
 }
 
 func (test *FederationLoginTest) TestLoginStartAnswersOnlyWhatABrowserRedirectNeeds() {
-	setup := SesameTestSetup{}.Provision()
+	setup := test.provision()
 	defer setup.Remove()
 	session := setup.SignIn("acme", true)
 	controller := test.controller()
@@ -42,7 +42,7 @@ func (test *FederationLoginTest) TestLoginStartAnswersOnlyWhatABrowserRedirectNe
 }
 
 func (test *FederationLoginTest) TestLoginCompleteIssuesAFederatedSession() {
-	setup := SesameTestSetup{}.Provision()
+	setup := test.provision()
 	defer setup.Remove()
 	session := setup.SignIn("acme", true)
 	controller := test.controller()
@@ -61,7 +61,7 @@ func (test *FederationLoginTest) TestLoginCompleteIssuesAFederatedSession() {
 }
 
 func (test *FederationLoginTest) TestLoginCompleteRefusesAReplayedLogin() {
-	setup := SesameTestSetup{}.Provision()
+	setup := test.provision()
 	defer setup.Remove()
 	session := setup.SignIn("acme", true)
 	controller := test.controller()
@@ -80,7 +80,7 @@ func (test *FederationLoginTest) TestLoginCompleteRefusesAReplayedLogin() {
 }
 
 func (test *FederationLoginTest) TestLoginCompleteRejectsATokenForAnotherLogin() {
-	setup := SesameTestSetup{}.Provision()
+	setup := test.provision()
 	defer setup.Remove()
 	session := setup.SignIn("acme", true)
 	controller := test.controller()
@@ -95,7 +95,7 @@ func (test *FederationLoginTest) TestLoginCompleteRejectsATokenForAnotherLogin()
 }
 
 func (test *FederationLoginTest) TestLoginCompleteRejectsATokenSignedByAnotherKey() {
-	setup := SesameTestSetup{}.Provision()
+	setup := test.provision()
 	defer setup.Remove()
 	session := setup.SignIn("acme", true)
 	controller := test.controller()
@@ -108,7 +108,7 @@ func (test *FederationLoginTest) TestLoginCompleteRejectsATokenSignedByAnotherKe
 }
 
 func (test *FederationLoginTest) TestLoginCompleteDoesNotFindAnotherTenantsLogin() {
-	setup := SesameTestSetup{}.Provision()
+	setup := test.provision()
 	defer setup.Remove()
 	session := setup.SignIn("acme", true)
 	other := setup.SignIn("globex", true)
@@ -123,9 +123,18 @@ func (test *FederationLoginTest) TestLoginCompleteDoesNotFindAnotherTenantsLogin
 }
 
 func (test *FederationLoginTest) controller() *FederationController {
-	engine := &EngineService{engineSettingsService: &EngineSettingsService{}}
-	calls := &TenantCallService{callerService: &CallerService{engineService: engine}, engineService: engine, administratorService: &AdministratorService{engineService: engine}, recentSignInService: &RecentSignInService{}}
-	return &FederationController{engineService: engine, tenantCallService: calls}
+	settings := &EngineSettingsService{}
+	engine := &EngineService{engineSettingsService: settings}
+	return &FederationController{
+		engineService:         engine,
+		engineSettingsService: settings,
+		tenantCallService: &TenantCallService{
+			callerService:        &CallerService{engineService: engine},
+			engineService:        engine,
+			administratorService: &AdministratorService{engineService: engine},
+			recentSignInService:  &RecentSignInService{},
+		},
+	}
 }
 
 func (test *FederationLoginTest) request(setup *SesameTestSetup, session sesame.IssuedSession) *http.Request {
@@ -190,7 +199,7 @@ func (test *FederationLoginTest) startRequest(tenantID string, providerID string
 	return FederationLoginStartRequest{
 		TenantID:    tenantID,
 		ProviderID:  providerID,
-		RedirectURI: "https://app.example/federation/callback",
+		RedirectURI: test.redirectURI(),
 	}
 }
 
@@ -346,4 +355,19 @@ func (test *FederationLoginTest) check(err error) {
 	if err != nil {
 		panic(err)
 	}
+}
+
+func (test *FederationLoginTest) provision() *SesameTestSetup {
+	setup := SesameTestSetup{}.Provision()
+	setup.UseSettings(map[string]any{
+		"binary":                 setup.binary,
+		"deployment":             setup.deployment,
+		"waitmilliseconds":       2000,
+		"federationredirecturis": []string{test.redirectURI()},
+	})
+	return setup
+}
+
+func (test *FederationLoginTest) redirectURI() string {
+	return "https://app.example/federation/callback"
 }

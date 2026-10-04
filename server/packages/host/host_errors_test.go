@@ -14,6 +14,7 @@ func TestEveryHostErrorNamesItsCode(t *testing.T) {
 		"invalid_request":           &MixedPrincipalLookupError{},
 		"passkey_not_found":         &PasskeyNotFoundError{},
 		"reauthentication_required": &ReauthenticationRequiredError{},
+		"redirect_not_allowed":      &RedirectNotAllowedError{},
 		"session_rejected":          &SessionRejectedError{},
 		"tenant_mismatch":           &TenantMismatchError{},
 	}

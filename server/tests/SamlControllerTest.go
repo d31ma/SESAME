@@ -111,7 +111,7 @@ func (test *SamlControllerTest) TestProviderOfAnotherTenantIsNotFoundInTheCaller
 }
 
 func (test *SamlControllerTest) TestProviderDisableStopsNewLogins() {
-	setup := SesameTestSetup{}.Provision()
+	setup := test.provision()
 	defer setup.Remove()
 	session := setup.SignIn("acme", true)
 	controller := test.controller()
@@ -131,9 +131,18 @@ func (test *SamlControllerTest) TestProviderDisableStopsNewLogins() {
 }
 
 func (test *SamlControllerTest) controller() *SamlController {
-	engine := &EngineService{engineSettingsService: &EngineSettingsService{}}
-	calls := &TenantCallService{callerService: &CallerService{engineService: engine}, engineService: engine, administratorService: &AdministratorService{engineService: engine}, recentSignInService: &RecentSignInService{}}
-	return &SamlController{engineService: engine, tenantCallService: calls}
+	settings := &EngineSettingsService{}
+	engine := &EngineService{engineSettingsService: settings}
+	return &SamlController{
+		engineService:         engine,
+		engineSettingsService: settings,
+		tenantCallService: &TenantCallService{
+			callerService:        &CallerService{engineService: engine},
+			engineService:        engine,
+			administratorService: &AdministratorService{engineService: engine},
+			recentSignInService:  &RecentSignInService{},
+		},
+	}
 }
 
 func (test *SamlControllerTest) request(setup *SesameTestSetup, session sesame.IssuedSession) *http.Request {
@@ -211,4 +220,15 @@ func (test *SamlControllerTest) check(err error) {
 	if err != nil {
 		panic(err)
 	}
+}
+
+func (test *SamlControllerTest) provision() *SesameTestSetup {
+	setup := SesameTestSetup{}.Provision()
+	setup.UseSettings(map[string]any{
+		"binary":           setup.binary,
+		"deployment":       setup.deployment,
+		"waitmilliseconds": 2000,
+		"samlconsumerurls": []string{test.consumerURL()},
+	})
+	return setup
 }

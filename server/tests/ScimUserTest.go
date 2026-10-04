@@ -82,8 +82,15 @@ func (test *ScimUserTest) TestUserDeprovisionDeactivatesTheUser() {
 
 func (test *ScimUserTest) controller() *ScimController {
 	engine := &EngineService{engineSettingsService: &EngineSettingsService{}}
-	calls := &TenantCallService{callerService: &CallerService{engineService: engine}, engineService: engine, administratorService: &AdministratorService{engineService: engine}, recentSignInService: &RecentSignInService{}}
-	return &ScimController{engineService: engine, tenantCallService: calls}
+	return &ScimController{
+		engineService: engine,
+		tenantCallService: &TenantCallService{
+			callerService:        &CallerService{engineService: engine},
+			engineService:        engine,
+			administratorService: &AdministratorService{engineService: engine},
+			recentSignInService:  &RecentSignInService{},
+		},
+	}
 }
 
 func (test *ScimUserTest) administrator(setup *SesameTestSetup, session sesame.IssuedSession) *http.Request {

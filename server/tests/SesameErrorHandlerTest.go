@@ -37,6 +37,13 @@ func (test *SesameErrorHandlerTest) TestTenantMismatchAnswersForbidden() {
 	Assert.Equals("tenant_mismatch", test.code(response))
 }
 
+func (test *SesameErrorHandlerTest) TestRedirectOffTheAllowlistAnswersBadRequest() {
+	response := test.answer(&host.RedirectNotAllowedError{})
+
+	Assert.Equals(http.StatusBadRequest, response.StatusCode)
+	Assert.Equals("redirect_not_allowed", test.code(response))
+}
+
 func (test *SesameErrorHandlerTest) TestUnusableSettingsAnswerAnInternalError() {
 	response := test.answer(&host.EngineNotConfiguredError{})
 
