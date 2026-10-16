@@ -1,9 +1,18 @@
 ---
 dropins:
-  - /Users/iyor/Library/CloudStorage/Dropbox/INSTRUCTIONS.md
+  - /Volumes/ANNEX/Users/iyor/Library/CloudStorage/Google Drive/INSTRUCTIONS.md
 ---
 
-# SESAME Agent Orchestration
+# SESAME Project Instructions
+
+## Shared Instructions
+
+Before any project work, read and follow the canonical Google Drive root
+instructions: `/Volumes/ANNEX/Users/iyor/Library/CloudStorage/Google Drive/INSTRUCTIONS.md`.
+The same file resolves from this repository as `../../../INSTRUCTIONS.md`.
+Its workflow, personas, engineering standards, validation, and safety rules
+apply here. The project rules below add to them; an explicit repository-local
+override takes precedence where stated.
 
 ## Project
 
@@ -12,8 +21,9 @@ SESAME is an open-source authentication and authorization service backed by
 in the same product category as authentik while using FYLO documents as its
 durable data model.
 
-The repository is at the foundation stage. The planned product is a headless Go
-engine and CLI released as native executables, with thin language SDK shims.
+The current README identifies SESAME as a developer-preview headless Go
+engine and CLI with thin language SDK shims. Read the current README, ADRs,
+and tests for implemented capabilities and remaining support gates.
 No UI is currently in scope. Do not infer that a protocol, platform, deployment
 topology, SDK, or feature is supported merely because it is listed as a target
 here. A capability is supported only when its implementation, native-platform
@@ -23,7 +33,7 @@ applicable conformance tests exist.
 ## Inheritance
 
 All agents inherit the workflow, personas, feedback loops, and engineering rules
-from `/Users/iyor/Library/CloudStorage/Dropbox/INSTRUCTIONS.md`.
+from `/Volumes/ANNEX/Users/iyor/Library/CloudStorage/Google Drive/INSTRUCTIONS.md`.
 
 Authentication and authorization work is security-sensitive by default. Begin
 new product work with the shared Senior Product Manager and Principal Software
@@ -103,7 +113,8 @@ or public APIs.
   Conflict and precedence behavior must be explicit, deterministic, and tested.
 - Treat revocation, disablement, credential removal, tenant suspension, and
   privilege reduction as security-critical writes. Define and test the maximum
-  propagation delay for every cache or replica.
+  propagation delay for every cache or replica. Revocation and privilege
+  reduction must survive restart.
 - Never log passwords, recovery codes, private keys, bearer tokens, session
   secrets, authorization codes, or raw sensitive authenticator material.
 - Store passwords only with a current password-hashing construction and explicit
@@ -125,14 +136,16 @@ or public APIs.
 
 ## FYLO Persistence Rules
 
-- FYLO documents are the durable source of truth. FYLO indexes, in-memory caches,
+- FYLO is an architectural commitment, not an interchangeable store. FYLO
+  documents are the durable source of truth. FYLO indexes, in-memory caches,
   search projections, and policy compilations are derived accelerators and must
   be safely rebuildable.
 - Model tenant ownership explicitly on every tenant-bound document. Never rely
   only on a caller-supplied filter for isolation.
 - Security decisions must use a consistent snapshot of all relevant identity,
-  session, grant, policy, and revocation state. Use durable transactions for
-  multi-document invariants; do not simulate atomicity with uncoordinated writes.
+  session, grant, policy, and revocation state. Use the supported FYLO
+  transaction and snapshot contract for multi-document invariants; do not
+  simulate atomicity with uncoordinated writes.
 - Uniqueness constraints such as normalized login identifiers must be
   race-safe. A preflight query followed by an unrelated write is insufficient.
 - Persist schema and policy versions. Migrations must be resumable, observable,
