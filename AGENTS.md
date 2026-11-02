@@ -1,6 +1,6 @@
 ---
 dropins:
-  - /Users/iyor/Library/CloudStorage/Dropbox/INSTRUCTIONS.md
+  - ~/.claude/CLAUDE.md
 ---
 
 # SESAME Agent Orchestration
@@ -23,7 +23,7 @@ applicable conformance tests exist.
 ## Inheritance
 
 All agents inherit the workflow, personas, feedback loops, and engineering rules
-from `/Users/iyor/Library/CloudStorage/Dropbox/INSTRUCTIONS.md`.
+from `~/.claude/CLAUDE.md`.
 
 Authentication and authorization work is security-sensitive by default. Begin
 new product work with the shared Senior Product Manager and Principal Software

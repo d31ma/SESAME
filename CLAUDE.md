@@ -1,6 +1,6 @@
 ---
 dropins:
-  - /Users/iyor/Library/CloudStorage/Dropbox/INSTRUCTIONS.md
+  - ~/.claude/CLAUDE.md
 ---
 
 # SESAME Project Context
@@ -30,7 +30,7 @@ applicable conformance tests prove it.
 ## Inheritance and Operating Role
 
 Inherit the complete workflow and engineering rules from
-`/Users/iyor/Library/CloudStorage/Dropbox/INSTRUCTIONS.md`.
+`~/.claude/CLAUDE.md`.
 
 Also follow `AGENTS.md`, which defines SESAME's specialist routing, vocabulary,
 security invariants, FYLO rules, protocol rules, validation expectations, and
