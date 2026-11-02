@@ -132,8 +132,8 @@ The initial Go gate should include:
 - generated-contract drift check;
 - secret scanning.
 
-The canonical local commands are documented in `CONTRIBUTING.md`, `AGENTS.md`,
-and `CLAUDE.md`. CI is authoritative for pinned static-analysis and
+The canonical local commands are documented in `CONTRIBUTING.md` and
+`CLAUDE.md`. CI is authoritative for pinned static-analysis and
 vulnerability-tool versions.
 
 Add linters only when each rule is understood and accepted. A huge inherited

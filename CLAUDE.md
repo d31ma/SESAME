@@ -32,14 +32,14 @@ applicable conformance tests prove it.
 Inherit the complete workflow and engineering rules from
 `~/.claude/CLAUDE.md`.
 
-Also follow `AGENTS.md`, which defines SESAME's specialist routing, vocabulary,
-security invariants, FYLO rules, protocol rules, validation expectations, and
-working conventions.
+Authentication and authorization work is security-sensitive by default. Begin
+new product work with the shared Senior Product Manager and Principal Software
+Architect phases.
 
 Operate across these specialties as the task demands:
 
 - **Identity Lifecycle Engineer** for principals, authenticators, groups,
-  enrollment, recovery, provisioning, suspension, and deprovisioning.
+  enrollment, recovery, provisioning (SCIM), suspension, and deprovisioning.
 - **Authentication Protocol Engineer** for sessions, MFA/passkeys, OAuth 2.x,
   OpenID Connect, SAML, token lifecycle, federation, and conformance.
 - **Authorization Systems Engineer** for roles, permissions, policies,
@@ -48,6 +48,10 @@ Operate across these specialties as the task demands:
   credentials, abuse resistance, privileged access, and incident response.
 - **FYLO Persistence Engineer** for document models, transactions, migrations,
   indexes, consistency, backup, restore, and recovery.
+
+For changes spanning specialties, the Identity Platform Engineer coordinates the
+work and keeps one end-to-end security model. Do not let protocol, policy, and
+persistence decisions evolve independently.
 
 Security Architect review is mandatory for changes involving identity data,
 credentials, authenticators, sessions, tokens, grants, policy, tenant
@@ -78,10 +82,14 @@ Use domain terms deliberately:
 - A **resource** is the protected object and an **action** is the requested
   operation.
 - A **policy** is a versioned rule contributing to a **decision**.
+- A **decision** is allow or deny for a principal, action, resource, and
+  contextual inputs at a specific time.
 - A **tenant** is the strongest logical isolation boundary in a shared
   deployment.
 
-Resolve ambiguity before committing names to public APIs or stored documents.
+Do not use `user`, `account`, `identity`, `principal`, `client`, and `session`
+interchangeably. Resolve ambiguity before committing names to public APIs or
+stored documents.
 
 ## Guiding Principles
 
@@ -90,7 +98,8 @@ Resolve ambiguity before committing names to public APIs or stored documents.
 - **Default deny**: access requires a current, applicable allow. Conflict and
   precedence semantics must be explicit and deterministic.
 - **Tenant isolation everywhere**: tenant scope belongs in documents, queries,
-  caches, events, logs, protocol state, and decision inputs.
+  caches, events, logs, protocol state, and decision inputs. Cross-tenant
+  access requires an explicit, audited system capability.
 - **Revocation is durable**: disablement, credential removal, session
   invalidation, tenant suspension, and privilege reduction must survive restart
   and have a defined maximum propagation delay.
@@ -104,7 +113,8 @@ Resolve ambiguity before committing names to public APIs or stored documents.
   actor, tenant, action, target, outcome, reason, and correlation context without
   exposing secrets.
 - **Self-hosting is first-class**: the default system must work without a hidden
-  proprietary cloud dependency.
+  proprietary cloud dependency. Optional hosted services must be separable and
+  documented.
 - **Honest support claims**: standards and platform support require conformance,
   adversarial tests, documentation, and operable failure handling.
 
@@ -117,10 +127,15 @@ Resolve ambiguity before committing names to public APIs or stored documents.
   below caller-controlled query construction.
 - Use durable transactions for multi-document security invariants and a
   consistent snapshot for decisions spanning identity, session, grant, policy,
-  and revocation state.
-- Make normalized login uniqueness and similar constraints race-safe.
+  and revocation state. Never simulate atomicity with uncoordinated writes.
+- Make normalized login uniqueness and similar constraints race-safe. A
+  preflight query followed by an unrelated write is insufficient.
 - Version schemas and policies. Make migrations resumable, observable,
-  backward-aware, and safe to retry.
+  backward-aware, and safe to retry, and test them against representative prior
+  data.
+- Define retention separately for operational identity data, soft-deleted data,
+  and audit data. Reconcile privacy erasure and security retention requirements
+  explicitly.
 - Keep signing keys, encryption keys, and deployment credentials outside normal
   documents unless a reviewed encrypted-envelope design explicitly requires
   otherwise.
@@ -148,14 +163,18 @@ Resolve ambiguity before committing names to public APIs or stored documents.
 - Require explicit algorithm allowlists, issuer and audience validation, bounded
   lifetimes, deliberate signing-key rotation, and safe clock-skew handling.
 - Require exact redirect matching, state/nonce validation where applicable,
-  PKCE for public clients, and single-use short-lived codes in OAuth/OIDC-style
-  flows.
+  PKCE for public clients, single-use short-lived codes, and explicit client
+  authentication in OAuth/OIDC-style flows.
 - Treat assertions, claims, headers, discovery documents, remote keys, and
   provisioning data as untrusted.
 - Protect outbound federation and connector traffic from SSRF, unsafe redirects,
   oversized responses, unsafe parsing, and attacker-controlled key selection.
 - Ensure recovery and privileged administration are at least as resistant to
-  takeover as the authentication they replace or manage.
+  takeover as the authentication they replace or manage. Privileged operations
+  require reauthentication or step-up authentication where appropriate.
+- Version and attribute policy changes. Test deny behavior, conflicting
+  policies, inheritance, missing attributes, stale caches, and deletion or
+  suspension.
 
 ## Architecture and Delivery
 
@@ -163,8 +182,11 @@ Resolve ambiguity before committing names to public APIs or stored documents.
   future UI clients, FYLO transport, SDK code, and protocol serialization.
 - Put authenticator verification, token operations, and policy evaluation behind
   small, auditable interfaces.
-- Use explicit, persisted state machines when a security flow must survive a
-  restart.
+- Use explicit state machines for login, enrollment, recovery, federation,
+  device authorization, and provisioning flows. Persist the transitions that
+  must survive a restart.
+- Enforce policy at the resource boundary. A centralized decision service does
+  not remove the need for correctly placed enforcement points.
 - Represent authorization requests with principal, tenant, action, resource, and
   contextual inputs. Return stable reasons suitable for audit and diagnosis
   without disclosing sensitive policy internals.
@@ -176,7 +198,8 @@ Resolve ambiguity before committing names to public APIs or stored documents.
 - Keep the dependency and supply-chain surface small, maintained, reproducible,
   and auditable.
 - Keep SESAME headless. A future UI must remain an external client of the same
-  versioned public contracts.
+  versioned public contracts; it cannot import internal packages or gain a
+  privileged bypass.
 - Keep SDK shims thin and dependency-light. They may own transport, local
   process lifecycle, timeouts, cancellation, pagination, safe retries, and
   typed error mapping; they must never own authentication or authorization
@@ -187,10 +210,11 @@ Resolve ambiguity before committing names to public APIs or stored documents.
 - Preserve standard OAuth/OIDC wire behavior at the host's HTTP boundary through
   bounded framework adapters; keep protocol decisions in the SESAME binary.
 - Treat NDJSON, future standards-dispatch schemas, and stable error codes as
-  public compatibility boundaries. Test every SDK against a real SESAME release
-  binary.
+  public compatibility boundaries. Version and test them independently from
+  internal packages. Test every SDK against a real SESAME release binary.
 - Until a coordination design is accepted, one host application process owns
-  one SESAME subprocess and one authoritative FYLO root.
+  one SESAME subprocess and one authoritative FYLO root. Reject competing owners
+  rather than weakening single-writer safety.
 - Cross-compilation is not platform support. Require native packaging, crash,
   restore, upgrade, and interoperability evidence for every support claim.
 - Follow `docs/ENGINEERING_STANDARDS.md` for repository structure, names, and
@@ -220,13 +244,35 @@ SESAME_FYLO_INTEGRATION=1 SESAME_FYLO_PROFILE=full \
   go test -count=1 ./test/fylo
 ```
 
+Run the smallest relevant package test before the complete gate. Do not copy
+commands from FYLO or TACHYON.
+
 Tests must exercise public behavior and cover malformed, replayed, expired,
 revoked, cross-tenant, concurrent, restart, rotation, recovery, and stale-cache
 cases as applicable. Add protocol conformance suites, deterministic
 authorization tests, audit-completeness tests, and FYLO transaction/recovery
-tests before making production support claims.
+tests before making production support claims. Every supported
+operating-system/architecture pair needs native packaging, process-signal,
+filesystem-semantics, and upgrade/rollback tests, and every supported SDK runs
+the same API and error corpus against a real SESAME executable.
 
-Never weaken or skip a security test to make a build pass. Update documentation
-when protocols, configuration, deployment assumptions, data handling, or
-security behavior changes. Run `graphify update .` after project changes when a
-graph exists.
+Never weaken, skip, or quarantine a security test to make a build pass. Update
+documentation when protocols, configuration, deployment assumptions, data
+handling, or security behavior changes. Run `graphify update .` after project
+changes when a graph exists.
+
+## Working Rules
+
+- Read this file, the shared instructions, current ADRs, and project context
+  before changing architecture or security behavior.
+- Preserve public API and stored-data compatibility unless a reviewed migration
+  intentionally changes them.
+- Pin release and CI inputs where reproducibility or supply-chain integrity
+  depends on them.
+- Do not create generic `utils`, `helpers`, `common`, or `manager` dumping
+  grounds.
+- Treat example configurations and development defaults as public attack
+  surfaces. Ship secure defaults with no universal credentials or sample
+  secrets.
+- Security fixes receive regression tests and a clear disclosure and release
+  plan.
