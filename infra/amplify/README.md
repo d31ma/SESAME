@@ -27,5 +27,11 @@ check. To roll back or redeploy, dispatch `Site Deploy` with a released
 version and target `production`. See `docs/RELEASE_ENGINEERING.md`
 ("Website").
 
-`d31ma/PaaS` is taking over this app (`dgt8kb065o3d1`), its headers, rewrite
-rules and domain. Once PaaS owns it, this template and this folder are removed.
+This template stays the owner of the app (`dgt8kb065o3d1`), its `production`
+branch, its rewrite rules and the `sesame.del.ma` domain (the owner's choice
+on 2026-11-11). `d31ma/PaaS` owns only the deploy role
+`sesame-site-deploy-production` and the Floci staging copy. When you change
+the rewrite rules here, also update `infra/sesame/amplify/custom-rules.json`
+in `d31ma/PaaS`, which staging mirrors. Never delete the stack
+`sesame-amplify-hosting`: its resources have no `Retain` policy, so a delete
+would delete the live site.

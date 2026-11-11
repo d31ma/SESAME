@@ -55,8 +55,10 @@ during a release or recovery.
 ## Website
 
 Production (`sesame.del.ma`) is an Amplify Hosting app (`dgt8kb065o3d1`,
-`ca-central-1`, branch `production`). Its headers, rewrite rules and domain
-belong to `d31ma/PaaS`. Staging (`staging.sesame.del.ma`) is hosted on Floci
+`ca-central-1`, branch `production`). The app, its rewrite rules and its
+domain belong to this repository's CloudFormation template
+(`infra/amplify/hosting.yaml`, stack `sesame-amplify-hosting`); the deploy role
+and the Floci staging copy belong to `d31ma/PaaS`. Staging (`staging.sesame.del.ma`) is hosted on Floci
 on kestrel and is reachable only on the tailnet and the CITADEL LAN.
 
 `Release` builds the website once per tag, in its own job with read-only
