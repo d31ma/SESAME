@@ -25,8 +25,9 @@ watches `client/` and rebuilds on change.
 bun run bundle
 ```
 
-Prerendered output lands in `dist/web/`. Deploy that directory as static
-files.
+Prerendered output lands in `dist/web/`. Releases build it, package it as
+`sesame-site-<version>.zip`, and deploy it to sesame.del.ma through the
+`Site Deploy` workflow; see `docs/RELEASE_ENGINEERING.md` ("Website").
 
 ## Layout
 

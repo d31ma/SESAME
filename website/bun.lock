@@ -10,6 +10,6 @@
     },
   },
   "packages": {
-    "@d31ma/tachyon": ["@d31ma/tachyon@github:d31ma/Tachyon#ef61b35", {}, "d31ma-Tachyon-ef61b35", "sha512-mJatqXrgGETAN6zvZLgHAOXa4mXA4FfJjEV/Q45GXYib0vMyHMnDoVXr2+Sj+ejPLN0q09hHf0ZUYoZ2qPzJpQ=="],
+    "@d31ma/tachyon": ["@d31ma/tachyon@github:d31ma/Tachyon#ef61b35", {}, "d31ma-TACHYON-ef61b35", "sha512-cBWojw+azy9NsUQu6o4L5EHeFLyoGngXNkaZoAC4YQKBBKTsBU6LWXrHgQ1kh1dSnmhZ3jRrVJwx7dYD7GfVFQ=="],
   }
 }

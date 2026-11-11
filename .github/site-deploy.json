@@ -1,0 +1,14 @@
+{
+  "appId": "dgt8kb065o3d1",
+  "region": "ca-central-1",
+  "branch": "production",
+  "domain": "sesame.del.ma",
+  "role": "arn:aws:iam::117469679339:role/sesame-site-deploy-production",
+  "requiredHeaders": {},
+  "probes": [
+    { "path": "/", "contains": "Identity your application owns", "contentTypes": ["text/html"] },
+    { "path": "/docs/", "contains": "<title>Docs", "contentTypes": ["text/html"] },
+    { "path": "/download/", "contains": "<title>Download", "contentTypes": ["text/html"] },
+    { "path": "/shared/assets/site.css", "contains": "--lift-border", "contentTypes": ["text/css"] }
+  ]
+}

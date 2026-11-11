@@ -5,6 +5,22 @@ All notable changes to SESAME will be documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and releases use UTC-derived CalVer in `YY.WW.DD` form.
 
+## [Unreleased]
+
+### Added
+
+- Each release builds the website once and attaches `sesame-site-<version>.zip`
+  (with `site-version.json` at its root) and its `.sha256`, attested by the
+  `Release` workflow. The new `Site Deploy` workflow deploys that zip to the
+  Amplify production site after kestrel's Floci staging check passes for the
+  same zip, probes it, and rolls back on a failed probe. See
+  `docs/RELEASE_ENGINEERING.md` ("Website").
+
+### Fixed
+
+- The website lockfile names the renamed `d31ma/TACHYON` tarball and its
+  current integrity hash, so `bun install --frozen-lockfile` works again.
+
 ## [26.33.02] - 2026-08-11
 
 ### Added

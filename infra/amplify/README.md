@@ -18,41 +18,14 @@ aws cloudformation deploy \
     CostCenter=DELMA ManagedBy=CloudFormation
 ```
 
-## Package and deploy the website
+## Deploy the website
 
-The zip must contain `index.html` at its root, not a parent `web` directory:
+Do not deploy the website by hand. Each release attaches
+`sesame-site-<version>.zip` to its GitHub release, and the `Site Deploy`
+workflow deploys it to the `production` branch after kestrel's Floci staging
+check. To roll back or redeploy, dispatch `Site Deploy` with a released
+version and target `production`. See `docs/RELEASE_ENGINEERING.md`
+("Website").
 
-```bash
-app_id="$(aws cloudformation describe-stacks \
-  --region ca-central-1 \
-  --stack-name sesame-amplify-hosting \
-  --query 'Stacks[0].Outputs[?OutputKey==`AppId`].OutputValue' \
-  --output text)"
-(
-  cd website/dist/web
-  find . -type f -print | LC_ALL=C sort |
-    zip -X ../../../website/dist/sesame-web.zip -@
-)
-```
-
-Create the Amplify upload slot, upload without logging the signed URL, and
-start the deployment:
-
-```bash
-deployment="$(aws amplify create-deployment \
-  --region ca-central-1 \
-  --app-id "$app_id" \
-  --branch-name production)"
-job_id="$(jq -r .jobId <<<"$deployment")"
-upload_url="$(jq -r .zipUploadUrl <<<"$deployment")"
-curl --fail --silent --show-error \
-  -H 'Content-Type: application/zip' \
-  --upload-file website/dist/sesame-web.zip \
-  "$upload_url"
-unset upload_url deployment
-aws amplify start-deployment \
-  --region ca-central-1 \
-  --app-id "$app_id" \
-  --branch-name production \
-  --job-id "$job_id"
-```
+`d31ma/PaaS` is taking over this app (`dgt8kb065o3d1`), its headers, rewrite
+rules and domain. Once PaaS owns it, this template and this folder are removed.

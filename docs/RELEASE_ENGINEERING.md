@@ -52,6 +52,50 @@ repository ruleset rejects updates and deletions for every `v*` tag without a
 bypass actor; release administrators must not weaken or disable that ruleset
 during a release or recovery.
 
+## Website
+
+Production (`sesame.del.ma`) is an Amplify Hosting app (`dgt8kb065o3d1`,
+`ca-central-1`, branch `production`). Its headers, rewrite rules and domain
+belong to `d31ma/PaaS`. Staging (`staging.sesame.del.ma`) is hosted on Floci
+on kestrel and is reachable only on the tailnet and the CITADEL LAN.
+
+`Release` builds the website once per tag, in its own job with read-only
+permissions. The job runs `bun test scripts/site-deploy.test.mjs`, then
+`bun install --frozen-lockfile` and `bun run bundle` in `website/`. It packages
+`website/dist/web` as `sesame-site-<version>.zip`, with `site-version.json`
+(`{"version", "commit"}`) at the zip's root, and writes its `.sha256` in
+`sha256sum` format. The zip is reproducible: the same source gives the same
+SHA-256. The publish job checks that the zip names the tag's version and
+commit, attests it in the same SLSA attestation as the executables (signer
+workflow `d31ma/SESAME/.github/workflows/release.yml`), and attaches the zip
+and its `.sha256` to the release.
+
+kestrel's pull deployer then deploys that zip to staging, probes it, and sets
+the commit status `site-staging/floci` on the release commit, with the
+description `<version> <first 12 hex of the zip SHA-256>`.
+
+When `Release` succeeds for a pushed `v*` tag, `Site Deploy`
+(`.github/workflows/site-deploy.yml`) reads `VERSION` at the tagged commit,
+downloads the release's zip, and checks its SHA-256. It waits up to 20 minutes
+for `site-staging/floci` to be `success` for exactly this zip, and stops at
+once on `failure` or `error`. It then deploys the same zip to Amplify
+`production` and probes `https://sesame.del.ma`. If the probes fail, it
+redeploys the version production served before and fails the run.
+
+A `Release` run started by `workflow_dispatch` (the recovery path above) does
+not start a deploy by itself. To deploy after a recovery, or to roll back or
+redeploy, dispatch `Site Deploy` with a released `version`. Target
+`after-staging` waits for the staging check; target `production` deploys at
+once without waiting.
+
+The workflow uses OIDC and stores no AWS secrets. Its deploy job runs in the
+GitHub environment `site-production` (limited to `main`), and PaaS lets only
+that environment assume `sesame-site-deploy-production`. It reads the commit
+status with its own token (`statuses: read`). The app id, region, branch,
+role and probes are in `.github/site-deploy.json`. The site needs no custom
+headers today (`requiredHeaders` is empty); when it does, PaaS must apply them
+before the release that needs them deploys.
+
 ## Developer-Preview Release Assets
 
 The current tag workflow publishes cross-compiled SESAME executables directly,
@@ -66,6 +110,8 @@ sesame-windows-amd64.exe
 sesame-clients.tar.gz
 SHA256SUMS
 sesame-v<version>.spdx.json
+sesame-site-<version>.zip
+sesame-site-<version>.zip.sha256
 ```
 
 The workflow generates checksums, an SPDX SBOM, and signed GitHub build
